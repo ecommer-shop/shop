@@ -15,7 +15,7 @@ import { AdminUiPlugin } from "@vendure/admin-ui-plugin";
 import { GraphiqlPlugin } from "@vendure/graphiql-plugin";
 import "dotenv/config";
 import path from "path";
-import { Route, RouteStore as RouteStore } from "./enums";
+import { Route, RouteStore } from "./enums";
 
 const IS_DEV = process.env.APP_ENV === "dev";
 const serverPort = +process.env.PORT || 3000;
