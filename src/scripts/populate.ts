@@ -12,7 +12,7 @@ populate(
       return app;
     }),
   initialData,
-  path.join(__dirname, 'assets/products.csv') // or wherever your CSV is
+  undefined
 )
   .then(() => {
     console.log('Populated DB!');
