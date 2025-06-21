@@ -6,4 +6,5 @@ COPY package.json ./
 COPY package-lock.json ./
 RUN npm install --production
 COPY . .
+RUN npm run seed
 RUN npm run build
