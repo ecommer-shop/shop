@@ -24,6 +24,7 @@ const storeUrl = process.env.STORE_URL || `http://localhost:4201`;
 export const config: VendureConfig = {
   apiOptions: {
     port: serverPort,
+    hostname: '0.0.0.0',
     adminApiPath: Route.ADMIN_API,
     shopApiPath: Route.SHOP_API,
     // The following options are useful in development mode,
