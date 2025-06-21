@@ -24,7 +24,6 @@ const storeUrl = process.env.STORE_URL || `http://localhost:4201`;
 export const config: VendureConfig = {
   apiOptions: {
     port: serverPort,
-    hostname: '0.0.0.0',
     adminApiPath: Route.ADMIN_API,
     shopApiPath: Route.SHOP_API,
     // The following options are useful in development mode,
@@ -51,7 +50,7 @@ export const config: VendureConfig = {
     type: 'postgres',
     // See the README.md "Migrations" section for an explanation of
     // the `synchronize` and `migrations` options.
-    synchronize: false,
+    synchronize: true,
     migrations: [path.join(__dirname, './migrations/*.+(js|ts)')],
     logging: false,
     database: process.env.DB_NAME,
