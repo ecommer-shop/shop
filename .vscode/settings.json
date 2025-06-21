@@ -5,4 +5,6 @@
     "titleBar.activeForeground": "#F5FCEB"
   },
   "editor.formatOnSave": true,
+  "cSpell.words": ["Graphiql", "superadmin", "Vendure"],
+  "prettier.singleQuote": true
 }
