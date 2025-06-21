@@ -9,12 +9,14 @@
     "build": "tsc",
     "start:server": "node ./dist/index.js",
     "start:worker": "node ./dist/index-worker.js",
-    "start": "concurrently npm:start:*"
+    "start": "concurrently npm:start:*",
+    "seed": "node ./src/populate/seed.js"
   },
   "dependencies": {
     "@vendure/admin-ui-plugin": "3.3.4",
     "@vendure/asset-server-plugin": "3.3.4",
     "@vendure/core": "3.3.4",
+    "@vendure/create": "^3.3.4",
     "@vendure/email-plugin": "3.3.4",
     "@vendure/graphiql-plugin": "3.3.4",
     "dotenv": "16.5.0",
