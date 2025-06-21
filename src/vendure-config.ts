@@ -53,7 +53,7 @@ export const config: VendureConfig = {
     // the `synchronize` and `migrations` options.
     synchronize: true,
     migrations: [path.join(__dirname, './migrations/*.+(js|ts)')],
-    logging: true,
+    logging: false,
     database: process.env.DB_NAME,
     schema: process.env.DB_SCHEMA,
     host: process.env.DB_HOST,
