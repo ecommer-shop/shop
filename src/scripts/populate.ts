@@ -1,7 +1,7 @@
 import path from 'path';
 import { bootstrap, defaultConfig, mergeConfig } from '@vendure/core';
 import { populate } from '@vendure/core/cli';
-import { config } from 'src/vendure-config';
+import { config } from '../vendure-config';
 import { initialData } from './initial-data';
 
 const populateConfig = mergeConfig(defaultConfig, config);
