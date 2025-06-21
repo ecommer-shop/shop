@@ -15,6 +15,7 @@
     "@vendure/admin-ui-plugin": "3.3.4",
     "@vendure/asset-server-plugin": "3.3.4",
     "@vendure/core": "3.3.4",
+    "@vendure/create": "^3.3.4",
     "@vendure/email-plugin": "3.3.4",
     "@vendure/graphiql-plugin": "3.3.4",
     "dotenv": "16.5.0",
@@ -22,7 +23,6 @@
   },
   "devDependencies": {
     "@vendure/cli": "3.3.4",
-    "@vendure/create": "^3.3.4",
     "concurrently": "9.1.2",
     "typescript": "5.8.2"
   }
