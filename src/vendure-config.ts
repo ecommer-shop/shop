@@ -103,7 +103,7 @@ export const config: VendureConfig = {
       route: Route.ADMIN,
       port: serverPort + 2,
       adminUiConfig: {
-        apiPort: serverPort,
+        apiPort: 443,
       },
     }),
   ],
