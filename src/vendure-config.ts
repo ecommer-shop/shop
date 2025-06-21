@@ -4,6 +4,7 @@ import {
   DefaultSchedulerPlugin,
   DefaultSearchPlugin,
   VendureConfig,
+  LanguageCode,
 } from '@vendure/core';
 import {
   defaultEmailHandlers,
@@ -103,7 +104,8 @@ export const config: VendureConfig = {
       route: Route.ADMIN,
       port: serverPort + 2,
       adminUiConfig: {
-        apiPort: process.env.ADMIN_UI_API_PORT || 443,
+        defaultLanguage: LanguageCode.es,
+        defaultLocale: 'CO',
       },
     }),
   ],
