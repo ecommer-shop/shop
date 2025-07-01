@@ -10,7 +10,7 @@
     "start:server": "node ./dist/index.js",
     "start:worker": "node ./dist/index-worker.js",
     "start": "concurrently npm:start:*",
-    "seed": "node ./src/populate/seed.js"
+    "seed": "ts-node ./src/populate/seed.ts"
   },
   "dependencies": {
     "@vendure/admin-ui-plugin": "3.3.4",
