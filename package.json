@@ -7,24 +7,26 @@
     "dev:worker": "ts-node ./src/index-worker.ts",
     "dev": "concurrently npm:dev:*",
     "build": "tsc",
+    "build:seed": "tsc && cp -R ./static ./dist/static",
     "start:server": "node ./dist/index.js",
     "start:worker": "node ./dist/index-worker.js",
     "start": "concurrently npm:start:*",
-    "seed": "ts-node ./src/populate/seed.ts"
+    "seed:prod": "node ./dist/populate/seed.js",
+    "seed:dev": "ts-node ./src/populate/seed.ts"
   },
   "dependencies": {
-    "@vendure/admin-ui-plugin": "3.3.4",
-    "@vendure/asset-server-plugin": "3.3.4",
-    "@vendure/core": "3.3.4",
-    "@vendure/create": "^3.3.4",
-    "@vendure/email-plugin": "3.3.4",
-    "@vendure/graphiql-plugin": "3.3.4",
-    "dotenv": "16.5.0",
-    "pg": "8.16.2"
+    "@vendure/admin-ui-plugin": "3.3.7",
+    "@vendure/asset-server-plugin": "3.3.7",
+    "@vendure/core": "3.3.7",
+    "@vendure/create": "3.3.7",
+    "@vendure/email-plugin": "3.3.7",
+    "@vendure/graphiql-plugin": "3.3.7",
+    "dotenv": "17.2.1",
+    "pg": "8.16.3"
   },
   "devDependencies": {
-    "@vendure/cli": "3.3.4",
-    "concurrently": "9.1.2",
-    "typescript": "5.8.2"
+    "@vendure/cli": "3.3.7",
+    "concurrently": "9.2.0",
+    "typescript": "5.8.3"
   }
 }
