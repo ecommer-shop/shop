@@ -1,10 +1,5 @@
 {
   "editor.formatOnSave": true,
-  "cSpell.words": ["Graphiql", "superadmin", "Vendure"],
-  "prettier.singleQuote": true,
-  "workbench.colorCustomizations": {
-    "activityBar.background": "#053142",
-    "titleBar.activeBackground": "#06455D",
-    "titleBar.activeForeground": "#F5FCFE"
-  }
+  "cSpell.words": ["Graphiql", "superadmin", "Vendure", "Wompi"],
+  "prettier.singleQuote": true
 }

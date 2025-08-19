@@ -16,7 +16,10 @@ import { AdminUiPlugin } from '@vendure/admin-ui-plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import 'dotenv/config';
 import path from 'path';
-import { Route, RouteStore } from './enums';
+import { ROUTE, ROUTE_STORE } from './consts';
+import { WompiPlugin } from './plugins/wompi/wompi.plugin';
+import { CURRENCY } from './plugins/wompi/constants';
+import { WompiPaymentHandler } from './plugins/wompi/payment-method-handler';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
@@ -25,16 +28,16 @@ const storeUrl = process.env.STORE_URL || `http://localhost:4201`;
 export const config: VendureConfig = {
   apiOptions: {
     port: serverPort,
-    adminApiPath: Route.ADMIN_API,
-    shopApiPath: Route.SHOP_API,
+    adminApiPath: ROUTE.Admin_Api,
+    shopApiPath: ROUTE.Shop_Api,
     // The following options are useful in development mode,
     // but are best turned off for production for security
     // reasons.
     ...(IS_DEV
       ? {
-          adminApiDebug: true,
-          shopApiDebug: true,
-        }
+        adminApiDebug: true,
+        shopApiDebug: true,
+      }
       : {}),
   },
   authOptions: {
@@ -51,7 +54,7 @@ export const config: VendureConfig = {
     type: 'postgres',
     // See the README.md "Migrations" section for an explanation of
     // the `synchronize` and `migrations` options.
-    synchronize: true,
+    synchronize: false,
     migrations: [path.join(__dirname, './migrations/*.+(js|ts)')],
     logging: false,
     database: process.env.DB_NAME,
@@ -62,7 +65,7 @@ export const config: VendureConfig = {
     password: process.env.DB_PASSWORD,
   },
   paymentOptions: {
-    paymentMethodHandlers: [dummyPaymentHandler],
+    paymentMethodHandlers: [WompiPaymentHandler],
   },
   // When adding or altering custom field definitions, the database will
   // need to be updated. See the "Migrations" section in README.md.
@@ -70,7 +73,7 @@ export const config: VendureConfig = {
   plugins: [
     GraphiqlPlugin.init(),
     AssetServerPlugin.init({
-      route: Route.ASSETS,
+      route: ROUTE.Assets,
       assetUploadDir:
         process.env.ASSET_UPLOAD_DIR ||
         path.join(__dirname, '../static/assets'),
@@ -85,7 +88,7 @@ export const config: VendureConfig = {
     EmailPlugin.init({
       devMode: true,
       outputPath: path.join(__dirname, '../static/email/test-emails'),
-      route: Route.MAILBOX,
+      route: ROUTE.Mailbox,
       handlers: defaultEmailHandlers,
       templateLoader: new FileBasedTemplateLoader(
         path.join(__dirname, '../static/email/templates')
@@ -94,18 +97,22 @@ export const config: VendureConfig = {
         // The following variables will change depending on your storefront implementation.
         // Here we are assuming a storefront running at http://localhost:8080.
         fromAddress: '"example" <noreply@rigeltoth.com>',
-        verifyEmailAddressUrl: `${storeUrl}${RouteStore.verify}`,
-        passwordResetUrl: `${storeUrl}${RouteStore.passwordReset}`,
-        changeEmailAddressUrl: `${storeUrl}${RouteStore.changeEmailAddress}`,
+        verifyEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.verify}`,
+        passwordResetUrl: `${storeUrl}${ROUTE_STORE.account.passwordReset}`,
+        changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
       },
     }),
     AdminUiPlugin.init({
-      route: Route.ADMIN,
+      route: ROUTE.Admin,
       port: serverPort + 2,
       adminUiConfig: {
         defaultLanguage: LanguageCode.es,
         defaultLocale: 'CO',
       },
+    }),
+    WompiPlugin.init({
+      secretKey: process.env.WOMPI_INTEGRITY_SECRET_KEY || '',
+      currency: CURRENCY, // TODO: set the whole currency to COP
     }),
   ],
 };
