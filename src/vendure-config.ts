@@ -17,9 +17,9 @@ import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import 'dotenv/config';
 import path from 'path';
 import { ROUTE, ROUTE_STORE } from './consts';
-import { WompiPlugin } from './plugins/wompi/wompi.plugin';
-import { CURRENCY } from './plugins/wompi/constants';
-import { WompiPaymentHandler } from './plugins/wompi/payment-method-handler';
+import { PaymentPlugin } from './plugins/payment/payment.plugin';
+import { CURRENCY } from './plugins/payment/constants';
+import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
@@ -54,7 +54,7 @@ export const config: VendureConfig = {
     type: 'postgres',
     // See the README.md "Migrations" section for an explanation of
     // the `synchronize` and `migrations` options.
-    synchronize: false,
+    synchronize: true,
     migrations: [path.join(__dirname, './migrations/*.+(js|ts)')],
     logging: false,
     database: process.env.DB_NAME,
@@ -65,7 +65,7 @@ export const config: VendureConfig = {
     password: process.env.DB_PASSWORD,
   },
   paymentOptions: {
-    paymentMethodHandlers: [WompiPaymentHandler],
+    paymentMethodHandlers: [PaymentPaymentHandler],
   },
   // When adding or altering custom field definitions, the database will
   // need to be updated. See the "Migrations" section in README.md.
@@ -110,8 +110,8 @@ export const config: VendureConfig = {
         defaultLocale: 'CO',
       },
     }),
-    WompiPlugin.init({
-      secretKey: process.env.WOMPI_INTEGRITY_SECRET_KEY || '',
+    PaymentPlugin.init({
+      secretKey: process.env.WOMPI_INTEGRITY_SECRET_KEY,
       currency: CURRENCY, // TODO: set the whole currency to COP
     }),
   ],

@@ -5,7 +5,7 @@ import {
    LanguageCode,
 } from '@vendure/core';
 
-export const WompiPaymentHandler = new PaymentMethodHandler({
+export const PaymentPaymentHandler = new PaymentMethodHandler({
    code: 'wompi',
    description: [
       { languageCode: LanguageCode.en, value: 'Wompi Bancolombia Payment Gateway' },

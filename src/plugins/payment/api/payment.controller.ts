@@ -1,12 +1,12 @@
 import { Controller, Post, Body, Req, HttpException, HttpStatus, Inject, HttpCode } from '@nestjs/common';
 import { RequestContextService, TransactionalConnection, Payment, LanguageCode, PaymentService } from '@vendure/core';
 import { PluginInitOptions } from '../types';
-import { WOMPI_PLUGIN_OPTIONS } from '../constants';
+import { PAYMENT_PLUGIN_OPTIONS } from '../constants';
 
 @Controller('api/payment')
-export class WompiController {
+export class PaymentController {
    constructor(
-      @Inject(WOMPI_PLUGIN_OPTIONS) private options: PluginInitOptions,
+      @Inject(PAYMENT_PLUGIN_OPTIONS) private options: PluginInitOptions,
       private connection: TransactionalConnection,
       private requestContextService: RequestContextService,
       private paymentService: PaymentService,
