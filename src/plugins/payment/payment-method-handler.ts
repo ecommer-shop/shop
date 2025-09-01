@@ -4,9 +4,10 @@ import {
    SettlePaymentResult,
    LanguageCode,
 } from '@vendure/core';
+import { PAYMENT_METHOD } from './constants';
 
 export const PaymentPaymentHandler = new PaymentMethodHandler({
-   code: 'wompi',
+   code: PAYMENT_METHOD.code,
    description: [
       { languageCode: LanguageCode.en, value: 'Wompi Bancolombia Payment Gateway' },
       { languageCode: LanguageCode.es, value: 'Pasarela de Pago Wompi Bancolombia' },
@@ -16,9 +17,9 @@ export const PaymentPaymentHandler = new PaymentMethodHandler({
    createPayment: async (ctx, order, amount, args, metadata): Promise<CreatePaymentResult> => {
       return {
          amount,
-         state: 'Authorized',
-         transactionId: metadata.referenceCode, // Store reference to link with webhook
-         metadata: {},
+         state: 'Settled',
+         transactionId: order.code, // Store reference to link with webhook
+         metadata: metadata || {},
       };
    },
 

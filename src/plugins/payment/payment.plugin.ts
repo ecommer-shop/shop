@@ -6,13 +6,11 @@ import { PaymentService } from './services/payment.service';
 import { paymentShopResolver } from './api/payment-shop.resolver';
 import { shopApiExtensions } from './api/api-extensions';
 import { PaymentController } from './api/payment.controller';
-import { PaymentS } from './entities/payment-s.entity';
-import { PaymentSService } from './services/payment-s.service';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
     controllers: [PaymentController],
-    providers: [{ provide: PAYMENT_PLUGIN_OPTIONS, useFactory: () => PaymentPlugin.options }, PaymentService, PaymentSService],
+    providers: [{ provide: PAYMENT_PLUGIN_OPTIONS, useFactory: () => PaymentPlugin.options }, PaymentService],
     configuration: config => {
         // Plugin-specific configuration
         // such as custom fields, custom permissions,
@@ -25,7 +23,6 @@ import { PaymentSService } from './services/payment-s.service';
         schema: shopApiExtensions,
         resolvers: [paymentShopResolver]
     },
-    entities: [PaymentS],
 })
 export class PaymentPlugin {
     static options: PluginInitOptions;

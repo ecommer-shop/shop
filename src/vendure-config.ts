@@ -5,6 +5,9 @@ import {
   DefaultSearchPlugin,
   VendureConfig,
   LanguageCode,
+  Logger,
+  DefaultLogger,
+  LogLevel,
 } from '@vendure/core';
 import {
   defaultEmailHandlers,
@@ -26,6 +29,9 @@ const serverPort = +process.env.PORT || 3000;
 const storeUrl = process.env.STORE_URL || `http://localhost:4201`;
 
 export const config: VendureConfig = {
+  logger: new DefaultLogger({
+    level: IS_DEV ? LogLevel.Debug : LogLevel.Info,
+  }),
   apiOptions: {
     port: serverPort,
     adminApiPath: ROUTE.Admin_Api,
@@ -111,7 +117,7 @@ export const config: VendureConfig = {
       },
     }),
     PaymentPlugin.init({
-      secretKey: process.env.WOMPI_INTEGRITY_SECRET_KEY,
+      secretKey: process.env.PAYMENT_SECRET_KEY,
       currency: CURRENCY, // TODO: set the whole currency to COP
     }),
   ],
