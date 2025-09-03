@@ -102,9 +102,7 @@ export const config: VendureConfig = {
         path.join(__dirname, `${staticDir}/email/templates`)
       ),
       globalTemplateVars: {
-        // The following variables will change depending on your storefront implementation.
-        // Here we are assuming a storefront running at http://localhost:8080.
-        fromAddress: 'rigel.toth@gmail.com',
+        fromAddress: 'noreply <mail@gyourdomain.com>',
         verifyEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.verify}`,
         passwordResetUrl: `${storeUrl}${ROUTE_STORE.account.passwordReset}`,
         changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
