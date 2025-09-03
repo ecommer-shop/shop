@@ -23,7 +23,7 @@ import { ROUTE, ROUTE_STORE } from './consts';
 import { PaymentPlugin } from './plugins/payment/payment.plugin';
 import { CURRENCY } from './plugins/payment/constants';
 import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler';
-import { ResendEmailSender } from './config/mail/resender-email-sender';
+import { ResendEmailSender } from './config/mail/resend-email-sender';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
