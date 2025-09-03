@@ -11,17 +11,21 @@ export class ResendEmailSender implements EmailSender {
   }
 
   async send(email: EmailDetails) {
-    Logger.debug('ResendEmailSender Send()', 'ResendEmailSender')
-    const { error, data } = await this.resend.emails.send({
-      to: email.recipient,
-      from: email.from,
-      subject: email.subject,
-      html: email.body,
-    })
-    if (error) {
-      Logger.error(error.message, 'ResendEmailSender')
-    } else {
-      Logger.debug(`Email sent: ${data?.id}`, 'ResendEmailSender')
+    Logger.debug(`ResendEmailSender.send() called with: ${JSON.stringify(email)}`, 'ResendEmailSender');
+    try {
+      const { error, data } = await this.resend.emails.send({
+        to: email.recipient,
+        from: email.from,
+        subject: email.subject,
+        html: email.body,
+      });
+      if (error) {
+        Logger.error(`Resend API error: ${error.message}`, 'ResendEmailSender');
+      } else {
+        Logger.info(`Resend sent email successfully. ID: ${data?.id}`, 'ResendEmailSender');
+      }
+    } catch (err: any) {
+      Logger.error(`Exception in ResendEmailSender.send: ${err?.message || err}`, 'ResendEmailSender');
     }
   }
 }
