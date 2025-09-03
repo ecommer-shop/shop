@@ -7,9 +7,11 @@ export class ResendEmailSender implements EmailSender {
 
   constructor(apiKey: string) {
     this.resend = new Resend(apiKey)
+    Logger.debug('ResendEmailSender constructor()', 'ResendEmailSender')
   }
 
   async send(email: EmailDetails) {
+    Logger.debug('ResendEmailSender Send()', 'ResendEmailSender')
     const { error, data } = await this.resend.emails.send({
       to: email.recipient,
       from: email.from,
