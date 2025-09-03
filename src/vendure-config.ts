@@ -23,10 +23,12 @@ import { ROUTE, ROUTE_STORE } from './consts';
 import { PaymentPlugin } from './plugins/payment/payment.plugin';
 import { CURRENCY } from './plugins/payment/constants';
 import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler';
+import { ResendEmailSender } from './config/mail/resender-email-sender';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
 const storeUrl = process.env.STORE_URL || `http://localhost:4201`;
+const staticDir = process.env.STATIC_DIR || `../static`;
 
 export const config: VendureConfig = {
   logger: new DefaultLogger({
@@ -86,18 +88,19 @@ export const config: VendureConfig = {
       // For local dev, the correct value for assetUrlPrefix should
       // be guessed correctly, but for production it will usually need
       // to be set manually to match your production url.
-      assetUrlPrefix: IS_DEV ? undefined : 'https://www.my-shop.com/assets/',
+      assetUrlPrefix: IS_DEV ? undefined : 'https://shop-rt.up.railway.app/assets/',
     }),
     DefaultSchedulerPlugin.init(),
     DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
     DefaultSearchPlugin.init({ bufferUpdates: false, indexStockStatus: true }),
     EmailPlugin.init({
-      devMode: true,
-      outputPath: path.join(__dirname, '../static/email/test-emails'),
+      transport: { type: 'none' },
+      emailSender: new ResendEmailSender(process.env.RESEND_API_KEY),
+      outputPath: path.join(__dirname, `${staticDir}/email/test-emails`),
       route: ROUTE.Mailbox,
       handlers: defaultEmailHandlers,
       templateLoader: new FileBasedTemplateLoader(
-        path.join(__dirname, '../static/email/templates')
+        path.join(__dirname, `~${staticDir}/email/templates`)
       ),
       globalTemplateVars: {
         // The following variables will change depending on your storefront implementation.
