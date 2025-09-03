@@ -100,7 +100,7 @@ export const config: VendureConfig = {
       route: ROUTE.Mailbox,
       handlers: defaultEmailHandlers,
       templateLoader: new FileBasedTemplateLoader(
-        path.join(__dirname, `~${staticDir}/email/templates`)
+        path.join(__dirname, `${staticDir}/email/templates`)
       ),
       globalTemplateVars: {
         // The following variables will change depending on your storefront implementation.
