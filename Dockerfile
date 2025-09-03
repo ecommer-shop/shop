@@ -6,4 +6,5 @@ COPY package.json ./
 COPY yarn.lock ./
 RUN yarn install --production
 COPY . .
+RUN cp -R ./static ./dist/static
 RUN yarn build
