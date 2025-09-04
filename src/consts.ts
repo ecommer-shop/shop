@@ -15,7 +15,7 @@ const RouteModuleStore = {
 export const ROUTE_STORE = {
   account: {
     verify: `${RouteModuleStore.account}/verify`,
-    passwordReset: `${RouteModuleStore.account}/password-reset`,
+    resetPassword: `${RouteModuleStore.account}/reset-password`,
     changeEmailAddress: `${RouteModuleStore.account}/verify-email-address-change`,
   },
   checkout: {

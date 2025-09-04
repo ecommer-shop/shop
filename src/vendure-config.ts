@@ -102,7 +102,7 @@ export const config: VendureConfig = {
       globalTemplateVars: {
         fromAddress: 'noreply <ron@rigeltoth.com>',
         verifyEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.verify}`,
-        passwordResetUrl: `${storeUrl}${ROUTE_STORE.account.passwordReset}`,
+        passwordResetUrl: `${storeUrl}${ROUTE_STORE.account.resetPassword}`,
         changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
       },
     }),
