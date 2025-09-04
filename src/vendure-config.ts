@@ -102,7 +102,7 @@ export const config: VendureConfig = {
         path.join(__dirname, `${staticDir}/email/templates`)
       ),
       globalTemplateVars: {
-        fromAddress: 'noreply <mail@gyourdomain.com>',
+        fromAddress: 'noreply <ron@rigeltoth.com>',
         verifyEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.verify}`,
         passwordResetUrl: `${storeUrl}${ROUTE_STORE.account.passwordReset}`,
         changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
