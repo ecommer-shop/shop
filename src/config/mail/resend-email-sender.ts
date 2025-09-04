@@ -14,12 +14,14 @@ export class ResendEmailSender implements EmailSender {
   async send(email: EmailDetails) {
     Logger.debug(`ResendEmailSender.send() called with: ${JSON.stringify(email)}`, 'ResendEmailSender');
     try {
-      const { error, data } = await this.resend.emails.send({
+      const response = await this.resend.emails.send({
         to: email.recipient,
         from: email.from,
         subject: email.subject,
         html: email.body,
       });
+      Logger.debug(`Resend API full response: ${JSON.stringify(response)}`, 'ResendEmailSender');
+      const { error, data } = response;
       if (error) {
         Logger.error(`Resend API error: ${JSON.stringify(error)}`, 'ResendEmailSender');
       } else {
