@@ -1,11 +1,9 @@
 import {
-  dummyPaymentHandler,
   DefaultJobQueuePlugin,
   DefaultSchedulerPlugin,
   DefaultSearchPlugin,
   VendureConfig,
   LanguageCode,
-  Logger,
   DefaultLogger,
   LogLevel,
 } from '@vendure/core';
