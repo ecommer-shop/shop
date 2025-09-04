@@ -6,8 +6,9 @@ export class ResendEmailSender implements EmailSender {
   protected resend: Resend
 
   constructor(apiKey: string) {
-    this.resend = new Resend(apiKey)
-    Logger.debug('ResendEmailSender constructor()', 'ResendEmailSender')
+    const maskedKey = apiKey ? apiKey.slice(0, 4) + '...' : 'undefined';
+    Logger.debug(`ResendEmailSender constructor() - API Key: ${maskedKey}`, 'ResendEmailSender');
+    this.resend = new Resend(apiKey);
   }
 
   async send(email: EmailDetails) {
@@ -20,12 +21,12 @@ export class ResendEmailSender implements EmailSender {
         html: email.body,
       });
       if (error) {
-        Logger.error(`Resend API error: ${error.message}`, 'ResendEmailSender');
+        Logger.error(`Resend API error: ${JSON.stringify(error)}`, 'ResendEmailSender');
       } else {
         Logger.info(`Resend sent email successfully. ID: ${data?.id}`, 'ResendEmailSender');
       }
     } catch (err: any) {
-      Logger.error(`Exception in ResendEmailSender.send: ${err?.message || err}`, 'ResendEmailSender');
+      Logger.error(`Exception in ResendEmailSender.send: ${JSON.stringify(err)}`, 'ResendEmailSender');
     }
   }
 }
