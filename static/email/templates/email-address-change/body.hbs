@@ -1,17 +1,16 @@
-{{> header title="Verify Your New Email Address" }}
+{{> header title="Verificar tu nueva dirección de correo electrónico" }}
 
 <mj-section background-color="#fafafa">
     <mj-column>
         <mj-text color="#525252">
-            We received a request to change your registered email address to this one.
-            Click the button below to verify this address and complete the process:
+            Recibimos una solicitud para cambiar su dirección de correo electrónico registrada a esta.
+            Haga clic en el botón de abajo para verificar esta dirección y completar el proceso:
         </mj-text>
-
         <mj-button font-family="Helvetica"
                    background-color="#f45e43"
                    color="white"
                    href="{{ changeEmailAddressUrl }}?token={{ identifierChangeToken }}">
-            Verify Me!
+            ¡Verifícame!
         </mj-button>
     </mj-column>
 </mj-section>
