@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",            // ESLint
+    "esbenp.prettier-vscode",            // Prettier
+    "graphql.vscode-graphql",            // GraphQL syntax, ops, gql tags
+    "graphql.vscode-graphql-syntax",     // Enhanced GraphQL syntax
+    "ms-vscode.vscode-typescript-next",  // Latest TS language features (optional)
+    "streetsidesoftware.code-spell-checker", // Spell checking for docs
+    "eamodio.gitlens",                   // Git insights
+    "ms-azuretools.vscode-docker",       // If you run Vendure via Docker
+    "Orta.vscode-jest",                  // If you test with Jest
+    "mikestead.dotenv",                  // .env highlighting
+    "EditorConfig.EditorConfig"          // Consistent editor settings
+  ]
+}
