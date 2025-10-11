@@ -25,7 +25,7 @@ import { ResendEmailSender } from './config/mail/resend-email-sender';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
-const storeUrl = process.env.STORE_URL || `http://localhost:4201`;
+const storeUrl = process.env.STORE_URL || `https://ecommer.shop`;
 const staticDir = process.env.STATIC_DIR || `../static`;
 
 export const config: VendureConfig = {
