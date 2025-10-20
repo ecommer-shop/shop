@@ -6,13 +6,14 @@ import {
   LanguageCode,
   DefaultLogger,
   LogLevel,
+  DefaultAssetNamingStrategy,
 } from '@vendure/core';
 import {
   defaultEmailHandlers,
   EmailPlugin,
   FileBasedTemplateLoader,
 } from '@vendure/email-plugin';
-import { AssetServerPlugin } from '@vendure/asset-server-plugin';
+import { AssetServerPlugin, configureS3AssetStorage } from '@vendure/asset-server-plugin';
 import { AdminUiPlugin } from '@vendure/admin-ui-plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import 'dotenv/config';
@@ -86,7 +87,21 @@ export const config: VendureConfig = {
       // For local dev, the correct value for assetUrlPrefix should
       // be guessed correctly, but for production it will usually need
       // to be set manually to match your production url.
-      assetUrlPrefix: IS_DEV ? undefined : 'https://shop-rt.up.railway.app/assets/',
+      assetUrlPrefix: process.env.ASSET_URL_PREFIX || (IS_DEV ? undefined : 'https://minio-e.up.railway.app/vendure-assets/'),
+      namingStrategy: new DefaultAssetNamingStrategy(),
+      storageStrategyFactory: configureS3AssetStorage({
+        bucket: process.env.MINIO_BUCKET || 'minio-assets',
+        credentials: {
+          accessKeyId: process.env.MINIO_ROOT_USER || 'minio-admin',
+          secretAccessKey: process.env.MINIO_ROOT_PASSWORD || 'minio-admin',
+        },
+        nativeS3Configuration: {
+          endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
+          forcePathStyle: true,
+          signatureVersion: 'v4',
+          region: 'eu-west-1', // dummy value, required by aws sdk
+        },
+      }),
     }),
     DefaultSchedulerPlugin.init(),
     DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
