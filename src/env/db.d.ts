@@ -9,6 +9,8 @@ declare global {
          DB_PORT: number;
          DB_SCHEMA: string;
          DB_USERNAME: string;
+         DATABASE_URL: string;
+         DB_SSL: string;
       }
    }
 }
