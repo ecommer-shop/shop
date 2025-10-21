@@ -23,6 +23,7 @@ import { PaymentPlugin } from './plugins/payment/payment.plugin';
 import { CURRENCY } from './plugins/payment/constants';
 import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler';
 import { ResendEmailSender } from './config/mail/resend-email-sender';
+import { Auth0Plugin } from './plugins/auth0/auth0.plugin';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
@@ -122,6 +123,10 @@ export const config: VendureConfig = {
           region: 'eu-west-1', // dummy value, required by aws sdk
         },
       }),
+    }),
+    Auth0Plugin.init({
+      domain: process.env.AUTH0_DOMAIN || '',
+      audience: process.env.AUTH0_AUDIENCE || '',
     }),
     DefaultSchedulerPlugin.init(),
     DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
