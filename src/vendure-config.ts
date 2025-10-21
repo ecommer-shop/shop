@@ -64,12 +64,32 @@ export const config: VendureConfig = {
     synchronize: true,
     migrations: [path.join(__dirname, './migrations/*.+(js|ts)')],
     logging: false,
-    database: process.env.DB_NAME,
-    schema: process.env.DB_SCHEMA,
-    host: process.env.DB_HOST,
-    port: +process.env.DB_PORT,
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
+    // Prefer DATABASE_URL (for e.g. Railway) but fall back to per-value env vars for local dev
+    ...(process.env.DATABASE_URL
+      ? (() => {
+        console.info('[config] Using DATABASE_URL for DB connection');
+        const base: any = {
+          url: process.env.DATABASE_URL,
+        };
+        // Optional SSL toggle: set DB_SSL=true in production if SSL required
+        if (process.env.DB_SSL === 'true') {
+          // TypeORM/pg often expects an `ssl` boolean or object at the top level
+          base.ssl = { rejectUnauthorized: false };
+          base.extra = { ssl: { rejectUnauthorized: false } };
+        }
+        return base;
+      })()
+      : (() => {
+        console.info('[config] Using individual DB_* env vars for DB connection');
+        return {
+          database: process.env.DB_NAME,
+          schema: process.env.DB_SCHEMA,
+          host: process.env.DB_HOST,
+          port: +process.env.DB_PORT,
+          username: process.env.DB_USERNAME,
+          password: process.env.DB_PASSWORD,
+        };
+      })()),
   },
   paymentOptions: {
     paymentMethodHandlers: [PaymentPaymentHandler],
@@ -90,10 +110,10 @@ export const config: VendureConfig = {
       assetUrlPrefix: process.env.ASSET_URL_PREFIX || (IS_DEV ? undefined : 'https://minio-e.up.railway.app/vendure-assets/'),
       namingStrategy: new DefaultAssetNamingStrategy(),
       storageStrategyFactory: configureS3AssetStorage({
-        bucket: process.env.MINIO_BUCKET || 'minio-assets',
+        bucket: process.env.MINIO_BUCKET || 'e-assets',
         credentials: {
-          accessKeyId: process.env.MINIO_ROOT_USER || 'minio-admin',
-          secretAccessKey: process.env.MINIO_ROOT_PASSWORD || 'minio-admin',
+          accessKeyId: process.env.MINIO_ACCESS_KEY || process.env.MINIO_ROOT_USER || 'minio-admin',
+          secretAccessKey: process.env.MINIO_SECRET_KEY || process.env.MINIO_ROOT_PASSWORD || 'minio-admin',
         },
         nativeS3Configuration: {
           endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
