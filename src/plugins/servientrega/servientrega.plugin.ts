@@ -1,0 +1,32 @@
+import { PluginCommonModule, Type, VendurePlugin } from '@vendure/core';
+
+import { SERVIENTREGA_PLUGIN_OPTIONS } from './constants';
+import { PluginInitOptions } from './types';
+import { Servientrega } from './services/servientrega';
+import { ServientregaShopResolver } from './api/servientrega-shop.resolver';
+import { shopApiExtensions } from './api/api-extensions';
+
+@VendurePlugin({
+    imports: [PluginCommonModule],
+    providers: [{ provide: SERVIENTREGA_PLUGIN_OPTIONS, useFactory: () => ServientregaPlugin.options }, Servientrega],
+    configuration: config => {
+        // Plugin-specific configuration
+        // such as custom fields, custom permissions,
+        // strategies etc. can be configured here by
+        // modifying the `config` object.
+        return config;
+    },
+    compatibility: '^3.0.0',
+    shopApiExtensions: {
+        schema: shopApiExtensions,
+        resolvers: [ServientregaShopResolver]
+    },
+})
+export class ServientregaPlugin {
+    static options: PluginInitOptions;
+
+    static init(options: PluginInitOptions): Type<ServientregaPlugin> {
+        this.options = options;
+        return ServientregaPlugin;
+    }
+}
