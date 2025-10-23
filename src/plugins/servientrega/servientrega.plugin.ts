@@ -27,6 +27,8 @@ export class ServientregaPlugin {
 
     static init(options: PluginInitOptions): Type<ServientregaPlugin> {
         this.options = options;
+        console.log('hi');
+        
         return ServientregaPlugin;
     }
 }
