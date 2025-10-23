@@ -6,13 +6,14 @@ import {
   LanguageCode,
   DefaultLogger,
   LogLevel,
+  DefaultAssetNamingStrategy,
 } from '@vendure/core';
 import {
   defaultEmailHandlers,
   EmailPlugin,
   FileBasedTemplateLoader,
 } from '@vendure/email-plugin';
-import { AssetServerPlugin } from '@vendure/asset-server-plugin';
+import { AssetServerPlugin, configureS3AssetStorage } from '@vendure/asset-server-plugin';
 import { AdminUiPlugin } from '@vendure/admin-ui-plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import 'dotenv/config';
@@ -64,12 +65,32 @@ export const config: VendureConfig = {
     synchronize: true,
     migrations: [path.join(__dirname, './migrations/*.+(js|ts)')],
     logging: false,
-    database: process.env.DB_NAME,
-    schema: process.env.DB_SCHEMA,
-    host: process.env.DB_HOST,
-    port: +process.env.DB_PORT,
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
+    // Prefer DATABASE_URL (for e.g. Railway) but fall back to per-value env vars for local dev
+    ...(process.env.DATABASE_URL
+      ? (() => {
+        console.info('[config] Using DATABASE_URL for DB connection');
+        const base: any = {
+          url: process.env.DATABASE_URL,
+        };
+        // Optional SSL toggle: set DB_SSL=true in production if SSL required
+        if (process.env.DB_SSL === 'true') {
+          // TypeORM/pg often expects an `ssl` boolean or object at the top level
+          base.ssl = { rejectUnauthorized: false };
+          base.extra = { ssl: { rejectUnauthorized: false } };
+        }
+        return base;
+      })()
+      : (() => {
+        console.info('[config] Using individual DB_* env vars for DB connection');
+        return {
+          database: process.env.DB_NAME,
+          schema: process.env.DB_SCHEMA,
+          host: process.env.DB_HOST,
+          port: +process.env.DB_PORT,
+          username: process.env.DB_USERNAME,
+          password: process.env.DB_PASSWORD,
+        };
+      })()),
   },
   paymentOptions: {
     paymentMethodHandlers: [PaymentPaymentHandler],
@@ -87,7 +108,21 @@ export const config: VendureConfig = {
       // For local dev, the correct value for assetUrlPrefix should
       // be guessed correctly, but for production it will usually need
       // to be set manually to match your production url.
-      assetUrlPrefix: IS_DEV ? undefined : 'https://shop-rt.up.railway.app/assets/',
+      assetUrlPrefix: process.env.ASSET_URL_PREFIX || (IS_DEV ? undefined : 'https://minio-e.up.railway.app/vendure-assets/'),
+      namingStrategy: new DefaultAssetNamingStrategy(),
+      storageStrategyFactory: configureS3AssetStorage({
+        bucket: process.env.MINIO_BUCKET || 'e-assets',
+        credentials: {
+          accessKeyId: process.env.MINIO_ACCESS_KEY || process.env.MINIO_ROOT_USER || 'minio-admin',
+          secretAccessKey: process.env.MINIO_SECRET_KEY || process.env.MINIO_ROOT_PASSWORD || 'minio-admin',
+        },
+        nativeS3Configuration: {
+          endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
+          forcePathStyle: true,
+          signatureVersion: 'v4',
+          region: 'eu-west-1', // dummy value, required by aws sdk
+        },
+      }),
     }),
     DefaultSchedulerPlugin.init(),
     DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
