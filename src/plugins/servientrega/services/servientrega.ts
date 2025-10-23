@@ -106,7 +106,6 @@ export class Servientrega {
         const subProductId = 1;
         const language = 'es';
         const urlw = `${url}/Cotizador/Restricciones/${countryId}/${productId}/${filialId}/${subProductId}/${language}`;
-        console.log(urlw);
         const agent = new https.Agent({ rejectUnauthorized: false });
 
         const { data } = await axios.get(urlw, {
