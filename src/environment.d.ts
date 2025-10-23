@@ -25,6 +25,8 @@ declare global {
       PAYMENT_SECRET_KEY: string;
       //EMAIL
       RESEND_API_KEY: string;
+      //SERVIENTREGA
+      SERVIENTREGA_BASE: string;
     }
   }
 }
