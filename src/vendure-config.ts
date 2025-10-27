@@ -24,6 +24,7 @@ import { CURRENCY } from './plugins/payment/constants';
 import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler';
 import { ResendEmailSender } from './config/mail/resend-email-sender';
 import { Auth0Plugin } from './plugins/auth0/auth0.plugin';
+import { ServientregaPlugin } from './plugins/servientrega/servientrega.plugin';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
@@ -157,6 +158,9 @@ export const config: VendureConfig = {
     PaymentPlugin.init({
       secretKey: process.env.PAYMENT_SECRET_KEY,
       currency: CURRENCY, // TODO: set the whole currency to COP
+    }),
+    ServientregaPlugin.init({
+      url: process.env.SERVIENTREGA_BASE || ''
     }),
   ],
 };
