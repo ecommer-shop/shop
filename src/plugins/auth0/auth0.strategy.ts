@@ -1,4 +1,10 @@
-import { AuthenticationStrategy, ExternalAuthenticationService, Injector, RequestContext, User } from '@vendure/core';
+import {
+    AuthenticationStrategy,
+    ExternalAuthenticationService,
+    Injector,
+    RequestContext,
+    User
+} from '@vendure/core';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
 import jwt from 'jsonwebtoken';
@@ -25,16 +31,14 @@ export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0
     }
 
     defineInputType(): DocumentNode {
-        // ✅ CORREGIDO: Define el input type para GraphQL
         return gql`
-      input Auth0AuthInput {
-        token: String!
-      }
-    `;
+            input Auth0AuthInput {
+                token: String!
+            }
+        `;
     }
 
     onLogOut?(ctx: RequestContext, user: User): Promise<void> {
-        // Opcional: implementar lógica de logout si es necesaria
         return Promise.resolve();
     }
 
@@ -87,6 +91,7 @@ export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0
             }
 
             this.client.getSigningKey(decodedToken.header.kid, (err, key) => {
+
                 if (err) {
                     reject(err);
                     return;
