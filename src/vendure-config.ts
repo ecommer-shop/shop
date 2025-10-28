@@ -155,7 +155,7 @@ export const config: VendureConfig = {
       currency: CURRENCY, // TODO: set the whole currency to COP
     }),
     ServientregaPlugin.init({
-      url: process.env.SERVIENTREGA_BASE
+      url: process.env.SERVIENTREGA_BASE || 'https://api.servientrega.com/',
     }),
   ],
 };
