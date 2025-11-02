@@ -97,7 +97,46 @@ export const config: VendureConfig = {
   },
   // When adding or altering custom field definitions, the database will
   // need to be updated. See the "Migrations" section in README.md.
-  customFields: {},
+  customFields: {
+    ProductVariant: [
+      {
+        name: 'weight',
+        type: 'float',
+        label: [
+          { languageCode: LanguageCode.en, value: 'Weight (grams)' },
+          { languageCode: LanguageCode.es, value: 'Peso (gramos)' },
+        ],
+        description:[
+          { languageCode: LanguageCode.en, value: 'Product weight in grams' },
+          { languageCode: LanguageCode.es, value: 'Peso del producto en gramos' },]
+        
+      },
+      {
+        name: 'height',
+        type: 'float',
+        label: [
+          { languageCode: LanguageCode.en, value: 'Height (cm)' },
+          { languageCode: LanguageCode.es, value: 'Altura (cm)' },
+        ],
+        description: [
+          { languageCode: LanguageCode.en, value: 'Product height in centimeters' },
+          { languageCode: LanguageCode.es, value: 'Altura del producto en centímetros' },
+        ]
+      },
+      {
+        name: 'width',
+        type: 'float',
+        label: [
+          { languageCode: LanguageCode.en, value: 'Width (cm)' },
+          { languageCode: LanguageCode.es, value: 'Ancho (cm)' },
+        ],
+        description: [
+          { languageCode: LanguageCode.en, value: 'Product width in centimeters' },
+          { languageCode: LanguageCode.es, value: 'Ancho del producto en centímetros' },
+        ]
+      },
+    ],
+  },
   plugins: [
     GraphiqlPlugin.init(),
     AssetServerPlugin.init({
@@ -155,7 +194,7 @@ export const config: VendureConfig = {
       currency: CURRENCY, // TODO: set the whole currency to COP
     }),
     ServientregaPlugin.init({
-      url: process.env.SERVIENTREGA_BASE
+      url: process.env.SERVIENTREGA_BASE ?? ''
     }),
   ],
 };
