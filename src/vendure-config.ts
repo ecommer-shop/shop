@@ -23,6 +23,8 @@ import { PaymentPlugin } from './plugins/payment/payment.plugin';
 import { CURRENCY } from './plugins/payment/constants';
 import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler';
 import { ResendEmailSender } from './config/mail/resend-email-sender';
+import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
+//import { ElectronicInvoicePlugin } from './plugins/electronic-invoice/electronic-invoice.plugin';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
@@ -98,6 +100,11 @@ export const config: VendureConfig = {
   // need to be updated. See the "Migrations" section in README.md.
   customFields: {},
   plugins: [
+    CoinbasePlugin,
+    //ElectronicInvoicePlugin.init({
+    //  apiKey: process.env.ELECTRONIC_INVOICE_API_KEY || '',
+    //  testMode: IS_DEV,
+    //} ),
     GraphiqlPlugin.init(),
     AssetServerPlugin.init({
       route: ROUTE.Assets,
