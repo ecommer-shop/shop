@@ -3,7 +3,12 @@ import {
     ExternalAuthenticationService,
     Injector,
     RequestContext,
-    User
+    User,
+    RoleService,
+    TransactionalConnection,
+    UserService,
+    Role,
+    Logger
 } from '@vendure/core';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
@@ -17,6 +22,8 @@ export interface Auth0Data {
 export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0Data> {
     readonly name = 'auth0';
     private externalAuthenticationService: ExternalAuthenticationService;
+    private roleService: RoleService;
+    private connection: TransactionalConnection;
     private client: jwksClient.JwksClient;
 
     constructor(
@@ -46,6 +53,8 @@ export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0
 
     init(injector: Injector) {
         this.externalAuthenticationService = injector.get(ExternalAuthenticationService);
+        this.roleService = injector.get(RoleService);
+        this.connection = injector.get(TransactionalConnection);
     }
 
     async authenticate(ctx: RequestContext, data: Auth0Data): Promise<User | false> {
@@ -56,24 +65,64 @@ export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0
                 return false;
             }
 
-            const user = await this.externalAuthenticationService.findCustomerUser(
+            const existingUser = await this.externalAuthenticationService.findCustomerUser(
                 ctx,
                 this.name,
                 decoded.sub
             );
 
-            if (user) {
-                return user;
+            if (existingUser) {
+                return existingUser;
             }
 
-            return this.externalAuthenticationService.createCustomerAndUser(ctx, {
-                strategy: this.name,
-                externalIdentifier: decoded.sub,
-                verified: decoded.email_verified || false,
-                emailAddress: decoded.email,
-                firstName: decoded.given_name || decoded.name?.split(' ')[0] || '',
-                lastName: decoded.family_name || decoded.name?.split(' ')[1] || '',
-            });
+            try {
+                const customerRole = await this.connection
+                    .getRepository(ctx, Role)
+                    .createQueryBuilder('role')
+                    .where('role.code = :code', { code: 'customer' })
+                    .getOne();
+
+                if (!customerRole) {
+                    Logger.warn(`Role 'customer' not found. Creating user without role.`);
+
+                    return await this.externalAuthenticationService.createCustomerAndUser(ctx, {
+                        strategy: this.name,
+                        externalIdentifier: decoded.sub,
+                        verified: decoded.email_verified || false,
+                        emailAddress: decoded.email,
+                        firstName: decoded.given_name || decoded.name?.split(' ')[0] || '',
+                        lastName: decoded.family_name || decoded.name?.split(' ')[1] || '',
+                    });
+                }
+
+                const newUser = await this.externalAuthenticationService.createCustomerAndUser(ctx, {
+                    strategy: this.name,
+                    externalIdentifier: decoded.sub,
+                    verified: decoded.email_verified || false,
+                    emailAddress: decoded.email,
+                    firstName: decoded.given_name || decoded.name?.split(' ')[0] || '',
+                    lastName: decoded.family_name || decoded.name?.split(' ')[1] || '',
+                });
+
+                // Asign customer role to the new user
+                const userWithRoles = await this.connection
+                    .getRepository(ctx, User)
+                    .createQueryBuilder('user')
+                    .leftJoinAndSelect('user.roles', 'roles')
+                    .where('user.id = :userId', { userId: newUser.id })
+                    .getOne();
+
+                if (userWithRoles) {
+                    userWithRoles.roles = [customerRole];
+                    await this.connection.getRepository(ctx, User).save(userWithRoles);
+                }
+
+                return newUser;
+
+            } catch (error) {
+                Logger.error(`Error during user creation: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth0Strategy');
+                return false;
+            }
 
         } catch (error) {
             console.error('Auth0 Authentication Error:', error);
@@ -91,7 +140,6 @@ export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0
             }
 
             this.client.getSigningKey(decodedToken.header.kid, (err, key) => {
-
                 if (err) {
                     reject(err);
                     return;

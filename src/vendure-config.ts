@@ -25,6 +25,7 @@ import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler'
 import { ResendEmailSender } from './config/mail/resend-email-sender';
 import { Auth0Plugin } from './plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from './plugins/servientrega/servientrega.plugin';
+import { Auth0AuthenticationStrategy } from './plugins/auth0/auth0.strategy';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
@@ -51,6 +52,11 @@ export const config: VendureConfig = {
   },
   authOptions: {
     tokenMethod: ['bearer', 'cookie'],
+    shopAuthenticationStrategy: [new Auth0AuthenticationStrategy(
+      process.env.AUTH0_DOMAIN || '',
+      process.env.AUTH0_AUDIENCE || ''
+    ),
+    ],
     superadminCredentials: {
       identifier: process.env.SUPERADMIN_USERNAME,
       password: process.env.SUPERADMIN_PASSWORD,
