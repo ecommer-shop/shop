@@ -7,6 +7,7 @@ import {
   DefaultLogger,
   LogLevel,
   DefaultAssetNamingStrategy,
+  NativeAuthenticationStrategy,
 } from '@vendure/core';
 import {
   defaultEmailHandlers,
@@ -23,9 +24,10 @@ import { PaymentPlugin } from './plugins/payment/payment.plugin';
 import { CURRENCY } from './plugins/payment/constants';
 import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler';
 import { ResendEmailSender } from './config/mail/resend-email-sender';
-import { Auth0Plugin } from './plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from './plugins/servientrega/servientrega.plugin';
 import { Auth0AuthenticationStrategy } from './plugins/auth0/auth0.strategy';
+import { Auth0Plugin } from './plugins/auth0/auth0.plugin';
+import { ExternalAuthPlugin } from './plugins/auth0/auth-external.plugin';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
@@ -52,11 +54,6 @@ export const config: VendureConfig = {
   },
   authOptions: {
     tokenMethod: ['bearer', 'cookie'],
-    shopAuthenticationStrategy: [new Auth0AuthenticationStrategy(
-      process.env.AUTH0_DOMAIN || '',
-      process.env.AUTH0_AUDIENCE || ''
-    ),
-    ],
     superadminCredentials: {
       identifier: process.env.SUPERADMIN_USERNAME,
       password: process.env.SUPERADMIN_PASSWORD,
@@ -113,10 +110,10 @@ export const config: VendureConfig = {
           { languageCode: LanguageCode.en, value: 'Weight (grams)' },
           { languageCode: LanguageCode.es, value: 'Peso (gramos)' },
         ],
-        description:[
+        description: [
           { languageCode: LanguageCode.en, value: 'Product weight in grams' },
           { languageCode: LanguageCode.es, value: 'Peso del producto en gramos' },]
-        
+
       },
       {
         name: 'height',
@@ -174,6 +171,7 @@ export const config: VendureConfig = {
       domain: process.env.AUTH0_DOMAIN || '',
       audience: process.env.AUTH0_AUDIENCE || '',
     }),
+    ExternalAuthPlugin,
     DefaultSchedulerPlugin.init(),
     DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
     DefaultSearchPlugin.init({ bufferUpdates: false, indexStockStatus: true }),
