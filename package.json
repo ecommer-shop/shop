@@ -17,7 +17,9 @@
   "dependencies": {
     "@aws-sdk/client-s3": "3.908.0",
     "@aws-sdk/lib-storage": "3.908.0",
+    "@pinelab/pinelab-invoice-plugin": "^4.4.2",
     "@pinelab/vendure-plugin-coinbase": "^1.4.0",
+    "@vendure/admin-ui": "3.4.4",
     "@vendure/admin-ui-plugin": "3.4.4",
     "@vendure/asset-server-plugin": "3.4.4",
     "@vendure/core": "3.4.4",
@@ -27,15 +29,16 @@
     "axios": "^1.12.2",
     "crypto": "^1.0.1",
     "dotenv": "17.2.1",
-    "pdfkit": "^0.17.2",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.2.0",
+    "pdfkit": "^0.17.2",
     "pg": "8.16.3",
     "resend": "^6.0.2"
   },
   "devDependencies": {
     "@vendure/cli": "3.3.7",
-    "concurrently": "9.2.0",
+    "@vendure/ui-devkit": "3.4.4",
+    "concurrently": "^9.2.1",
     "typescript": "5.8.3"
   }
 }

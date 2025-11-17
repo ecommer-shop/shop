@@ -24,7 +24,8 @@ import { CURRENCY } from './plugins/payment/constants';
 import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler';
 import { ResendEmailSender } from './config/mail/resend-email-sender';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
-//import { ElectronicInvoicePlugin } from './plugins/electronic-invoice/electronic-invoice.plugin';
+import { compileUiExtensions } from '@vendure/ui-devkit/compiler';
+import { InvoicePlugin } from '@pinelab/pinelab-invoice-plugin';
 import { Auth0Plugin } from './plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from './plugins/servientrega/servientrega.plugin';
 
@@ -142,10 +143,6 @@ export const config: VendureConfig = {
   },
   plugins: [
     CoinbasePlugin,
-    //ElectronicInvoicePlugin.init({
-    //  apiKey: process.env.ELECTRONIC_INVOICE_API_KEY || '',
-    //  testMode: IS_DEV,
-    //} ),
     GraphiqlPlugin.init(),
     AssetServerPlugin.init({
       route: ROUTE.Assets,
@@ -193,6 +190,9 @@ export const config: VendureConfig = {
         changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
       },
     }),
+    InvoicePlugin.init({
+      vendureHost: 'http://localhost:3106'
+    }),
     AdminUiPlugin.init({
       route: ROUTE.Admin,
       port: serverPort + 2,
@@ -200,6 +200,10 @@ export const config: VendureConfig = {
         defaultLanguage: LanguageCode.es,
         defaultLocale: 'CO',
       },
+      //app: compileUiExtensions({
+      //  outputPath: path.join(__dirname, '__admin-ui'),
+      //  extensions: [InvoicePlugin.ui],
+      //}),      
     }),
     PaymentPlugin.init({
       secretKey: process.env.PAYMENT_SECRET_KEY,
@@ -208,5 +212,5 @@ export const config: VendureConfig = {
     ServientregaPlugin.init({
       url: process.env.SERVIENTREGA_BASE ?? ''
     }),
-  ],
+],
 };
