@@ -25,6 +25,7 @@ import { PaymentPaymentHandler } from './plugins/payment/payment-method-handler'
 import { ResendEmailSender } from './config/mail/resend-email-sender';
 import { Auth0Plugin } from './plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from './plugins/servientrega/servientrega.plugin';
+import { AlegraPlugin } from './plugins/alegra/alegra.plugin';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
@@ -201,5 +202,11 @@ export const config: VendureConfig = {
     ServientregaPlugin.init({
       url: process.env.SERVIENTREGA_BASE ?? ''
     }),
-  ],
+    AlegraPlugin.init({
+      apiUrl: process.env.ALEGRA_API_URL || 'https://api.alegra.com/api/v1',
+      email: process.env.ALEGRA_EMAIL,
+      token: process.env.ALEGRA_TOKEN,
+      onlyOnPaymentSettled: true,
+    }),
+],
 };

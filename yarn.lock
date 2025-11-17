@@ -2023,31 +2023,32 @@
     fs-extra "^11.2.0"
     sharp "~0.33.5"
 
-"@vendure/cli@3.3.7":
-  version "3.3.7"
-  resolved "https://registry.npmjs.org/@vendure/cli/-/cli-3.3.7.tgz"
-  integrity sha512-LAq1CMSKuDYLD8q2iQSjLELyQpQlmoh3kFmmSGPD9/HMqCv58zJpezvTsBlyWoh/oKhSgpl9/Mb6GVyGb4ImrA==
+"@vendure/cli@^3.5.0":
+  version "3.5.0"
+  resolved "https://registry.yarnpkg.com/@vendure/cli/-/cli-3.5.0.tgz#12bef962c0f4735cac10151dbd6582a2ae29815c"
+  integrity sha512-cU/EWHrsaXISMYKo+fm6Zp/GK4+2/OWf6V1tc6wPvNZA5xvYUKWnbNezZTTtqsdy/AQmSf3ygRArNpTGNe0ZFA==
   dependencies:
     "@clack/prompts" "^0.7.0"
-    "@vendure/common" "3.3.7"
+    "@vendure/common" "3.5.0"
     change-case "^4.1.2"
     commander "^11.0.0"
     dotenv "^16.4.5"
     fs-extra "^11.2.0"
     picocolors "^1.0.0"
+    strip-json-comments "^5.0.3"
     ts-morph "^21.0.1"
     ts-node "^10.9.2"
     tsconfig-paths "^4.2.0"
-
-"@vendure/common@3.3.7":
-  version "3.3.7"
-  resolved "https://registry.npmjs.org/@vendure/common/-/common-3.3.7.tgz"
-  integrity sha512-locoYTG4ztP4ONwtdVRZa34fNrPAwAiy5Y/mIMama7t7A0SUgprdThEYfd/ZmurYmpz6SvRe+QBsnBSkwGy9Sg==
 
 "@vendure/common@3.4.4":
   version "3.4.4"
   resolved "https://registry.yarnpkg.com/@vendure/common/-/common-3.4.4.tgz#fd86e152a0337b37bac7d906dc1f1727d5552d11"
   integrity sha512-FsEB4sN+GryYZu4PZCzTVePXbSWMz5H6aXvqO8cPt/KmFCohprVtySRuzQrjFCnqotLK6qw//S2I043+4Wo06Q==
+
+"@vendure/common@3.5.0":
+  version "3.5.0"
+  resolved "https://registry.yarnpkg.com/@vendure/common/-/common-3.5.0.tgz#6ee9731eba377dabdc6a355e0f501393e6d858fa"
+  integrity sha512-1aIcvP2R2Clj+0v62rHqOf0z0de2kp9euPU6wfPpU50cK0TABxPI86/RSvkVj5ZwA/PZNUv3ReMd3+QjWkyQ2w==
 
 "@vendure/core@3.4.4":
   version "3.4.4"
@@ -5475,6 +5476,11 @@ strip-bom@^3.0.0:
   version "3.0.0"
   resolved "https://registry.npmjs.org/strip-bom/-/strip-bom-3.0.0.tgz"
   integrity sha512-vavAMRXOgBVNF6nyEEmL3DBK19iRpDcoIwW+swQ+CbGiu7lju6t+JklA1MHweoWtadgt4ISVUsXLyDq34ddcwA==
+
+strip-json-comments@^5.0.3:
+  version "5.0.3"
+  resolved "https://registry.yarnpkg.com/strip-json-comments/-/strip-json-comments-5.0.3.tgz#b7304249dd402ee67fd518ada993ab3593458bcf"
+  integrity sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==
 
 strnum@^2.1.0:
   version "2.1.1"
