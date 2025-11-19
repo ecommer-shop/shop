@@ -1,6 +1,6 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { Auth0AuthenticationStrategy } from './auth0.strategy';
-import { AuthorizationService } from './service/auth.service';
+import { AuthorizationService } from './services/auth.service';
 import { shopApiExtensions } from './api/api-external-extensions';
 import { ExternalAuthResolver } from './api/external-auth.resolver';
 

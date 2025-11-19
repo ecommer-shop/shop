@@ -3,17 +3,13 @@ import { Allow, Ctx, RequestContext, User, TransactionalConnection, AuthService 
 import { Permission } from '@vendure/common/lib/generated-types';
 import { forwardRef, Inject, Injectable, UseGuards } from '@nestjs/common';
 import { Servientrega } from '../services/servientrega';
-import { AuthorizationService } from '../../auth0/service/auth.service';
-import { Roles } from '../../auth0/constants/roles.enum';
+import { AuthorizationService } from '../../auth0/services/auth.service';
 
 @Injectable()
 @Resolver()
 export class ServientregaShopResolver {
     constructor(
         private readonly servientrega: Servientrega,
-        private readonly connection: TransactionalConnection,
-        @Inject(forwardRef(() => AuthorizationService))
-        private authService: AuthorizationService
     ) { }
 
     @Query()
