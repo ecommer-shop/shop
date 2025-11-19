@@ -134,35 +134,4 @@ export class Servientrega {
         console.log(data);
         return data;
     }
-
-    async adminOnlyEndpoint() {
-        return { message: 'Solo para admins' };
-    }
-
-    /*async debugUserRoles(email: string) {
-    try {
-    const user = await this.connection.rawConnection
-        .getRepository(User)
-        .createQueryBuilder('user')
-        .leftJoinAndSelect('user.roles', 'roles')
-        .leftJoinAndSelect('user.authenticationMethods', 'authMethods')
-        .where('user.identifier = :email', { email: email })
-        .getOne();
-    
-    if (!user) {
-        return { error: 'User not found' };
-    }
-    
-    return {
-        id: user.id,
-        identifier: user.identifier,
-        roles: user.roles.map((role: { code: any; permissions: any; }) => ({
-            code: role.code,
-            permissions: role.permissions
-        }))
-    };
-    } catch (error) {
-    return { error: error };
-}}*/
-
 }

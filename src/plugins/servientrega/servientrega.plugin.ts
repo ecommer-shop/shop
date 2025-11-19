@@ -5,9 +5,11 @@ import { PluginInitOptions } from './types';
 import { Servientrega } from './services/servientrega';
 import { ServientregaShopResolver } from './api/servientrega-shop.resolver';
 import { shopApiExtensions } from './api/api-extensions';
+import { AuthorizationService } from '../auth0/service/auth.service';
+import { Auth0Plugin } from '../auth0/auth0.plugin';
 
 @VendurePlugin({
-    imports: [PluginCommonModule],
+    imports: [PluginCommonModule, Auth0Plugin],
     providers: [{ provide: SERVIENTREGA_PLUGIN_OPTIONS, useFactory: () => ServientregaPlugin.options }, Servientrega],
     configuration: config => {
         // Plugin-specific configuration
@@ -28,7 +30,6 @@ export class ServientregaPlugin {
     static init(options: PluginInitOptions): Type<ServientregaPlugin> {
         this.options = options;
         console.log('hi');
-        
         return ServientregaPlugin;
     }
 }

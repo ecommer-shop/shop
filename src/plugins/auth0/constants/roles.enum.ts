@@ -1,7 +1,7 @@
 export enum Roles {
-    ADMIN = '__admin_role__',
+    ADMIN = 'administrator',
     CUSTOMER = '__customer_role__',
-    VENDOR = '__vendor_role__',
-    MODERATOR = '__moderator_role__',
-    SUPPORT = '__support_role__',
+    INVENTORY_MANAGER = 'inventory-manager',
+    ORDER_MANAGER = 'order-manager',
+    SUPER_ADMIN = '__super_admin_role__'
 }

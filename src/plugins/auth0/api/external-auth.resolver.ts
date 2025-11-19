@@ -1,30 +1,54 @@
-import { Resolver, Mutation, Args } from '@nestjs/graphql';
+import { Resolver, Mutation, Args, Query } from '@nestjs/graphql';
 import {
     Ctx,
     RequestContext,
-    AuthService,
     CustomerService,
     TransactionalConnection,
     User,
-    Role,
-    ID
+    ID,
+    Allow,
+    AuthService
 } from '@vendure/core';
 import jwt from 'jsonwebtoken';
+import { CUSTOMER_PERMISSIONS } from '../constants/permissions.consts';
+import { AuthorizationService } from '../service/auth.service';
+import { Roles } from '../constants/roles.enum';
 
 @Resolver()
 export class ExternalAuthResolver {
     constructor(
+        private authoService: AuthorizationService,
         private authService: AuthService,
         private customerService: CustomerService,
         private connection: TransactionalConnection,
     ) { }
+
+
+    @Query()
+    @Allow(...CUSTOMER_PERMISSIONS)
+    async testAuthorization(@Ctx() ctx: RequestContext) {
+        return { message: 'hi' }
+    }
+
+    @Query()
+    @Allow(...CUSTOMER_PERMISSIONS)
+    async testAuthorization2(@Ctx() ctx: RequestContext) {
+        await this.authoService.requireAllPermissions(ctx, ...CUSTOMER_PERMISSIONS);
+        return { message: 'hi' }
+    }
+
+    @Query()
+    async testAuthorizationRole(@Ctx() ctx: RequestContext) {
+        await this.authoService.requireRole(ctx, Roles.CUSTOMER);
+        return { message: 'hi' }
+    }
 
     @Mutation()
     async authenticateExternal(
         @Ctx() ctx: RequestContext,
         @Args('input') input: { token: string },
     ) {
-        // Si el usuario ya tiene sesión activa, devolver info directamente
+
         if (ctx.session?.user) {
             const userWithRoles = await this.loadUserWithRoles(ctx, ctx.session.user.id);
 
