@@ -3,10 +3,6 @@ import { Permission } from "@vendure/core";
 // Customer
 export const CUSTOMER_PERMISSIONS = [
     Permission.Authenticated,
-    Permission.ReadCatalog,
-    Permission.ReadProduct,
-    Permission.ReadOrder,
-    Permission.UpdateCustomer, // Puede actualizar su propio perfil
 ] as const;
 
 // Inventory Manager
@@ -74,7 +70,8 @@ export const ORDER_MANAGER_PERMISSIONS = [
 
 /**
  * Mapa de códigos de rol a permisos
- * para asignar permisos cuando creas usuarios desde Auth0
+ * para asignar permisos cuando se crean usuarios desde Auth0
+ * por defecto se crean con __customer_role___
  */
 export const ROLE_PERMISSIONS_MAP = {
     '__customer_role__': CUSTOMER_PERMISSIONS,

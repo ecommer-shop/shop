@@ -22,6 +22,7 @@ import { ExternalAuthResolver } from './api/external-auth.resolver';
         return config;
     },
 })
+
 export class Auth0Plugin {
     static init(options: { domain: string; audience: string }) {
         return Auth0Plugin;

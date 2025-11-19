@@ -57,7 +57,7 @@ export class AuthorizationService {
      */
     async requireAnyPermission(
         ctx: RequestContext,
-        permissions: Permission[]
+        ...permissions: Permission[]
     ): Promise<void> {
         if (!ctx.session?.user) {
             throw new ForbiddenError();

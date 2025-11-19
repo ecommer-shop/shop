@@ -6,42 +6,19 @@ import {
     TransactionalConnection,
     User,
     ID,
-    Allow,
     AuthService
 } from '@vendure/core';
 import jwt from 'jsonwebtoken';
-import { CUSTOMER_PERMISSIONS } from '../constants/permissions.consts';
 import { AuthorizationService } from '../service/auth.service';
-import { Roles } from '../constants/roles.enum';
 
 @Resolver()
 export class ExternalAuthResolver {
     constructor(
-        private authoService: AuthorizationService,
+        private authorizationService: AuthorizationService,
         private authService: AuthService,
         private customerService: CustomerService,
         private connection: TransactionalConnection,
     ) { }
-
-
-    @Query()
-    @Allow(...CUSTOMER_PERMISSIONS)
-    async testAuthorization(@Ctx() ctx: RequestContext) {
-        return { message: 'hi' }
-    }
-
-    @Query()
-    @Allow(...CUSTOMER_PERMISSIONS)
-    async testAuthorization2(@Ctx() ctx: RequestContext) {
-        await this.authoService.requireAllPermissions(ctx, ...CUSTOMER_PERMISSIONS);
-        return { message: 'hi' }
-    }
-
-    @Query()
-    async testAuthorizationRole(@Ctx() ctx: RequestContext) {
-        await this.authoService.requireRole(ctx, Roles.CUSTOMER);
-        return { message: 'hi' }
-    }
 
     @Mutation()
     async authenticateExternal(
