@@ -12,7 +12,7 @@ export const initialData: InitialData = {
   ],
   roles: [
     {
-      code: 'administrator',
+      code: 'Admin',
       description: 'Administrator',
       permissions: [
         Permission.CreateCatalog,
@@ -39,6 +39,59 @@ export const initialData: InitialData = {
         Permission.ReadSystem,
         Permission.UpdateSystem,
         Permission.DeleteSystem,
+      ],
+    },
+    {
+      code: 'customer',
+      description: 'Normal Customer',
+      permissions: [
+        Permission.ReadCatalog,
+        Permission.ReadProduct,
+        Permission.ReadCustomer,
+        Permission.UpdateCustomer,
+        Permission.ReadOrder,
+      ],
+    },
+    {
+      code: 'vendor',
+      description: 'Vendor/Seller',
+      permissions: [
+        Permission.CreateCatalog,
+        Permission.ReadCatalog,
+        Permission.UpdateCatalog,
+        Permission.DeleteCatalog,
+        Permission.CreateProduct,
+        Permission.ReadProduct,
+        Permission.UpdateProduct,
+        Permission.DeleteProduct,
+        Permission.ReadOrder,
+        Permission.UpdateOrder,
+      ],
+    },
+    {
+      code: 'moderator',
+      description: 'Store Moderator',
+      permissions: [
+        Permission.CreateCatalog,
+        Permission.ReadCatalog,
+        Permission.UpdateCatalog,
+        Permission.DeleteCatalog,
+        Permission.ReadSettings,
+        Permission.UpdateSettings,
+        Permission.ReadCustomer,
+        Permission.UpdateCustomer,
+        Permission.ReadOrder,
+        Permission.UpdateOrder,
+      ],
+    },
+    {
+      code: 'support',
+      description: 'Customer Support',
+      permissions: [
+        Permission.ReadCatalog,
+        Permission.ReadProduct,
+        Permission.ReadCustomer,
+        Permission.ReadOrder,
       ],
     },
   ],

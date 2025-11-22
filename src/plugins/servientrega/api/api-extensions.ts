@@ -29,6 +29,14 @@ const servientregaShopApiExtensions = gql`
     servientregaProducts: JSON!
   }
 
+  extend type Query {
+    adminOnlyEndpoint: JSON!
+  }
+
+  extend type Query {
+    debugUserRoles: JSON!
+  }
+
 `;
 export const shopApiExtensions = gql`
   ${servientregaShopApiExtensions}

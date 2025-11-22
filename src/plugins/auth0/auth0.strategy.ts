@@ -3,7 +3,11 @@ import {
     ExternalAuthenticationService,
     Injector,
     RequestContext,
-    User
+    User,
+    RoleService,
+    TransactionalConnection,
+    Role,
+    Logger,
 } from '@vendure/core';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
@@ -17,66 +21,64 @@ export interface Auth0Data {
 export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0Data> {
     readonly name = 'auth0';
     private externalAuthenticationService: ExternalAuthenticationService;
+    private roleService: RoleService;
+    private connection: TransactionalConnection;
     private client: jwksClient.JwksClient;
 
-    constructor(
-        private domain: string,
-        private audience: string
-    ) {
+    constructor(private domain: string, private audience: string) {
         this.client = jwksClient({
             jwksUri: `https://${domain}/.well-known/jwks.json`,
             cache: true,
-            rateLimit: true
+            rateLimit: true,
         });
     }
 
     defineInputType(): DocumentNode {
         return gql`
-            input Auth0AuthInput {
-                token: String!
-            }
-        `;
+      input Auth0AuthInput {
+        token: String!
+      }
+    `;
     }
-
-    onLogOut?(ctx: RequestContext, user: User): Promise<void> {
-        return Promise.resolve();
-    }
-
-    destroy?: (() => void | Promise<void>) | undefined;
 
     init(injector: Injector) {
         this.externalAuthenticationService = injector.get(ExternalAuthenticationService);
+        this.roleService = injector.get(RoleService);
+        this.connection = injector.get(TransactionalConnection);
     }
 
     async authenticate(ctx: RequestContext, data: Auth0Data): Promise<User | false> {
         try {
             const decoded = await this.verifyToken(data.token);
+            if (!decoded?.email) return false;
 
-            if (!decoded || !decoded.email) {
-                return false;
-            }
-
-            const user = await this.externalAuthenticationService.findCustomerUser(
+            // Buscar usuario existente
+            const existingUser = await this.externalAuthenticationService.findCustomerUser(
                 ctx,
                 this.name,
-                decoded.sub
+                decoded.sub,
             );
 
-            if (user) {
-                return user;
+            if (existingUser) {
+                return existingUser;
             }
 
-            return this.externalAuthenticationService.createCustomerAndUser(ctx, {
+            // Crear nuevo usuario y cliente
+            const newUser = await this.externalAuthenticationService.createCustomerAndUser(ctx, {
                 strategy: this.name,
                 externalIdentifier: decoded.sub,
-                verified: decoded.email_verified || false,
+                verified: decoded.email_verified ?? false,
                 emailAddress: decoded.email,
                 firstName: decoded.given_name || decoded.name?.split(' ')[0] || '',
                 lastName: decoded.family_name || decoded.name?.split(' ')[1] || '',
             });
 
+            // Vendure asigna automáticamente el rol `__customer_role__`
+            Logger.info(`Nuevo usuario creado desde Auth0: ${decoded.email}`, 'Auth0Strategy');
+
+            return newUser;
         } catch (error) {
-            console.error('Auth0 Authentication Error:', error);
+            Logger.error(`Auth0 error: ${error instanceof Error ? error.message : error}`, 'Auth0Strategy');
             return false;
         }
     }
@@ -91,21 +93,20 @@ export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0
             }
 
             this.client.getSigningKey(decodedToken.header.kid, (err, key) => {
-
-                if (err) {
-                    reject(err);
+                if (err || !key) {
+                    reject(err || new Error('Missing signing key'));
                     return;
                 }
 
-                const signingKey = key?.getPublicKey();
+                const signingKey = key.getPublicKey();
 
                 jwt.verify(
                     token,
-                    signingKey!,
+                    signingKey,
                     {
                         audience: this.audience,
                         issuer: `https://${this.domain}/`,
-                        algorithms: ['RS256']
+                        algorithms: ['RS256'],
                     },
                     (verifyErr, decoded) => {
                         if (verifyErr) {
@@ -113,7 +114,7 @@ export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0
                         } else {
                             resolve(decoded);
                         }
-                    }
+                    },
                 );
             });
         });

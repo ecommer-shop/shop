@@ -1,3 +1,5 @@
+import { Permission } from "@vendure/core";
+
 export const ROUTE = {
   Admin: "admin",
   Admin_Api: "admin-api",
