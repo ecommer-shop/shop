@@ -16,8 +16,4 @@ export class MercadoPagoService {
     async createMercadoPagoPreference(ctx: RequestContext, id: ID): Promise<boolean> {
         return true;
     }
-
-    async createMercadooPagoPreference(ctx: RequestContext, id: ID): Promise<boolean> {
-        return true;
-    }
 }

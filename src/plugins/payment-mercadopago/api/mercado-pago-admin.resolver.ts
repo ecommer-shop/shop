@@ -13,11 +13,4 @@ export class MercadoPagoAdminResolver {
     async createMercadoPagoPreference(@Ctx() ctx: RequestContext, @Args() args: { id: ID }): Promise<boolean> {
         return this.mercadoPagoService.createMercadoPagoPreference(ctx, args.id);
     }
-
-    @Mutation()
-    @Transaction()
-    @Allow(Permission.SuperAdmin)
-    async createMercadooPagoPreference(@Ctx() ctx: RequestContext, @Args() args: { id: ID }): Promise<boolean> {
-        return this.mercadoPagoService.createMercadooPagoPreference(ctx, args.id);
-    }
 }
