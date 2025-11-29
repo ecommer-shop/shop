@@ -1,11 +1,5 @@
 {
   "editor.formatOnSave": true,
   "cSpell.words": ["Graphiql", "superadmin", "Vendure", "Wompi"],
-  "prettier.singleQuote": true,
-  "workbench.colorCustomizations": {
-    "tab.activeBorder": "#3895e0",
-    "activityBar.background": "#093809",
-    "titleBar.activeBackground": "#13410d",
-    "titleBar.activeForeground": "#FDFAF2"
-  }
+  "prettier.singleQuote": true
 }
