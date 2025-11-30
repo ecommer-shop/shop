@@ -22,6 +22,7 @@ import {
 
 import { ROUTE, ROUTE_STORE } from '../consts';
 import { PaymentPlugin } from '../plugins/payment/payment.plugin';
+import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
 import { CURRENCY } from '../plugins/payment/constants';
 import { Auth0Plugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
@@ -121,6 +122,7 @@ export const plugins: VendureConfig['plugins'] = [
     },
   }),
 
+  CoinbasePlugin,
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
