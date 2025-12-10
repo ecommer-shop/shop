@@ -5,7 +5,7 @@
 import { ArgsType, Field, Int } from '@nestjs/graphql';
 
 export interface PluginInitOptions {
-    url: string
+  url: string
 }
 
 /**

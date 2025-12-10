@@ -1,34 +1,30 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { Auth0AuthenticationStrategy } from './auth0.strategy';
-
-export interface Auth0PluginOptions {
-    domain: string;
-    audience: string;
-}
+import { AuthorizationService } from './services/auth.service';
+import { shopApiExtensions } from './api/api-external-extensions';
+import { ExternalAuthResolver } from './api/external-auth.resolver';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
-    configuration: (config) => {
-
-        return Auth0Plugin.configure(config);
-    }
-})
-export class Auth0Plugin {
-    static options: Auth0PluginOptions;
-
-    static init(options: Auth0PluginOptions): typeof Auth0Plugin {
-        this.options = options;
-        return Auth0Plugin;
-    }
-
-    static configure(config: any) {
-        const strategy = new Auth0AuthenticationStrategy(
-            this.options.domain,
-            this.options.audience
+    shopApiExtensions: {
+        schema: shopApiExtensions,
+        resolvers: [ExternalAuthResolver],
+    },
+    providers: [AuthorizationService],
+    exports: [AuthorizationService],
+    configuration: config => {
+        config.authOptions.shopAuthenticationStrategy.push(
+            new Auth0AuthenticationStrategy(
+                process.env.AUTH0_DOMAIN || '',
+                process.env.AUTH0_AUDIENCE || ''
+            )
         );
-
-        config.authOptions.shopAuthenticationStrategy.push(strategy);
-
         return config;
+    },
+})
+
+export class Auth0Plugin {
+    static init(options: { domain: string; audience: string }) {
+        return Auth0Plugin;
     }
 }
