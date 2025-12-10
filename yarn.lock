@@ -4209,6 +4209,14 @@ mensch@^0.3.4:
   resolved "https://registry.npmjs.org/mensch/-/mensch-0.3.4.tgz"
   integrity sha512-IAeFvcOnV9V0Yk+bFhYR07O3yNina9ANIN5MoXBKYJ/RLYPurd2d0yw14MDhpr9/momp0WofT1bPUh3hkzdi/g==
 
+mercadopago@^2.10.0:
+  version "2.11.0"
+  resolved "https://registry.yarnpkg.com/mercadopago/-/mercadopago-2.11.0.tgz#aa36cf03b9e3984d71c53d63a9301776ddc6ec2a"
+  integrity sha512-Etv7sBwQp8ZW179W5wAGc7JFmfFOeJttQSeN1HuDrwU38YOIi+nYdKN+2KTgR9/F1S8oOGMlkVPthyIwOF5BXQ==
+  dependencies:
+    node-fetch "^2.7.0"
+    uuid "^9.0.0"
+
 merge-descriptors@1.0.3:
   version "1.0.3"
   resolved "https://registry.npmjs.org/merge-descriptors/-/merge-descriptors-1.0.3.tgz"
@@ -4750,7 +4758,7 @@ node-addon-api@^5.0.0:
   resolved "https://registry.npmjs.org/node-addon-api/-/node-addon-api-5.1.0.tgz"
   integrity sha512-eh0GgfEkpnoWDq+VY8OyvYhFEzBk6jIYbRKdIlyTiAXIVJ8PyBaKb0rp7oDtoddbdoHWhq8wwr+XZ81F1rpNdA==
 
-node-fetch@^2.6.0, node-fetch@^2.6.7:
+node-fetch@^2.6.0, node-fetch@^2.6.7, node-fetch@^2.7.0:
   version "2.7.0"
   resolved "https://registry.npmjs.org/node-fetch/-/node-fetch-2.7.0.tgz"
   integrity sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==
