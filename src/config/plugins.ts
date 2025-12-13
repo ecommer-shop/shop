@@ -46,27 +46,27 @@ const assetServerPlugin = AssetServerPlugin.init({
   namingStrategy: new DefaultAssetNamingStrategy(),
   ...(useS3Storage
     ? {
-        storageStrategyFactory: configureS3AssetStorage({
-          bucket: process.env.MINIO_BUCKET || 'e-assets',
-          credentials: {
-            accessKeyId:
-              process.env.MINIO_ACCESS_KEY ||
-              process.env.MINIO_ROOT_USER ||
-              'minio-admin',
-            secretAccessKey:
-              process.env.MINIO_SECRET_KEY ||
-              process.env.MINIO_ROOT_PASSWORD ||
-              'minio-admin',
-          },
-          nativeS3Configuration: {
-            endpoint:
-              process.env.MINIO_ENDPOINT || 'http://localhost:9000',
-            forcePathStyle: true,
-            signatureVersion: 'v4',
-            region: 'eu-west-1', // dummy requerido por aws-sdk
-          },
-        }),
-      }
+      storageStrategyFactory: configureS3AssetStorage({
+        bucket: process.env.MINIO_BUCKET || 'e-assets',
+        credentials: {
+          accessKeyId:
+            process.env.MINIO_ACCESS_KEY ||
+            process.env.MINIO_ROOT_USER ||
+            'minio-admin',
+          secretAccessKey:
+            process.env.MINIO_SECRET_KEY ||
+            process.env.MINIO_ROOT_PASSWORD ||
+            'minio-admin',
+        },
+        nativeS3Configuration: {
+          endpoint:
+            process.env.MINIO_ENDPOINT || 'http://localhost:9000',
+          forcePathStyle: true,
+          signatureVersion: 'v4',
+          region: 'eu-west-1', // dummy requerido por aws-sdk
+        },
+      }),
+    }
     : {}),
 });
 
@@ -88,7 +88,7 @@ const emailPlugin = EmailPlugin.init({
   handlers: defaultEmailHandlers,
   templateLoader: new FileBasedTemplateLoader(emailTemplatePath),
   globalTemplateVars: {
-    fromAddress: 'noreply <ron@rigeltoth.com>',
+    fromAddress: 'noreply <ceo@ecommer.shop>',
     verifyEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.verify}`,
     passwordResetUrl: `${storeUrl}${ROUTE_STORE.account.resetPassword}`,
     changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
