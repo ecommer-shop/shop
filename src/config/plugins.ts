@@ -88,7 +88,7 @@ const emailPlugin = EmailPlugin.init({
   handlers: defaultEmailHandlers,
   templateLoader: new FileBasedTemplateLoader(emailTemplatePath),
   globalTemplateVars: {
-    fromAddress: 'noreply <ron@rigeltoth.com>',
+    fromAddress: 'noreply <ceo@ecommer.shop>',
     verifyEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.verify}`,
     passwordResetUrl: `${storeUrl}${ROUTE_STORE.account.resetPassword}`,
     changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
