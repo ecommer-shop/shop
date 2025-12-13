@@ -1,10 +1,10 @@
 export const ROUTE = {
   Admin: "admin",
-  Admin_Api: "admin-api",
+  AdminApi: "admin-api",
   Assets: "assets",
   Mailbox: "mailbox",
   Shop: "shop",
-  Shop_Api: "shop-api",
+  ShopApi: "shop-api",
 } as const;
 
 const RouteModuleStore = {
