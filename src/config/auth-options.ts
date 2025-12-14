@@ -10,4 +10,5 @@ export const authOptions: VendureConfig['authOptions'] = {
   cookieOptions: {
     secret: process.env.COOKIE_SECRET,
   },
+  requireVerification: false,
 };

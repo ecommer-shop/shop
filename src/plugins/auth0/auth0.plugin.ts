@@ -1,9 +1,9 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { Auth0AuthenticationStrategy } from './auth0.strategy';
 import { AuthorizationService } from './services/auth.service';
+import { ExternalAuthService } from './services/external-auth.service';
 import { shopApiExtensions } from './api/api-external-extensions';
 import { ExternalAuthResolver } from './api/external-auth.resolver';
-import { ExternalAuthService } from './services/external-auth.service';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
@@ -11,10 +11,7 @@ import { ExternalAuthService } from './services/external-auth.service';
         schema: shopApiExtensions,
         resolvers: [ExternalAuthResolver],
     },
-    providers: [
-        AuthorizationService,
-        ExternalAuthService
-    ],
+    providers: [AuthorizationService, ExternalAuthService],
     exports: [AuthorizationService],
     configuration: config => {
         config.authOptions.shopAuthenticationStrategy.push(
