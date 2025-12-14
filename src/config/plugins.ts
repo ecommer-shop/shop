@@ -71,10 +71,7 @@ const assetServerPlugin = AssetServerPlugin.init({
 });
 
 
-const emailTemplatePath = path.join(
-  __dirname,
-  `${staticDir}/email/templates`,
-);
+const emailTemplatePath = path.join(__dirname, '../', staticDir, 'email', 'templates');
 const partialsPath = path.join(emailTemplatePath, 'partials');
 
 if (!fs.existsSync(partialsPath)) {
@@ -88,7 +85,7 @@ const emailPlugin = EmailPlugin.init({
   handlers: defaultEmailHandlers,
   templateLoader: new FileBasedTemplateLoader(emailTemplatePath),
   globalTemplateVars: {
-    fromAddress: 'noreply <ceo@ecommer.shop>',
+    fromAddress: '"EcommerShop" <ceo@ecommer.shop>',
     verifyEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.verify}`,
     passwordResetUrl: `${storeUrl}${ROUTE_STORE.account.resetPassword}`,
     changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
