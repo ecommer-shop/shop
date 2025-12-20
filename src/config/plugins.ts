@@ -82,7 +82,9 @@ const emailPlugin = EmailPlugin.init({
   transport: { type: 'none' },
   emailSender: new ResendEmailSender(process.env.RESEND_API_KEY),
   route: ROUTE.Mailbox,
-  handlers: defaultEmailHandlers,
+  handlers: [
+    ...defaultEmailHandlers,
+  ],
   templateLoader: new FileBasedTemplateLoader(emailTemplatePath),
   globalTemplateVars: {
     fromAddress: '"EcommerShop" <ceo@ecommer.shop>',

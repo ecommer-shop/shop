@@ -8,7 +8,7 @@ export const IS_DEV = process.env.APP_ENV === 'dev';
 
 export const serverPort = Number(process.env.PORT) || 3000;
 export const storeUrl =
-  process.env.STORE_URL || 'https://ecommer.shop';
+  process.env.STORE_URL || 'http://localhost:3001';
 
 export const staticDir = process.env.STATIC_DIR || '../static';
 
