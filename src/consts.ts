@@ -16,14 +16,14 @@ const RouteModuleStore = {
 
 export const ROUTE_STORE = {
   account: {
-    verify: `${RouteModuleStore.account}/verify`,
-    resetPassword: `${RouteModuleStore.account}/reset-password`,
+    verify: `${RouteModuleStore.account}/verify-email`,
+    resetPassword: `/reset-password`,
     changeEmailAddress: `${RouteModuleStore.account}/verify-email-address-change`,
   },
   checkout: {
-    order: `${RouteModuleStore.checkout}/order`,
-    orders: `${RouteModuleStore.checkout}/orders`,
-    addressBook: `${RouteModuleStore.checkout}/address-book`,
+    order: `${RouteModuleStore.checkout}/order-confirmation`,
+    orders: `${RouteModuleStore.account}/orders`,
+    addressBook: `${RouteModuleStore.checkout}/addresses`,
     details: `${RouteModuleStore.checkout}/details`,
     changeCredentials: `${RouteModuleStore.checkout}/change-credentials`,
     singIn: `${RouteModuleStore.checkout}/sign-in`,
