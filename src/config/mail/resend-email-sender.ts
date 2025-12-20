@@ -30,6 +30,5 @@ export class ResendEmailSender implements EmailSender {
     } catch (err: any) {
       Logger.error(`Exception in ResendEmailSender.send: ${JSON.stringify(err)}`, 'ResendEmailSender');
     }
-    console.log("SEMANDO")
   }
 }
