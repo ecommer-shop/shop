@@ -6,5 +6,6 @@ COPY package.json ./
 COPY yarn.lock ./
 RUN yarn install --production
 COPY . .
+RUN npx vite build
 RUN yarn build
 RUN cp -R ./static ./dist/static
