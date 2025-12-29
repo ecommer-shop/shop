@@ -83,11 +83,11 @@ if (!fs.existsSync(partialsPath)) {
 
 const emailPlugin = EmailPlugin.init({
   transport: { type: 'none' },
+
   emailSender: new ResendEmailSender(process.env.RESEND_API_KEY),
+
   route: ROUTE.Mailbox,
-  handlers: [
-    ...defaultEmailHandlers,
-  ],
+  handlers: [...defaultEmailHandlers],
   templateLoader: new FileBasedTemplateLoader(emailTemplatePath),
   globalTemplateVars: {
     fromAddress: '"EcommerShop" <ceo@ecommer.shop>',
@@ -96,6 +96,7 @@ const emailPlugin = EmailPlugin.init({
     changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
   },
 });
+
 
 
 export const plugins: VendureConfig['plugins'] = [
