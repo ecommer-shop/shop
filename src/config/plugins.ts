@@ -7,6 +7,7 @@ import {
   DefaultSchedulerPlugin,
   DefaultSearchPlugin,
   LanguageCode,
+  Role,
 } from '@vendure/core';
 import { AdminUiPlugin } from '@vendure/admin-ui-plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
@@ -33,6 +34,8 @@ import {
   storeUrl,
   assetUploadDir,
 } from './environment';
+import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
+import { DashboardPlugin } from '@vendure/dashboard/plugin';
 
 const useS3Storage =
   !!process.env.MINIO_ENDPOINT || !!process.env.MINIO_BUCKET;
@@ -118,6 +121,11 @@ export const plugins: VendureConfig['plugins'] = [
       defaultLanguage: LanguageCode.es,
       defaultLocale: 'CO',
     },
+  }),
+
+  DashboardPlugin.init({
+    route: ROUTE.Dashboard,
+    appDir: './dist/dashboard',
   }),
 
   PaymentPlugin.init({
