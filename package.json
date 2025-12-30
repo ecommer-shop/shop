@@ -17,6 +17,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "3.908.0",
     "@aws-sdk/lib-storage": "3.908.0",
+    "@pinelab/vendure-plugin-coinbase": "^1.4.2",
     "@vendure/admin-ui-plugin": "3.5.0",
     "@vendure/asset-server-plugin": "3.5.0",
     "@vendure/core": "3.5.0",
