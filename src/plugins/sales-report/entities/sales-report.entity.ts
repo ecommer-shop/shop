@@ -19,7 +19,7 @@ export class SalesReport extends VendureEntity {
   id: number;
 
   /**
-   * Usuario responsable de las ventas (opcional si se usa customerId)
+   * Usuario responsable de las ventas 
    */
   @Column({ nullable: true })
   userId?: number;
@@ -73,7 +73,7 @@ export class SalesReport extends VendureEntity {
   }>;
 
   /**
-   * Métodos de pago utilizados (JSON con desglose)
+   * Métodos de pago utilizados 
    */
   @Column({ type: 'jsonb', nullable: true })
   paymentMethods?: Array<{
@@ -89,7 +89,7 @@ export class SalesReport extends VendureEntity {
   observations?: string;
 
   /**
-   * Mes del reporte (para facilitar consultas)
+   * Mes del reporte 
    */
   @Column({ type: 'int' })
   month: number;
@@ -112,4 +112,6 @@ export class SalesReport extends VendureEntity {
   @UpdateDateColumn()
   updatedAt: Date;
 }
+
+
 

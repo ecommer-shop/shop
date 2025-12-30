@@ -39,8 +39,12 @@ export class SalesReportService {
     customerId?: number,
     observations?: string,
   ): Promise<SalesReport> {
+    const identifier = userId ? `usuario ${userId}` : `cliente ${customerId}`;
+    
     if (!userId && !customerId) {
-      throw new Error('Debe proporcionar userId o customerId');
+      const errorMsg = 'No se puede generar reporte: falta userId o customerId';
+      Logger.error(errorMsg, 'SalesReportService');
+      throw new Error(errorMsg);
     }
 
     // Validar que el período sea quincenal (aproximadamente 15 días)
@@ -49,10 +53,44 @@ export class SalesReportService {
     );
     if (daysDiff < 10 || daysDiff > 20) {
       Logger.warn(
-        `El período proporcionado (${daysDiff} días) no parece ser quincenal`,
+        `Período inusual para ${identifier}: ${daysDiff} días (esperado: 10-20 días). Período: ${periodStart.toISOString()} a ${periodEnd.toISOString()}`,
         'SalesReportService',
       );
     }
+
+    // Validar existencia de usuario/cliente
+    if (userId) {
+      try {
+        const user = await this.userService.getUserById(ctx, userId);
+        if (!user) {
+          const errorMsg = `No se puede generar reporte: usuario ${userId} no existe`;
+          Logger.error(errorMsg, 'SalesReportService');
+          throw new Error(errorMsg);
+        }
+      } catch (error) {
+        const errorMsg = `Error validando usuario ${userId}: ${error instanceof Error ? error.message : String(error)}`;
+        Logger.error(errorMsg, 'SalesReportService');
+        throw new Error(errorMsg);
+      }
+    } else if (customerId) {
+      try {
+        const customer = await this.customerService.findOne(ctx, customerId);
+        if (!customer) {
+          const errorMsg = `No se puede generar reporte: cliente ${customerId} no existe`;
+          Logger.error(errorMsg, 'SalesReportService');
+          throw new Error(errorMsg);
+        }
+      } catch (error) {
+        const errorMsg = `Error validando cliente ${customerId}: ${error instanceof Error ? error.message : String(error)}`;
+        Logger.error(errorMsg, 'SalesReportService');
+        throw new Error(errorMsg);
+      }
+    }
+
+    Logger.info(
+      `Iniciando generación de reporte quincenal para ${identifier}. Período: ${periodStart.toISOString()} a ${periodEnd.toISOString()}`,
+      'SalesReportService',
+    );
 
     // Obtener órdenes del período
     const orders = await this.getOrdersForPeriod(
@@ -62,6 +100,18 @@ export class SalesReportService {
       userId,
       customerId,
     );
+
+    if (orders.length === 0) {
+      Logger.warn(
+        `No se encontraron órdenes para ${identifier} en el período ${periodStart.toISOString()} a ${periodEnd.toISOString()}. Se generará reporte con totales en cero.`,
+        'SalesReportService',
+      );
+    } else {
+      Logger.info(
+        `Se encontraron ${orders.length} órdenes para ${identifier} en el período especificado`,
+        'SalesReportService',
+      );
+    }
 
     // Calcular totales
     const totalSales = orders.reduce(
@@ -177,11 +227,29 @@ export class SalesReportService {
     }
 
     if (existingReport) {
+      Logger.info(
+        `Actualizando reporte existente (ID: ${existingReport.id}) para ${identifier}. Total ventas: ${totalSales}, Pendiente: ${totalPending}`,
+        'SalesReportService',
+      );
       Object.assign(existingReport, reportData);
-      return await this.salesReportRepository.save(existingReport);
+      const savedReport = await this.salesReportRepository.save(existingReport);
+      Logger.info(
+        `Reporte actualizado exitosamente (ID: ${savedReport.id}) para ${identifier}`,
+        'SalesReportService',
+      );
+      return savedReport;
     } else {
+      Logger.info(
+        `Creando nuevo reporte para ${identifier}. Total ventas: ${totalSales}, Pendiente: ${totalPending}, Productos: ${salesDetails.length}, Métodos de pago: ${paymentMethods.length}`,
+        'SalesReportService',
+      );
       const newReport = this.salesReportRepository.create(reportData);
-      return await this.salesReportRepository.save(newReport);
+      const savedReport = await this.salesReportRepository.save(newReport);
+      Logger.info(
+        `Reporte creado exitosamente (ID: ${savedReport.id}) para ${identifier}`,
+        'SalesReportService',
+      );
+      return savedReport;
     }
   }
 
@@ -270,6 +338,11 @@ export class SalesReportService {
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
+    Logger.info(
+      `Iniciando generación automática de reportes mensuales para el mes anterior (${lastMonth.toISOString()} a ${monthEnd.toISOString()})`,
+      'SalesReportService',
+    );
+
     // Primera quincena (1-15)
     const firstPeriodStart = new Date(lastMonth);
     const firstPeriodEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 15);
@@ -294,6 +367,11 @@ export class SalesReportService {
       .andWhere('order.orderPlacedAt <= :end', { end: monthEnd })
       .getMany();
 
+    Logger.info(
+      `Se encontraron ${allOrders.length} órdenes en el mes anterior. Identificando usuarios y clientes únicos...`,
+      'SalesReportService',
+    );
+
     // Obtener usuarios y clientes únicos
     const uniqueUsers = new Set<number>();
     const uniqueCustomers = new Set<number>();
@@ -305,6 +383,11 @@ export class SalesReportService {
           : order.customer.user.id;
         if (!isNaN(userId)) {
           uniqueUsers.add(userId);
+        } else {
+          Logger.warn(
+            `ID de usuario inválido en orden ${order.code}: ${order.customer.user.id}`,
+            'SalesReportService',
+          );
         }
       }
       if (order.customer?.id) {
@@ -313,15 +396,45 @@ export class SalesReportService {
           : order.customer.id;
         if (!isNaN(customerId)) {
           uniqueCustomers.add(customerId);
+        } else {
+          Logger.warn(
+            `ID de cliente inválido en orden ${order.code}: ${order.customer.id}`,
+            'SalesReportService',
+          );
         }
+      } else {
+        Logger.warn(
+          `Orden ${order.code} no tiene cliente asociado`,
+          'SalesReportService',
+        );
       }
     }
 
+    Logger.info(
+      `Se identificaron ${uniqueUsers.size} usuarios únicos y ${uniqueCustomers.size} clientes únicos para generar reportes`,
+      'SalesReportService',
+    );
+
     // Generar reportes para cada usuario
+    let userSuccessCount = 0;
+    let userErrorCount = 0;
+    
     for (const userId of uniqueUsers) {
       try {
         const userIdNum = typeof userId === 'string' ? parseInt(userId, 10) : userId;
-        if (isNaN(userIdNum)) continue;
+        if (isNaN(userIdNum)) {
+          Logger.warn(
+            `ID de usuario inválido, saltando: ${userId} (tipo: ${typeof userId})`,
+            'SalesReportService',
+          );
+          userErrorCount++;
+          continue;
+        }
+        
+        Logger.info(
+          `Generando reportes quincenales para usuario ${userIdNum} (${userSuccessCount + userErrorCount + 1}/${uniqueUsers.size})`,
+          'SalesReportService',
+        );
         
         const report1 = await this.generateBiweeklyReport(
           ctx,
@@ -340,48 +453,95 @@ export class SalesReportService {
           undefined,
         );
         reports.push(report2);
+        
+        userSuccessCount++;
       } catch (error) {
+        userErrorCount++;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
         Logger.error(
-          `Error generando reportes para usuario ${userId}: ${error}`,
+          `Error generando reportes para usuario ${userId}: ${errorMessage}. Causa: ${errorMessage.includes('no existe') ? 'Usuario no encontrado en la base de datos' : errorMessage.includes('órdenes') ? 'No se encontraron órdenes válidas' : 'Error en la generación del reporte'}. Stack: ${errorStack || 'N/A'}`,
           'SalesReportService',
         );
       }
     }
 
     // Generar reportes para clientes sin usuario asociado
+    let customerSuccessCount = 0;
+    let customerErrorCount = 0;
+    let customerSkippedCount = 0;
+    
     for (const customerId of uniqueCustomers) {
       // Solo generar si no tiene usuario (ya se generó arriba)
       const customerIdNum = typeof customerId === 'string' ? parseInt(customerId, 10) : customerId;
-      if (isNaN(customerIdNum)) continue;
+      if (isNaN(customerIdNum)) {
+        Logger.warn(
+          `ID de cliente inválido, saltando: ${customerId} (tipo: ${typeof customerId})`,
+          'SalesReportService',
+        );
+        customerErrorCount++;
+        continue;
+      }
       
-      const customer = await this.customerService.findOne(ctx, customerIdNum);
-      if (customer && !customer.user) {
-        try {
-          const report1 = await this.generateBiweeklyReport(
-            ctx,
-            firstPeriodStart,
-            firstPeriodEnd,
-            undefined,
-            customerIdNum,
-          );
-          reports.push(report1);
-
-          const report2 = await this.generateBiweeklyReport(
-            ctx,
-            secondPeriodStart,
-            secondPeriodEnd,
-            undefined,
-            customerIdNum,
-          );
-          reports.push(report2);
-        } catch (error) {
-          Logger.error(
-            `Error generando reportes para cliente ${customerIdNum}: ${error}`,
+      try {
+        const customer = await this.customerService.findOne(ctx, customerIdNum);
+        if (!customer) {
+          Logger.warn(
+            `Cliente ${customerIdNum} no existe en la base de datos, saltando generación de reportes`,
             'SalesReportService',
           );
+          customerErrorCount++;
+          continue;
         }
+        
+        if (customer.user) {
+          Logger.info(
+            `Cliente ${customerIdNum} tiene usuario asociado (${customer.user.id}), reportes ya generados. Saltando.`,
+            'SalesReportService',
+          );
+          customerSkippedCount++;
+          continue;
+        }
+        
+        Logger.info(
+          `Generando reportes quincenales para cliente ${customerIdNum} sin usuario (${customerSuccessCount + customerErrorCount + customerSkippedCount + 1}/${uniqueCustomers.size})`,
+          'SalesReportService',
+        );
+        
+        const report1 = await this.generateBiweeklyReport(
+          ctx,
+          firstPeriodStart,
+          firstPeriodEnd,
+          undefined,
+          customerIdNum,
+        );
+        reports.push(report1);
+
+        const report2 = await this.generateBiweeklyReport(
+          ctx,
+          secondPeriodStart,
+          secondPeriodEnd,
+          undefined,
+          customerIdNum,
+        );
+        reports.push(report2);
+        
+        customerSuccessCount++;
+      } catch (error) {
+        customerErrorCount++;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        Logger.error(
+          `Error generando reportes para cliente ${customerIdNum}: ${errorMessage}. Causa: ${errorMessage.includes('no existe') ? 'Cliente no encontrado en la base de datos' : errorMessage.includes('órdenes') ? 'No se encontraron órdenes válidas' : 'Error en la generación del reporte'}. Stack: ${errorStack || 'N/A'}`,
+          'SalesReportService',
+        );
       }
     }
+
+    Logger.info(
+      `Generación automática de reportes mensuales completada. Resumen: ${reports.length} reportes generados exitosamente. Usuarios: ${userSuccessCount} exitosos, ${userErrorCount} con errores. Clientes: ${customerSuccessCount} exitosos, ${customerErrorCount} con errores, ${customerSkippedCount} omitidos (tienen usuario).`,
+      'SalesReportService',
+    );
 
     return reports;
   }
