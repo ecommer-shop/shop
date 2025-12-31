@@ -4,12 +4,12 @@ import { IS_DEV, serverPort } from './environment';
 
 export const apiOptions: VendureConfig['apiOptions'] = {
   port: serverPort,
-  adminApiPath: ROUTE.Admin_Api,
-  shopApiPath: ROUTE.Shop_Api,
+  adminApiPath: ROUTE.AdminApi,
+  shopApiPath: ROUTE.ShopApi,
   ...(IS_DEV
     ? {
-        adminApiDebug: true,
-        shopApiDebug: true,
-      }
+      adminApiDebug: true,
+      shopApiDebug: true,
+    }
     : {}),
 };
