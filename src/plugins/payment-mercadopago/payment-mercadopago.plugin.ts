@@ -4,10 +4,12 @@ import { PAYMENT_MERCADOPAGO_PLUGIN_OPTIONS } from './constants';
 import { PluginInitOptions } from './types';
 import { MercadoPagoService } from './services/mercado-pago.service';
 import { MercadoPagoAdminResolver } from './api/mercado-pago-admin.resolver';
+import { MercadoPagoController } from './api/mercado-pago.controller';
 import { adminApiExtensions } from './api/api-extensions';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
+    controllers: [MercadoPagoController],
     providers: [{ provide: PAYMENT_MERCADOPAGO_PLUGIN_OPTIONS, useFactory: () => PaymentMercadopagoPlugin.options }, MercadoPagoService],
     configuration: config => {
         // Plugin-specific configuration

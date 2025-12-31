@@ -25,6 +25,8 @@ import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CURRENCY } from '../plugins/payment/constants';
 import { Auth0Plugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
+import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
+import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
 import { ResendEmailSender } from './mail/resend-email-sender';
 import {
   IS_DEV,
@@ -125,7 +127,11 @@ export const plugins: VendureConfig['plugins'] = [
     currency: CURRENCY,
   }),
 
+  PaymentMercadopagoPlugin.init({}),
+
   ServientregaPlugin.init({
     url: process.env.SERVIENTREGA_BASE ?? '',
   }),
+
+  SalesReportPlugin.init({}),
 ];
