@@ -7,6 +7,7 @@ export const ROUTE = {
   Mailbox: "mailbox",
   Shop: "shop",
   ShopApi: "shop-api",
+  Dashboard: "dashboard"
 } as const;
 
 const RouteModuleStore = {

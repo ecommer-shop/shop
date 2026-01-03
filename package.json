@@ -6,7 +6,9 @@
     "dev:server": "ts-node ./src/index.ts",
     "dev:worker": "ts-node ./src/index-worker.ts",
     "dev": "concurrently npm:dev:*",
-    "build": "tsc",
+    "build:server": "tsc",
+    "build:dashboard": "vite build",
+    "build": "yarn run build:server && yarn run build:dashboard",
     "build:seed": "tsc && cp -R ./static ./dist/static",
     "start:server": "node ./dist/index.js",
     "start:worker": "node ./dist/index-worker.js",
@@ -21,6 +23,7 @@
     "@vendure/asset-server-plugin": "3.5.0",
     "@vendure/core": "3.5.0",
     "@vendure/create": "3.5.0",
+    "@vendure/dashboard": "3.5.1",
     "@vendure/email-plugin": "3.5.0",
     "@vendure/graphiql-plugin": "3.5.0",
     "axios": "^1.12.2",
@@ -36,5 +39,9 @@
     "@vendure/cli": "3.3.7",
     "concurrently": "9.2.0",
     "typescript": "5.8.3"
+  },
+  "overrides": {
+    "@swc/core": "1.13.5",
+    "@lingui/swc-plugin": "5.6.1"
   }
 }

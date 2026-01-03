@@ -3,32 +3,65 @@ import { EmailDetails, EmailSender } from '@vendure/email-plugin'
 import { Resend } from 'resend'
 
 export class ResendEmailSender implements EmailSender {
-  protected resend: Resend
+  protected resend?: Resend;
+  protected apiKey?: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey;
+
     const maskedKey = apiKey ? apiKey.slice(0, 4) + '...' : 'undefined';
-    Logger.debug(`ResendEmailSender constructor() - API Key: ${maskedKey}`, 'ResendEmailSender');
-    this.resend = new Resend(apiKey);
+    Logger.debug(
+      `ResendEmailSender constructed. API Key: ${maskedKey}`,
+      'ResendEmailSender',
+    );
+  }
+
+  private getClient(): Resend {
+    if (!this.apiKey) {
+      throw new Error('RESEND_API_KEY is not defined');
+    }
+
+    if (!this.resend) {
+      this.resend = new Resend(this.apiKey);
+    }
+
+    return this.resend;
   }
 
   async send(email: EmailDetails) {
-    Logger.debug(`ResendEmailSender.send() called with: ${JSON.stringify(email)}`, 'ResendEmailSender');
+    Logger.debug(
+      `ResendEmailSender.send() called`,
+      'ResendEmailSender',
+    );
+
     try {
-      const response = await this.resend.emails.send({
+      const client = this.getClient();
+
+      const response = await client.emails.send({
         to: email.recipient,
         from: email.from,
         subject: email.subject,
         html: email.body,
       });
-      Logger.debug(`Resend API full response: ${JSON.stringify(response)}`, 'ResendEmailSender');
+
       const { error, data } = response;
+
       if (error) {
-        Logger.error(`Resend API error: ${JSON.stringify(error)}`, 'ResendEmailSender');
+        Logger.error(
+          `Resend API error: ${JSON.stringify(error)}`,
+          'ResendEmailSender',
+        );
       } else {
-        Logger.info(`Resend sent email successfully. ID: ${data?.id}`, 'ResendEmailSender');
+        Logger.info(
+          `Resend sent email successfully. ID: ${data?.id}`,
+          'ResendEmailSender',
+        );
       }
     } catch (err: any) {
-      Logger.error(`Exception in ResendEmailSender.send: ${JSON.stringify(err)}`, 'ResendEmailSender');
+      Logger.error(
+        `ResendEmailSender error: ${err?.message}`,
+        'ResendEmailSender',
+      );
     }
   }
 }
