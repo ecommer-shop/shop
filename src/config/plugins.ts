@@ -7,6 +7,7 @@ import {
   DefaultSchedulerPlugin,
   DefaultSearchPlugin,
   LanguageCode,
+  Role,
 } from '@vendure/core';
 import { AdminUiPlugin } from '@vendure/admin-ui-plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
@@ -27,6 +28,8 @@ import { ReviewsPlugin } from '../plugins/reviews/reviews.plugin';
 import { CURRENCY } from '../plugins/payment/constants';
 import { Auth0Plugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
+import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
+import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
 import { ResendEmailSender } from './mail/resend-email-sender';
 import {
   IS_DEV,
@@ -35,6 +38,8 @@ import {
   storeUrl,
   assetUploadDir,
 } from './environment';
+import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
+import { DashboardPlugin } from '@vendure/dashboard/plugin';
 
 const useS3Storage =
   !!process.env.MINIO_ENDPOINT || !!process.env.MINIO_BUCKET;
@@ -82,9 +87,11 @@ if (!fs.existsSync(partialsPath)) {
 
 const emailPlugin = EmailPlugin.init({
   transport: { type: 'none' },
+
   emailSender: new ResendEmailSender(process.env.RESEND_API_KEY),
+
   route: ROUTE.Mailbox,
-  handlers: defaultEmailHandlers,
+  handlers: [...defaultEmailHandlers],
   templateLoader: new FileBasedTemplateLoader(emailTemplatePath),
   globalTemplateVars: {
     fromAddress: '"EcommerShop" <ceo@ecommer.shop>',
@@ -93,6 +100,7 @@ const emailPlugin = EmailPlugin.init({
     changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
   },
 });
+
 
 
 export const plugins: VendureConfig['plugins'] = [
@@ -120,14 +128,25 @@ export const plugins: VendureConfig['plugins'] = [
     },
   }),
 
+
+  DashboardPlugin.init({
+    route: ROUTE.Dashboard,
+    appDir: './dist/dashboard',
+  }),
+
   CoinbasePlugin,
   ReviewsPlugin,
+  
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
   }),
 
+  PaymentMercadopagoPlugin.init({}),
+
   ServientregaPlugin.init({
     url: process.env.SERVIENTREGA_BASE ?? '',
   }),
+
+  SalesReportPlugin.init({}),
 ];

@@ -5,6 +5,7 @@ import { MercadoPagoController } from './api/payment-mercadopago.controller';
 import { PluginInitOptions } from './types';
 import { MercadoPagoService } from './services/mercado-pago.service';
 import { MercadoPagoAdminResolver } from './api/mercado-pago-admin.resolver';
+import { MercadoPagoController } from './api/mercado-pago.controller';
 import { adminApiExtensions } from './api/api-extensions';
 
 @VendurePlugin({
