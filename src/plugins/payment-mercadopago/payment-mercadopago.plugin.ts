@@ -1,6 +1,7 @@
 import { PluginCommonModule, Type, VendurePlugin } from '@vendure/core';
 
 import { PAYMENT_MERCADOPAGO_PLUGIN_OPTIONS } from './constants';
+import { MercadoPagoController } from './api/payment-mercadopago.controller';
 import { PluginInitOptions } from './types';
 import { MercadoPagoService } from './services/mercado-pago.service';
 import { MercadoPagoAdminResolver } from './api/mercado-pago-admin.resolver';
