@@ -4,38 +4,28 @@ import {
     Injector,
     RequestContext,
     User,
-    RoleService,
     TransactionalConnection,
-    Role,
     Logger,
 } from '@vendure/core';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
-import jwt from 'jsonwebtoken';
-import jwksClient from 'jwks-rsa';
+import { verifyToken } from '@clerk/backend';
 
-export interface Auth0Data {
+export interface ClerkData {
     token: string;
 }
 
-export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0Data> {
-    readonly name = 'auth0';
+export class ClerkAuthenticationStrategy implements AuthenticationStrategy<ClerkData> {
+    readonly name = 'clerk';
     private externalAuthenticationService: ExternalAuthenticationService;
-    private roleService: RoleService;
     private connection: TransactionalConnection;
-    private client: jwksClient.JwksClient;
 
-    constructor(private domain: string, private audience: string) {
-        this.client = jwksClient({
-            jwksUri: `https://${domain}/.well-known/jwks.json`,
-            cache: true,
-            rateLimit: true,
-        });
-    }
+
+    constructor() { }
 
     defineInputType(): DocumentNode {
         return gql`
-      input Auth0AuthInput {
+      input ClerkAuthInput {
         token: String!
       }
     `;
@@ -43,80 +33,88 @@ export class Auth0AuthenticationStrategy implements AuthenticationStrategy<Auth0
 
     init(injector: Injector) {
         this.externalAuthenticationService = injector.get(ExternalAuthenticationService);
-        this.roleService = injector.get(RoleService);
         this.connection = injector.get(TransactionalConnection);
     }
 
-    async authenticate(ctx: RequestContext, data: Auth0Data): Promise<User | false> {
+    async authenticate(ctx: RequestContext, data: ClerkData): Promise<User | false> {
         try {
             const decoded = await this.verifyToken(data.token);
-            if (!decoded?.email) return false;
 
-            // Buscar usuario existente
-            const existingUser = await this.externalAuthenticationService.findCustomerUser(
-                ctx,
-                this.name,
-                decoded.sub,
-            );
+            const email = decoded.email_addresses;
+            if (!email) return false;
+
+            const externalId = decoded.sub;
+            if (!externalId) return false;
+
+            const existingUser =
+                await this.externalAuthenticationService.findCustomerUser(
+                    ctx,
+                    this.name,
+                    externalId,
+                );
 
             if (existingUser) {
+                if (decoded.email_verified && !existingUser.verified) {
+                    await this.connection
+                        .getRepository(ctx, User)
+                        .update(existingUser.id, {
+                            verified: true,
+                        });
+
+                    Logger.info(
+                        `User marcado como verificado desde Clerk: ${existingUser.identifier}`,
+                        'ClerkStrategy'
+                    );
+
+                    const refreshedUser = await this.connection
+                        .getRepository(ctx, User)
+                        .findOne({
+                            where: { id: existingUser.id },
+                            relations: ['roles'],
+                        });
+
+                    return refreshedUser ?? existingUser;
+                }
+
                 return existingUser;
             }
 
-            // Crear nuevo usuario y cliente
-            const newUser = await this.externalAuthenticationService.createCustomerAndUser(ctx, {
-                strategy: this.name,
-                externalIdentifier: decoded.sub,
-                verified: decoded.email_verified ?? false,
-                emailAddress: decoded.email,
-                firstName: decoded.given_name || decoded.name?.split(' ')[0] || '',
-                lastName: decoded.family_name || decoded.name?.split(' ')[1] || '',
-            });
 
-            // Vendure asigna automáticamente el rol `__customer_role__`
-            Logger.info(`Nuevo usuario creado desde Auth0: ${decoded.email}`, 'Auth0Strategy');
+            const newUser =
+                await this.externalAuthenticationService.createCustomerAndUser(ctx, {
+                    strategy: this.name,
+                    externalIdentifier: externalId,
+                    verified: decoded.email_verified,
+                    emailAddress: email,
+                    firstName: decoded.first_name ?? '',
+                    lastName: decoded.last_name ?? '',
+                });
+
+            Logger.info(
+                `Nuevo usuario creado desde Clerk: ${email}`,
+                'ClerkStrategy'
+            );
 
             return newUser;
         } catch (error) {
-            Logger.error(`Auth0 error: ${error instanceof Error ? error.message : error}`, 'Auth0Strategy');
+            Logger.error(
+                `Clerk error: ${error instanceof Error ? error.message : error}`,
+                'ClerkStrategy'
+            );
             return false;
         }
     }
 
+
     private async verifyToken(token: string): Promise<any> {
-        return new Promise((resolve, reject) => {
-            const decodedToken = jwt.decode(token, { complete: true });
-
-            if (!decodedToken || !decodedToken.header.kid) {
-                reject(new Error('Invalid token'));
-                return;
-            }
-
-            this.client.getSigningKey(decodedToken.header.kid, (err, key) => {
-                if (err || !key) {
-                    reject(err || new Error('Missing signing key'));
-                    return;
-                }
-
-                const signingKey = key.getPublicKey();
-
-                jwt.verify(
-                    token,
-                    signingKey,
-                    {
-                        audience: this.audience,
-                        issuer: `https://${this.domain}/`,
-                        algorithms: ['RS256'],
-                    },
-                    (verifyErr, decoded) => {
-                        if (verifyErr) {
-                            reject(verifyErr);
-                        } else {
-                            resolve(decoded);
-                        }
-                    },
-                );
+        try {
+            const decoded = await verifyToken(token, {
+                secretKey: process.env.CLERK_SECRET_KEY || '',
             });
-        });
+            return decoded;
+        } catch (error) {
+            Logger.error(`Token verification error: ${error instanceof Error ? error.message : error}`, 'ClerkStrategy');
+            throw new Error('Invalid or expired token');
+        }
     }
 }

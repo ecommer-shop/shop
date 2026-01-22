@@ -18,11 +18,11 @@ export class ExternalAuthResolver {
     ) { }
 
     @Mutation()
-    @Allow(Permission.Authenticated)
+    @Allow(Permission.Public)
     async authenticateExternal(
         @Ctx() ctx: RequestContext,
         @Args('input') input: { token: string },
     ) {
-        await this.externalAuthService.loadCurrentUserRolesAndPermissions(ctx, input.token);
+        return await this.externalAuthService.loadCurrentUserRolesAndPermissions(ctx, input.token);
     }
 }
