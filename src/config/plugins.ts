@@ -7,6 +7,7 @@ import {
   DefaultSchedulerPlugin,
   DefaultSearchPlugin,
   LanguageCode,
+  Role,
 } from '@vendure/core';
 import { AdminUiPlugin } from '@vendure/admin-ui-plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
@@ -23,8 +24,10 @@ import {
 import { ROUTE, ROUTE_STORE } from '../consts';
 import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CURRENCY } from '../plugins/payment/constants';
-import { Auth0Plugin } from '../plugins/auth0/auth0.plugin';
+import { ClerkPlugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
+import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
+import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
 import { ResendEmailSender } from './mail/resend-email-sender';
 import {
   IS_DEV,
@@ -33,6 +36,9 @@ import {
   storeUrl,
   assetUploadDir,
 } from './environment';
+import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
+import { DashboardPlugin } from '@vendure/dashboard/plugin';
+import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
 
 const useS3Storage =
   !!process.env.MINIO_ENDPOINT || !!process.env.MINIO_BUCKET;
@@ -80,9 +86,11 @@ if (!fs.existsSync(partialsPath)) {
 
 const emailPlugin = EmailPlugin.init({
   transport: { type: 'none' },
+
   emailSender: new ResendEmailSender(process.env.RESEND_API_KEY),
+
   route: ROUTE.Mailbox,
-  handlers: defaultEmailHandlers,
+  handlers: [...defaultEmailHandlers],
   templateLoader: new FileBasedTemplateLoader(emailTemplatePath),
   globalTemplateVars: {
     fromAddress: '"EcommerShop" <ceo@ecommer.shop>',
@@ -93,15 +101,18 @@ const emailPlugin = EmailPlugin.init({
 });
 
 
+
 export const plugins: VendureConfig['plugins'] = [
+  MultivendorPlugin.init({
+    platformFeePercent: 10,
+    platformFeeSKU: "FEE"
+  }),
+
   GraphiqlPlugin.init(),
 
   assetServerPlugin,
 
-  Auth0Plugin.init({
-    domain: process.env.AUTH0_DOMAIN || '',
-    audience: process.env.AUTH0_AUDIENCE || '',
-  }),
+  ClerkPlugin.init(),
 
   DefaultSchedulerPlugin.init(),
   DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
@@ -118,12 +129,21 @@ export const plugins: VendureConfig['plugins'] = [
     },
   }),
 
+  DashboardPlugin.init({
+    route: ROUTE.Dashboard,
+    appDir: './dist/dashboard',
+  }),
+
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
   }),
 
+  PaymentMercadopagoPlugin.init({}),
+
   ServientregaPlugin.init({
     url: process.env.SERVIENTREGA_BASE ?? '',
   }),
+
+  SalesReportPlugin.init({}),
 ];

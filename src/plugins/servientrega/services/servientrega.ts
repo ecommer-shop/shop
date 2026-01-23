@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ID, Product, RequestContext, TransactionalConnection } from '@vendure/core';
+import { AuthenticationMethod, ID, Product, RequestContext, TransactionalConnection, User } from '@vendure/core';
 import { SERVIENTREGA_PLUGIN_OPTIONS } from '../constants';
 import { PluginInitOptions } from '../types';
 import axios from 'axios';
@@ -134,6 +134,4 @@ export class Servientrega {
         console.log(data);
         return data;
     }
-
-
 }
