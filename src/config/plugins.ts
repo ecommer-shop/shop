@@ -38,6 +38,7 @@ import {
 } from './environment';
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
+import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
 
 const useS3Storage =
   !!process.env.MINIO_ENDPOINT || !!process.env.MINIO_BUCKET;
@@ -102,6 +103,11 @@ const emailPlugin = EmailPlugin.init({
 
 
 export const plugins: VendureConfig['plugins'] = [
+  MultivendorPlugin.init({
+    platformFeePercent: 10,
+    platformFeeSKU: "FEE"
+  }),
+
   GraphiqlPlugin.init(),
 
   assetServerPlugin,
