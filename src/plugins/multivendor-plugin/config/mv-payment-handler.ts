@@ -1,3 +1,3 @@
-import { PaymentPaymentHandler } from 'src/plugins/payment/payment-method-handler';
+import { PaymentPaymentHandler } from '../../payment/payment-method-handler';
 
 export const multivendorPaymentMethodHandler = PaymentPaymentHandler
