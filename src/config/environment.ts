@@ -7,6 +7,7 @@ import path from 'node:path';
 export const IS_DEV = process.env.APP_ENV === 'dev';
 
 export const serverPort = Number(process.env.PORT) || 3000;
+
 export const storeUrl =
   process.env.STORE_URL || 'https://ecommer.shop';
 
