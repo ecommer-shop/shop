@@ -1,19 +1,28 @@
-{{> header title="Verificar tu nueva dirección de correo electrónico" }}
+{{> header title="Confirma tu nueva dirección de correo" }}
 
-<mj-section background-color="#fafafa">
-    <mj-column>
-        <mj-text color="#525252">
-            Recibimos una solicitud para cambiar su dirección de correo electrónico registrada a esta.
-            Haga clic en el botón de abajo para verificar esta dirección y completar el proceso:
-        </mj-text>
-        <mj-button font-family="Helvetica"
-                   background-color="#f45e43"
-                   color="white"
-                   href="{{ changeEmailAddressUrl }}?token={{ identifierChangeToken }}">
-            ¡Verifícame!
-        </mj-button>
-    </mj-column>
+<mj-section padding="20px">
+  <mj-column background-color="#ffffff" padding="30px" border-radius="12px">
+
+    <mj-text font-size="20px" font-weight="bold" color="#12123F">
+      Cambio de correo solicitado 🔐
+    </mj-text>
+
+    <mj-text>
+      Recibimos una solicitud para cambiar tu correo electrónico.
+      Para confirmar este cambio, haz clic en el botón de abajo.
+    </mj-text>
+
+    <mj-button
+      background-color="#6BB8FF"
+      color="#ffffff"
+      border-radius="24px"
+      font-size="16px"
+      padding="20px 0"
+      href="{{ changeEmailAddressUrl }}?token={{ identifierChangeToken }}">
+      Confirmar correo
+    </mj-button>
+
+  </mj-column>
 </mj-section>
-
 
 {{> footer }}
