@@ -6,10 +6,10 @@ import { Servientrega } from './services/servientrega';
 import { ServientregaShopResolver } from './api/servientrega-shop.resolver';
 import { shopApiExtensions } from './api/api-extensions';
 import { AuthorizationService } from '../auth0/services/auth.service';
-import { Auth0Plugin } from '../auth0/auth0.plugin';
+import { ClerkPlugin } from '../auth0/auth0.plugin';
 
 @VendurePlugin({
-    imports: [PluginCommonModule, Auth0Plugin],
+    imports: [PluginCommonModule, ClerkPlugin],
     providers: [{ provide: SERVIENTREGA_PLUGIN_OPTIONS, useFactory: () => ServientregaPlugin.options }, Servientrega],
     configuration: config => {
         // Plugin-specific configuration

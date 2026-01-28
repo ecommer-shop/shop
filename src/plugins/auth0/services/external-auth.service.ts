@@ -4,9 +4,23 @@ import {
     ID,
     RequestContext,
     TransactionalConnection,
-    User
+    User,
+    Logger
 } from "@vendure/core"
 import jwt from 'jsonwebtoken';
+import { verifyToken } from '@clerk/backend';
+
+type TokenUser = {
+    exp: number,
+    iat: number,
+    iss: string;
+    jti: string,
+    nbf: number,
+    sub: string,
+    userEmail: string,
+    userFirstname?: string,
+    userLastname?: string
+}
 
 export class ExternalAuthService {
     constructor(
@@ -29,19 +43,31 @@ export class ExternalAuthService {
             };
         }
 
-        // Decodificar token JWT (no hace verificación con firma, solo lectura)
-        const decoded: any = jwt.decode(token);
-        if (!decoded || !decoded.email) {
-            throw new Error('Token inválido: no contiene email');
+        let decoded: any;
+        try {
+            decoded = await verifyToken(token, {
+                secretKey: process.env.CLERK_SECRET_KEY || '',
+            });
+
+        } catch (error) {
+            Logger.error(`Error verificando token de Clerk: ${error instanceof Error ? error.message : error}`, 'ExternalAuthService');
+            throw new Error('Token inválido o expirado');
+        }
+        console.log("TOKEN email", decoded.userEmail);
+        if (!decoded || !decoded.userEmail) {
+
+            throw new Error('Token inválido: no contiene email, contiene:');
         }
 
-        const email = decoded.email;
-        const name = decoded.name ?? decoded.given_name ?? 'Usuario Externo';
+        const email = decoded.userEmail;
+        const firstName = decoded.userFirstname ?? 'Usuario Externo';
+        const lastName = decoded.userLastname ?? '';
 
         // Crear o actualizar Customer (esto crea el User si no existe)
         const customer = await this.customerService.createOrUpdate(ctx, {
             emailAddress: email,
-            firstName: name,
+            firstName,
+            lastName,
         });
 
         // Buscar el User asociado a ese Customer
@@ -52,7 +78,7 @@ export class ExternalAuthService {
         const session = await this.authService.createAuthenticatedSessionForUser(
             ctx,
             userEntity,
-            'external',
+            'clerk',
         );
 
         // Cargar roles del usuario (para incluir el code)
