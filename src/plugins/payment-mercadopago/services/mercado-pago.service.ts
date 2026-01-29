@@ -14,7 +14,7 @@ export class MercadoPagoService {
     constructor(
         private connection: TransactionalConnection,
         @Inject(PAYMENT_MERCADOPAGO_PLUGIN_OPTIONS) private options: PluginInitOptions
-    ) {}
+    ) { }
 
     /**
      * Crea una preferencia de pago en Mercado Pago
@@ -31,7 +31,7 @@ export class MercadoPagoService {
         this.validatePreferenceData(dto);
 
         try {
-            // Crear instancia de Preference
+            // Crear instancia de Preferences
             const preferences = new Preference(mercadoPagoConfig.client);
 
             // Preparar items para la preferencia
@@ -71,8 +71,8 @@ export class MercadoPagoService {
             this.logger.debug(`Preferencia creada exitosamente: ${preference.id}`);
 
             return {
-                preferenceId: preference.id,
-                init_point: preference.init_point,
+                preferenceId: preference.id!,
+                init_point: preference.init_point!,
             };
         } catch (error: any) {
             this.logger.error(`Error al crear preferencia en MercadoPago: ${error.message}`, error.stack);

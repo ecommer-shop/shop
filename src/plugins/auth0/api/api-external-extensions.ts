@@ -11,7 +11,7 @@ export const shopApiExtensions = gql`
     description: String
   }
 
-    type ExternalAuthPermission {
+  type ExternalAuthPermission {
     code: String!
     permission: String
   }

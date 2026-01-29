@@ -1,18 +1,28 @@
-{{> header title="Verificar tu dirección de correo electrónico" }}
+{{> header title="Verifica tu correo electrónico" }}
 
-<mj-section background-color="#F1F1F1">
-    <mj-column>
-        <mj-text color="#525252">
-            Gracias por crear una cuenta. Haga clic en el botón de abajo para verificar esta dirección de correo
-            electrónico y
-            completar el proceso de registro:
-        </mj-text>
-        <mj-button font-family="Helvetica" background-color="#9969F8" color="white"
-            href="{{ verifyEmailAddressUrl }}?token={{ verificationToken }}">
-            Verifica me!
-        </mj-button>
-    </mj-column>
+<mj-section padding="20px">
+  <mj-column background-color="#ffffff" padding="30px" border-radius="12px">
+
+    <mj-text font-size="20px" font-weight="bold" color="#12123F">
+      Verifica tu dirección de correo ✉️
+    </mj-text>
+
+    <mj-text>
+      Gracias por crear una cuenta en <strong>Ecommer.shop</strong>.
+      Para completar el registro, por favor confirma tu correo electrónico.
+    </mj-text>
+
+    <mj-button
+      background-color="#6BB8FF"
+      color="#ffffff"
+      border-radius="24px"
+      font-size="16px"
+      padding="20px 0"
+      href="{{ verifyEmailAddressUrl }}?token={{ verificationToken }}">
+      Verificar correo
+    </mj-button>
+
+  </mj-column>
 </mj-section>
-
 
 {{> footer }}
