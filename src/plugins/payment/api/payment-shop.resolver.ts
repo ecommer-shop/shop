@@ -10,7 +10,7 @@ export class paymentShopResolver {
     @Query()
     @Allow(Permission.Public) // todo: adjust permissions as needed
     GetPaymentSignature(@Ctx() ctx: RequestContext, @Args() args: { amountInCents: number }): Promise<string> {
-        Logger.debug('PaymentShopResolver: Getting payment signature', { amountInCents: args.amountInCents }.toString());
+        Logger.info('PaymentShopResolver: Getting payment signature', { amountInCents: args.amountInCents }.toString());
         return this.paymentService.getPaymentSignature(ctx, args.amountInCents);
     }
 }
