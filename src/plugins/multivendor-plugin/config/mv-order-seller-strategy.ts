@@ -82,14 +82,14 @@ export class MultivendorSellerStrategy implements OrderSellerStrategy {
             }
         }
 
-        for (const partialOrder of partialOrders.values()) {
+        for (const partialOrder of Array.from(partialOrders.values())) {
             const shippingLineIds = new Set(partialOrder.lines.map(l => l.shippingLineId));
             partialOrder.shippingLines = order.shippingLines.filter(shippingLine =>
                 shippingLineIds.has(shippingLine.id),
             );
         }
 
-        return [...partialOrders.values()];
+        return Array.from(partialOrders.values());
     }
 
     async afterSellerOrdersCreated(ctx: RequestContext, aggregateOrder: Order, sellerOrders: Order[]) {
