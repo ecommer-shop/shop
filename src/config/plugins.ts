@@ -142,7 +142,7 @@ export const plugins: VendureConfig['plugins'] = [
   PaymentMercadopagoPlugin.init({}),
 
   ServientregaPlugin.init({
-    url: 'https://app.servientrega.com/co/rest',
+    url: process.env.SERVIENTREGA_BASE!,
   }),
 
   SalesReportPlugin.init({}),
