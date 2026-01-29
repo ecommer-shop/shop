@@ -12,6 +12,7 @@ export class PaymentService {
         @Inject(PAYMENT_PLUGIN_OPTIONS) private readonly options: PluginInitOptions) { }
 
     async getPaymentSignature(ctx: RequestContext, amountInCents: number): Promise<string> {
+        Logger.debug('PaymentService: Getting payment signature', { amountInCents, currency: this.options.currency, secretKey: this.options.secretKey }.toString());
         if (!this.options.secretKey) {
             throw new Error('PAYMENT_SECRET_KEY environment variable is not set');
         }
