@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "jsx": "react-jsx",
+    "paths": {
+      "@/vdb/*": ["../../../../node_modules/@vendure/dashboard/src/lib/*"],
+      "@/gql": ["../../../gql/graphql.ts"]
+    }
+  }
+}

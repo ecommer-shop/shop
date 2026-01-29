@@ -24,11 +24,11 @@ import {
 import { ROUTE, ROUTE_STORE } from '../consts';
 import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
-import { ReviewsPlugin } from '../plugins/reviews/reviews.plugin';
+import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
 import { CURRENCY } from '../plugins/payment/constants';
 import { Auth0Plugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
-import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
+//import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
 import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
 import { ResendEmailSender } from './mail/resend-email-sender';
 import {
@@ -142,7 +142,7 @@ export const plugins: VendureConfig['plugins'] = [
     currency: CURRENCY,
   }),
 
-  PaymentMercadopagoPlugin.init({}),
+  //PaymentMercadopagoPlugin.init({}),
 
   ServientregaPlugin.init({
     url: process.env.SERVIENTREGA_BASE ?? '',
