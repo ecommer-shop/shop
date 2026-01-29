@@ -49,35 +49,32 @@ const assetServerPlugin = AssetServerPlugin.init({
   namingStrategy: new DefaultAssetNamingStrategy(),
   ...(useS3Storage
     ? {
-        storageStrategyFactory: configureS3AssetStorage({
-          bucket: process.env.MINIO_BUCKET || 'e-assets',
-          credentials: {
-            accessKeyId:
-              process.env.MINIO_ACCESS_KEY ||
-              process.env.MINIO_ROOT_USER ||
-              'minio-admin',
-            secretAccessKey:
-              process.env.MINIO_SECRET_KEY ||
-              process.env.MINIO_ROOT_PASSWORD ||
-              'minio-admin',
-          },
-          nativeS3Configuration: {
-            endpoint:
-              process.env.MINIO_ENDPOINT || 'http://localhost:9000',
-            forcePathStyle: true,
-            signatureVersion: 'v4',
-            region: 'eu-west-1', // dummy requerido por aws-sdk
-          },
-        }),
-      }
+      storageStrategyFactory: configureS3AssetStorage({
+        bucket: process.env.MINIO_BUCKET || 'e-assets',
+        credentials: {
+          accessKeyId:
+            process.env.MINIO_ACCESS_KEY ||
+            process.env.MINIO_ROOT_USER ||
+            'minio-admin',
+          secretAccessKey:
+            process.env.MINIO_SECRET_KEY ||
+            process.env.MINIO_ROOT_PASSWORD ||
+            'minio-admin',
+        },
+        nativeS3Configuration: {
+          endpoint:
+            process.env.MINIO_ENDPOINT || 'http://localhost:9000',
+          forcePathStyle: true,
+          signatureVersion: 'v4',
+          region: 'eu-west-1', // dummy requerido por aws-sdk
+        },
+      }),
+    }
     : {}),
 });
 
 
-const emailTemplatePath = path.join(
-  __dirname,
-  `${staticDir}/email/templates`,
-);
+const emailTemplatePath = path.join(__dirname, '../', staticDir, 'email', 'templates');
 const partialsPath = path.join(emailTemplatePath, 'partials');
 
 if (!fs.existsSync(partialsPath)) {
@@ -88,10 +85,12 @@ const emailPlugin = EmailPlugin.init({
   transport: { type: 'none' },
   emailSender: new ResendEmailSender(process.env.RESEND_API_KEY),
   route: ROUTE.Mailbox,
-  handlers: defaultEmailHandlers,
+  handlers: [
+    ...defaultEmailHandlers,
+  ],
   templateLoader: new FileBasedTemplateLoader(emailTemplatePath),
   globalTemplateVars: {
-    fromAddress: 'noreply <ron@rigeltoth.com>',
+    fromAddress: '"EcommerShop" <ceo@ecommer.shop>',
     verifyEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.verify}`,
     passwordResetUrl: `${storeUrl}${ROUTE_STORE.account.resetPassword}`,
     changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,

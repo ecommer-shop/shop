@@ -4200,11 +4200,16 @@ mensch@^0.3.4:
 
 mercadopago@^2.10.0:
   version "2.11.0"
-  resolved "https://registry.npmjs.org/mercadopago/-/mercadopago-2.11.0.tgz"
+  resolved "https://registry.yarnpkg.com/mercadopago/-/mercadopago-2.11.0.tgz#aa36cf03b9e3984d71c53d63a9301776ddc6ec2a"
   integrity sha512-Etv7sBwQp8ZW179W5wAGc7JFmfFOeJttQSeN1HuDrwU38YOIi+nYdKN+2KTgR9/F1S8oOGMlkVPthyIwOF5BXQ==
   dependencies:
     node-fetch "^2.7.0"
     uuid "^9.0.0"
+
+merge-descriptors@1.0.3:
+  version "1.0.3"
+  resolved "https://registry.npmjs.org/merge-descriptors/-/merge-descriptors-1.0.3.tgz"
+  integrity sha512-gaNvAS7TZ897/rVaZ0nMtAyxNyi/pdbjbAwUpFQpN70GqnVfOiXpeUUMKRBmzXaSQ8DdTX4/0ms62r2K+hE6mQ==
 
 merge-descriptors@^2.0.0:
   version "2.0.0"
