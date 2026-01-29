@@ -31,7 +31,7 @@ export class Servientrega {
     }
 
     async getCitiesOrigin(ctx: RequestContext, args: { countryId: number, productID: number, language: string }): Promise<any> {
-        const url = this.options.url;
+        const url = "https://app.servientrega.com/co/rest/locations/v1.0/api";
         const countryId = args.countryId;
         const productID = args.productID;
         const language = args.language;

@@ -10,7 +10,7 @@ import { ClerkPlugin } from '../auth0/auth0.plugin';
 
 @VendurePlugin({
     imports: [PluginCommonModule, ClerkPlugin],
-    providers: [{ provide: SERVIENTREGA_PLUGIN_OPTIONS, useFactory: () => ServientregaPlugin.options }, Servientrega],
+    providers: [{ provide: SERVIENTREGA_PLUGIN_OPTIONS, useValue: () => ServientregaPlugin.options }, Servientrega],
     configuration: config => {
         // Plugin-specific configuration
         // such as custom fields, custom permissions,
