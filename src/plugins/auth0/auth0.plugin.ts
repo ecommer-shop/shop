@@ -1,5 +1,5 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
-import { Auth0AuthenticationStrategy } from './auth0.strategy';
+import { ClerkAuthenticationStrategy } from './auth0.strategy';
 import { AuthorizationService } from './services/auth.service';
 import { ExternalAuthService } from './services/external-auth.service';
 import { shopApiExtensions } from './api/api-external-extensions';
@@ -15,17 +15,14 @@ import { ExternalAuthResolver } from './api/external-auth.resolver';
     exports: [AuthorizationService],
     configuration: config => {
         config.authOptions.shopAuthenticationStrategy.push(
-            new Auth0AuthenticationStrategy(
-                process.env.AUTH0_DOMAIN || '',
-                process.env.AUTH0_AUDIENCE || ''
-            )
+            new ClerkAuthenticationStrategy()
         );
         return config;
     },
 })
 
-export class Auth0Plugin {
-    static init(options: { domain: string; audience: string }) {
-        return Auth0Plugin;
+export class ClerkPlugin {
+    static init(options?: {}) {
+        return ClerkPlugin;
     }
 }

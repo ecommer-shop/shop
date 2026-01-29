@@ -26,7 +26,7 @@ import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
 import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
 import { CURRENCY } from '../plugins/payment/constants';
-import { Auth0Plugin } from '../plugins/auth0/auth0.plugin';
+import { ClerkPlugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
 //import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
 import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
@@ -40,6 +40,7 @@ import {
 } from './environment';
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
+import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
 
 const useS3Storage =
   !!process.env.MINIO_ENDPOINT || !!process.env.MINIO_BUCKET;
@@ -104,14 +105,16 @@ const emailPlugin = EmailPlugin.init({
 
 
 export const plugins: VendureConfig['plugins'] = [
+  MultivendorPlugin.init({
+    platformFeePercent: 10,
+    platformFeeSKU: "FEE"
+  }),
+
   GraphiqlPlugin.init(),
 
   assetServerPlugin,
 
-  Auth0Plugin.init({
-    domain: process.env.AUTH0_DOMAIN || '',
-    audience: process.env.AUTH0_AUDIENCE || '',
-  }),
+  ClerkPlugin.init(),
 
   DefaultSchedulerPlugin.init(),
   DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
@@ -145,7 +148,7 @@ export const plugins: VendureConfig['plugins'] = [
   //PaymentMercadopagoPlugin.init({}),
 
   ServientregaPlugin.init({
-    url: process.env.SERVIENTREGA_BASE ?? '',
+    url: process.env.SERVIENTREGA_BASE!,
   }),
 
   SalesReportPlugin.init({}),
