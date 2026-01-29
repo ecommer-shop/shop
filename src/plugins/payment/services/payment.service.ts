@@ -27,6 +27,7 @@ export class PaymentService {
             throw new Error('No active order found');
         }
         const concatenated = `${order.code}${amountInCents}${this.options.currency}${this.options.secretKey}`; // todo: add expiration time
+        Logger.debug('PaymentService: Concatenated string', concatenated);
         const hash = crypto.createHash('sha256').update(concatenated).digest('hex');
         Logger.debug('PaymentService: Generated payment signature', hash);
         return hash;
