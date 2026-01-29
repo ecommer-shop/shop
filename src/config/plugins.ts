@@ -27,6 +27,7 @@ import { Auth0Plugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
 import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
 import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
+import { InvoiceClientPlugin } from '../plugins/invoice-client/invoice-client.plugin';
 import { ResendEmailSender } from './mail/resend-email-sender';
 import {
   IS_DEV,
@@ -135,4 +136,9 @@ export const plugins: VendureConfig['plugins'] = [
   }),
 
   SalesReportPlugin.init({}),
+
+  InvoiceClientPlugin.init({
+    invoiceServiceUrl: process.env.INVOICE_SERVICE_URL || 'http://localhost:3001/api',
+    apiKey: process.env.INVOICE_SERVICE_API_KEY || '',
+  }),
 ];

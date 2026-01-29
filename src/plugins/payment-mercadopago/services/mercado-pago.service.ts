@@ -4,7 +4,7 @@ import { PAYMENT_MERCADOPAGO_PLUGIN_OPTIONS } from '../constants';
 import { PluginInitOptions } from '../types';
 import { CreatePreferenceDto, CreatePreferenceResponse } from '../models/create-preference.dto';
 import { mercadoPagoConfig, assertMercadoPagoReady } from '../../../config/mercadopago.config';
-import { Preferences } from 'mercadopago';
+import { Preference } from 'mercadopago';
 import { IS_DEV, storeUrl } from '../../../config/environment';
 
 @Injectable()
@@ -31,8 +31,8 @@ export class MercadoPagoService {
         this.validatePreferenceData(dto);
 
         try {
-            // Crear instancia de Preferences
-            const preferences = new Preferences(mercadoPagoConfig.client);
+            // Crear instancia de Preference
+            const preferences = new Preference(mercadoPagoConfig.client);
 
             // Preparar items para la preferencia
             const items = dto.productos.map(producto => ({
@@ -64,15 +64,15 @@ export class MercadoPagoService {
             this.logger.debug(`Creando preferencia con ${items.length} items`);
             const preference = await preferences.create({ body: preferenceData });
 
-            if (!preference || !preference.body || !preference.body.id || !preference.body.init_point) {
+            if (!preference || !preference.id || !preference.init_point) {
                 throw new Error('La respuesta de MercadoPago no contiene los datos esperados');
             }
 
-            this.logger.debug(`Preferencia creada exitosamente: ${preference.body.id}`);
+            this.logger.debug(`Preferencia creada exitosamente: ${preference.id}`);
 
             return {
-                preferenceId: preference.body.id,
-                init_point: preference.body.init_point,
+                preferenceId: preference.id,
+                init_point: preference.init_point,
             };
         } catch (error: any) {
             this.logger.error(`Error al crear preferencia en MercadoPago: ${error.message}`, error.stack);
