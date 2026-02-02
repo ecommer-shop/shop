@@ -24,6 +24,6 @@
         "src/plugins/**/dashboard/*",
         "src/gql/**/*.ts",
         "src/vite-env.d.ts",
-        "src /**/*.tsx",
+        "src/**/*.tsx"
     ]
 }
