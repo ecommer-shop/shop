@@ -23,10 +23,12 @@ import {
 
 import { ROUTE, ROUTE_STORE } from '../consts';
 import { PaymentPlugin } from '../plugins/payment/payment.plugin';
+import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
+import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
 import { CURRENCY } from '../plugins/payment/constants';
 import { ClerkPlugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
-import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
+//import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
 import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
 import { InvoiceClientPlugin } from '../plugins/invoice-client/invoice-client.plugin';
 import { ResendEmailSender } from './mail/resend-email-sender';
@@ -130,17 +132,21 @@ export const plugins: VendureConfig['plugins'] = [
     },
   }),
 
+
   DashboardPlugin.init({
     route: ROUTE.Dashboard,
     appDir: './dist/dashboard',
   }),
 
+  CoinbasePlugin,
+  ReviewsPlugin,
+  
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
   }),
 
-  PaymentMercadopagoPlugin.init({}),
+  //PaymentMercadopagoPlugin.init({}),
 
   ServientregaPlugin.init({
     url: process.env.SERVIENTREGA_BASE!,
