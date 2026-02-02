@@ -104,7 +104,7 @@ export class ProductReviewService {
         customerId: ID,
         productId: ID,
     ): Promise<boolean> {
-        const ProductReview = await import('../entities/product-review.entity').then(
+        const ProductReview = await import('../entities/product-review.entity.js').then(
             m => m.ProductReview,
         );
 
