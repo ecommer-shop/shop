@@ -39,6 +39,8 @@ import {
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
+import { GoogleSheetsLoaderPlugin } from '../plugins/google-sheets-loader/google-sheets-loader.plugin';
+import { GoogleDataLoadingStrategy } from '../plugins/google-sheets-loader/google-loader-strategy';
 
 const useS3Storage =
   !!process.env.MINIO_ENDPOINT || !!process.env.MINIO_BUCKET;
@@ -146,4 +148,8 @@ export const plugins: VendureConfig['plugins'] = [
   }),
 
   SalesReportPlugin.init({}),
+
+  GoogleSheetsLoaderPlugin.init({
+    googleApiKey: process.env.GOOGLE_API_KEY || 'AIzaSyCSoajaDJg6HbXiQBMTV7KgwhGz3fGuTzs'
+  })
 ];
