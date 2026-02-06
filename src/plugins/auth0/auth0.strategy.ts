@@ -79,7 +79,6 @@ export class ClerkAuthenticationStrategy implements AuthenticationStrategy<Clerk
                 return existingUser;
             }
 
-
             const newUser =
                 await this.externalAuthenticationService.createCustomerAndUser(ctx, {
                     strategy: this.name,

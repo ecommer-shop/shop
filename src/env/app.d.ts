@@ -4,6 +4,7 @@ declare global {
    namespace NodeJS {
       interface ProcessEnv {
          ADMIN_UI_API_PORT: number;
+         HOST_URL: string;
          APP_ENV: string;
          ASSET_UPLOAD_DIR: string;
          COOKIE_SECRET: string;

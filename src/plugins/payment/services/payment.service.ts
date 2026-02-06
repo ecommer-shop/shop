@@ -12,6 +12,7 @@ export class PaymentService {
         @Inject(PAYMENT_PLUGIN_OPTIONS) private readonly options: PluginInitOptions) { }
 
     async getPaymentSignature(ctx: RequestContext, amountInCents: number): Promise<string> {
+        Logger.debug('PaymentService: Getting payment signature', { amountInCents, currency: this.options.currency, secretKey: this.options.secretKey }.toString());
         if (!this.options.secretKey) {
             throw new Error('PAYMENT_SECRET_KEY environment variable is not set');
         }
@@ -27,6 +28,7 @@ export class PaymentService {
             throw new Error('No active order found');
         }
         const concatenated = `${order.code}${amountInCents}${this.options.currency}${this.options.secretKey}`; // todo: add expiration time
+        Logger.debug('PaymentService: Concatenated string', concatenated);
         const hash = crypto.createHash('sha256').update(concatenated).digest('hex');
         Logger.debug('PaymentService: Generated payment signature', hash);
         return hash;
