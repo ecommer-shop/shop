@@ -20,7 +20,8 @@ export default defineConfig({
             api: IS_DEV
                 ? { host: 'http://localhost', port: 3000 }
                 : {
-                    host: 'https://admin.ecommer.shop'
+                    host: process.env.HOST_URL as string,
+                    // host: 'https://admin.ecommer.shop'
                 },
             // When you start the Vite server, your Admin API schema will
             // be introspected and the types will be generated in this location.
