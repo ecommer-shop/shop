@@ -11,10 +11,10 @@ export class PaymentService {
         private readonly userService: UserService,
         @Inject(PAYMENT_PLUGIN_OPTIONS) private readonly options: PluginInitOptions) { }
 
-    async getPaymentSignature(ctx: RequestContext, amountInCents: number, reference: string): Promise<string> {
+    async getPaymentSignature(ctx: RequestContext, amountInCents: number, paymentReference: string): Promise<string> {
         Logger.debug('PaymentService: Getting payment signature', JSON.stringify({
             amountInCents,
-            reference,
+            paymentReference,
             currency: this.options.currency
         }));
 
@@ -22,7 +22,7 @@ export class PaymentService {
             throw new Error('PAYMENT_SECRET_KEY environment variable is not set');
         }
 
-        const concatenated = `${reference}${amountInCents}${this.options.currency}${this.options.secretKey}`;
+        const concatenated = `${paymentReference}${amountInCents}${this.options.currency}${this.options.secretKey}`;
         Logger.debug('PaymentService: Concatenated string', concatenated);
 
         const hash = crypto.createHash('sha256').update(concatenated).digest('hex');
