@@ -9,11 +9,11 @@ export class paymentShopResolver {
 
     @Query()
     @Allow(Permission.Public)
-    GetPaymentSignature(@Ctx() ctx: RequestContext, @Args() args: { amountInCents: number; reference: string }): Promise<string> {
+    GetPaymentSignature(@Ctx() ctx: RequestContext, @Args() args: { amountInCents: number; paymentReference: string }): Promise<string> {
         Logger.info('PaymentShopResolver: Getting payment signature', JSON.stringify({
             amountInCents: args.amountInCents,
-            reference: args.reference
+            paymentReference: args.paymentReference
         }));
-        return this.paymentService.getPaymentSignature(ctx, args.amountInCents, args.reference);
+        return this.paymentService.getPaymentSignature(ctx, args.amountInCents, args.paymentReference);
     }
 }

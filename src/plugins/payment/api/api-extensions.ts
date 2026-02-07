@@ -4,7 +4,7 @@ const paymentShopApiExtensions = gql`
   extend type Query {
     GetPaymentSignature(
     amountInCents: Int!,
-    reference: String!,
+    paymentReference: String!,
     ): String!
   }
 `;
