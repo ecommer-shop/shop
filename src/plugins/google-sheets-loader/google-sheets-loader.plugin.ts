@@ -1,17 +1,18 @@
 import * as path from 'path';
-import { PluginCommonModule, Type, VendurePlugin } from '@vendure/core';
+import { Injector, PluginCommonModule, Type, VendurePlugin } from '@vendure/core';
 
 import { GOOGLE_SHEETS_LOADER_PLUGIN_OPTIONS } from './constants';
 import { PluginInitOptions } from './types';
 import { GoogleSheet } from './entities/google-sheet.entity';
-import { GoogleSheetService } from './services/google-sheet.service';
 import { GoogleSheetAdminResolver } from './api/google-sheet-admin.resolver';
 import { adminApiExtensions } from './api/api-extensions';
 import { GoogleSheetTranslation } from './entities/google-sheet-translation.entity';
+import { ExcelImportService } from './services/excel-import.service';
+import { ExcelImportResolver } from './api/excel-import.resolver';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
-    providers: [{ provide: GOOGLE_SHEETS_LOADER_PLUGIN_OPTIONS, useFactory: () => GoogleSheetsLoaderPlugin.options }, GoogleSheetService],
+    providers: [{ provide: GOOGLE_SHEETS_LOADER_PLUGIN_OPTIONS, useFactory: () => GoogleSheetsLoaderPlugin.options }, ExcelImportService, Injector],
     configuration: config => {
         // Plugin-specific configuration
         // such as custom fields, custom permissions,
@@ -24,7 +25,7 @@ import { GoogleSheetTranslation } from './entities/google-sheet-translation.enti
     entities: [GoogleSheet, GoogleSheetTranslation],
     adminApiExtensions: {
         schema: adminApiExtensions,
-        resolvers: [GoogleSheetAdminResolver]
+        resolvers: [GoogleSheetAdminResolver, ExcelImportResolver]
     },
 })
 export class GoogleSheetsLoaderPlugin {

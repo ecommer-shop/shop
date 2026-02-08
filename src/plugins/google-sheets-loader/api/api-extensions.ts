@@ -35,6 +35,31 @@ const googleSheetAdminApiExtensions = gql`
     updateGoogleSheet(input: UpdateGoogleSheetInput!): GoogleSheet!
     deleteGoogleSheet(id: ID!): DeletionResponse!
   }
+
+  type GoogleSheetImportResult {
+    jobId: ID!
+  }
+
+  extend type Mutation {
+    importProductsFromGoogleSheet(sheetUrl: String!): GoogleSheetImportResult!
+  }
+
+    input ImportProductInput {
+    sku: String!
+    name: String!
+    description: String
+  }
+
+  type ImportProductsResult {
+    success: Boolean!
+    message: String!
+  }
+
+  extend type Mutation {
+    importProductsFromExcel(
+      products: [ImportProductInput!]!
+    ): ImportProductsResult!
+  }
 `;
 export const adminApiExtensions = gql`
   ${googleSheetAdminApiExtensions}
