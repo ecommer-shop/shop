@@ -48,16 +48,34 @@ const googleSheetAdminApiExtensions = gql`
     sku: String!
     name: String!
     description: String
+    price: Int!
+    stock: Int!
+  }
+
+  type ImportProductErrorDetail {
+    sku: String!
+    error: String!
+  }
+
+  type ImportProductSkippedDetail {
+    sku: String!
+    reason: String!
   }
 
   type ImportProductsResult {
     success: Boolean!
     message: String!
+    importedCount: Int!
+    failedCount: Int!
+    skippedCount: Int!
+    errors: [ImportProductErrorDetail!]
+    skipped: [ImportProductSkippedDetail!]
   }
 
   extend type Mutation {
     importProductsFromExcel(
       products: [ImportProductInput!]!
+      channelToken: String!
     ): ImportProductsResult!
   }
 `;

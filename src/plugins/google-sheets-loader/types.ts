@@ -5,3 +5,10 @@
 export interface PluginInitOptions {
     googleApiKey?: string;
 }
+
+export type ImportProduct = {
+    sku: string;
+    name: string;
+    description?: string;
+    price: number;
+};

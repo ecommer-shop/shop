@@ -1,2 +1,2 @@
-export const GOOGLE_SHEETS_LOADER_PLUGIN_OPTIONS = Symbol('GOOGLE_SHEETS_LOADER_PLUGIN_OPTIONS');
-export const loggerCtx = 'GoogleSheetsLoaderPlugin';
+export const EXCEL_LOADER_PLUGIN_OPTIONS = Symbol('EXCEL_LOADER_PLUGIN_OPTIONS');
+export const loggerCtx = 'ExcelLoaderPlugin';

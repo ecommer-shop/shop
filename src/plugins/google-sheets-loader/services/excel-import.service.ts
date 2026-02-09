@@ -3,13 +3,25 @@ import {
     ProductService,
     ProductVariantService,
     RequestContext,
+    RequestContextService,
 } from '@vendure/core';
 
 export type ImportProduct = {
     sku: string;
     name: string;
     description?: string;
+    price: number;
+    stock: number;
 };
+
+function slugify(text: string) {
+    return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+}
 
 @Injectable()
 export class ExcelImportService {
@@ -18,70 +30,102 @@ export class ExcelImportService {
     constructor(
         private productService: ProductService,
         private productVariantService: ProductVariantService,
+        private requestContextService: RequestContextService,
     ) { }
 
     async importProducts(
         ctx: RequestContext,
+        channelToken: string,
         products: ImportProduct[],
     ) {
-        try {
-            this.logger.log(`Starting import for ${products.length} products`);
+        const adminCtx = await this.requestContextService.create({
+            apiType: 'admin',
+            channelOrToken: channelToken,
+        });
 
-            let importedCount = 0;
-            const errors: { sku: string; error: string }[] = [];
+        this.logger.log(`Starting import for ${products.length} products`);
 
-            for (const product of products) {
-                try {
-                    this.logger.log(`Creating product: ${product.sku} - ${product.name}`);
+        let importedCount = 0;
+        let skippedCount = 0;
 
-                    const newProduct = await this.productService.create(ctx, {
-                        enabled: true,
-                        translations: [
-                            {
-                                languageCode: ctx.languageCode,
-                                name: product.name,
-                                description: product.description,
-                            },
-                        ],
-                    });
+        const skipped: { sku: string; reason: string }[] = [];
+        const errors: { sku: string; error: string }[] = [];
 
-                    await this.productVariantService.create(ctx, [
-                        {
-                            productId: newProduct.id,
-                            sku: product.sku,
-                            translations: [
-                                {
-                                    languageCode: ctx.languageCode,
-                                    name: product.name,
-                                },
-                            ],
+        for (const product of products) {
+            try {
+                //this.logger.log(`Checking SKU: ${product.sku}`);
+
+                // se valida por sku si el producto existe
+                const existingVariants =
+                    await this.productVariantService.findAll(adminCtx, {
+                        filter: {
+                            sku: { eq: product.sku },
                         },
-                    ]);
-
-                    importedCount++;
-                    this.logger.log(`Successfully created product: ${product.sku}`);
-                } catch (e: any) {
-                    this.logger.error(`Error creating product ${product.sku}: ${e.message}`);
-                    errors.push({
-                        sku: product.sku,
-                        error: e.message,
+                        take: 1,
                     });
+
+                if (existingVariants.totalItems > 0) {
+                    skippedCount++;
+                    skipped.push({
+                        sku: product.sku,
+                        reason: 'Variant already exists',
+                    });
+
+                    /*this.logger.log(
+                                            `Skipping SKU ${product.sku} (already exists)`,
+                                        );*/
+                    continue;
                 }
+
+                const slug = slugify(product.name);
+
+                this.logger.log(
+                    `Creating product: ${product.sku} - ${product.name}`,
+                );
+
+                const newProduct = await this.productService.create(adminCtx, {
+                    enabled: true,
+                    translations: [
+                        {
+                            languageCode: adminCtx.languageCode,
+                            name: product.name,
+                            description: product.description,
+                            slug,
+                        },
+                    ],
+                });
+
+                await this.productVariantService.create(adminCtx, [
+                    {
+                        productId: newProduct.id,
+                        sku: product.sku,
+                        price: product.price * 100,
+                        stockOnHand: product.stock,
+                        translations: newProduct.translations,
+                    },
+                ]);
+
+                importedCount++;
+                this.logger.log(`Successfully created SKU ${product.sku}`);
+            } catch (e: any) {
+                this.logger.error(
+                    `Error importing SKU ${product.sku}: ${e.message}`,
+                );
+                errors.push({
+                    sku: product.sku,
+                    error: e.message,
+                });
             }
-
-            const message = `Imported ${importedCount}/${products.length} products successfully`;
-            this.logger.log(message);
-
-            return {
-                success: errors.length === 0,
-                message,
-                importedCount,
-                failedCount: errors.length,
-                errors: errors.length > 0 ? errors : undefined,
-            };
-        } catch (e: any) {
-            this.logger.error(`Import failed: ${e.message}`, e.stack);
-            throw e;
         }
+
+        return {
+            success: errors.length === 0,
+            message: `Imported ${importedCount}/${products.length} products. Skipped: ${skippedCount}`,
+            importedCount,
+            skippedCount,
+            failedCount: errors.length,
+            skipped: skipped.length ? skipped : undefined,
+            errors: errors.length ? errors : undefined,
+        };
     }
 }

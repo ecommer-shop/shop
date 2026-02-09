@@ -8,17 +8,26 @@ import {
 } from '@vendure/dashboard';
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
+
 type ImportProduct = {
     sku: string;
     name: string;
     description?: string;
+    price: number;
+    stock: number;
 };
 
 const IMPORT_PRODUCTS_MUTATION = `
-  mutation ImportProductsFromExcel($products: [ImportProductInput!]!) {
-    importProductsFromExcel(products: $products) {
+  mutation ImportProductsFromExcel($products: [ImportProductInput!]!, $channelToken: String!) {
+    importProductsFromExcel(products: $products, channelToken: $channelToken) {
       success
       message
+      importedCount
+      failedCount
+      errors {
+        sku
+        error
+      }
     }
   }
 `;
@@ -50,18 +59,32 @@ function ExcelImportPage() {
             const data = await file.arrayBuffer();
             const workbook = XLSX.read(data);
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json<any>(sheet);
+            const rows = XLSX.utils.sheet_to_json(sheet, {
+                header: ['sku', 'name', 'description', 'price', 'stock'],
+                range: 1,
+                defval: null,
+            });
 
-            const parsed: ImportProduct[] = rows.map((row, index) => {
-                if (!row.sku || !row.name) {
-                    throw new Error(`Fila ${index + 2}: falta sku o name`);
+
+            const parsed: ImportProduct[] = rows.map((row: any, index) => {
+                if (
+                    !row.sku ||
+                    !row.name ||
+                    row.price === null ||
+                    row.stock === null
+                ) {
+                    throw new Error(`Fila ${index + 2}: faltan campos obligatorios`);
                 }
+
                 return {
-                    sku: String(row.sku),
-                    name: String(row.name),
-                    description: row.description ? String(row.description) : undefined,
+                    sku: String(row.sku).trim(),
+                    name: String(row.name).trim(),
+                    description: row.description ? String(row.description).trim() : undefined,
+                    price: Number(row.price),
+                    stock: Number(row.stock),
                 };
             });
+
 
             setProducts(parsed);
             setStatus('ready');
@@ -74,6 +97,13 @@ function ExcelImportPage() {
 
     const handleUpload = async () => {
         setStatus('loading');
+        const channelToken = localStorage.getItem('vendure-selected-channel-token');
+
+        if (!channelToken) {
+            setStatus('error');
+            setMessage('No se encontró el token del canal. Recarga la página.');
+            return;
+        }
 
         try {
             const response = await fetch('/admin-api/graphql', {
@@ -86,6 +116,7 @@ function ExcelImportPage() {
                     query: IMPORT_PRODUCTS_MUTATION,
                     variables: {
                         products,
+                        channelToken,
                     },
                 }),
             });
@@ -103,7 +134,11 @@ function ExcelImportPage() {
             const result = json.data?.importProductsFromExcel;
             if (result) {
                 setStatus('success');
-                setMessage(result.message);
+                let detailedMessage = result.message;
+                if (result.errors && result.errors.length > 0) {
+                    detailedMessage += `\n\nErrores:\n${result.errors.map((e: any) => `- ${e.sku}: ${e.error}`).join('\n')}`;
+                }
+                setMessage(detailedMessage);
                 setProducts([]);
             } else {
                 throw new Error('No se recibió respuesta del servidor');
@@ -121,19 +156,24 @@ function ExcelImportPage() {
             <PageLayout>
                 <PageBlock column="main">
                     <div className="space-y-4">
-                        <input
-                            type="file"
-                            accept=".xlsx,.xls"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                    handleFile(file);
-                                }
-                            }}
-                        />
+                        <Button type='button' variant='default'>
+                            <input
+                                type="file"
+                                accept=".xlsx,.xls"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        handleFile(file);
+                                    }
+                                }}
+                                style={{
+                                    cursor: "pointer"
+                                }}
+                            />
+                        </Button>
 
                         {status === 'ready' && (
-                            <Button onClick={handleUpload}>
+                            <Button variant="outline" onClick={handleUpload}>
                                 Importar {products.length} productos
                             </Button>
                         )}
