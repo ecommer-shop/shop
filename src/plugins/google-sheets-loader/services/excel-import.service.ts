@@ -99,7 +99,7 @@ export class ExcelImportService {
                     {
                         productId: newProduct.id,
                         sku: product.sku,
-                        price: product.price * 100,
+                        price: product.price,
                         stockOnHand: product.stock,
                         translations: newProduct.translations,
                     },

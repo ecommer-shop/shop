@@ -159,7 +159,7 @@ function ExcelImportPage() {
                         <Button type='button' variant='default'>
                             <input
                                 type="file"
-                                accept=".xlsx,.xls"
+                                accept=".xlsx, .xls, .xlsm, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/vnd.ms-excel.sheet.macroEnabled.12"
                                 onChange={(e) => {
                                     const file = e.target.files?.[0];
                                     if (file) {
