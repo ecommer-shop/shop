@@ -4,7 +4,9 @@ import {
     ProductVariantService,
     RequestContext,
     RequestContextService,
+    TransactionalConnection,
 } from '@vendure/core';
+import pLimit from 'p-limit';
 
 export type ImportProduct = {
     sku: string;
@@ -31,6 +33,7 @@ export class ExcelImportService {
         private productService: ProductService,
         private productVariantService: ProductVariantService,
         private requestContextService: RequestContextService,
+        private connection: TransactionalConnection,
     ) { }
 
     async importProducts(
@@ -45,86 +48,182 @@ export class ExcelImportService {
 
         this.logger.log(`Starting import for ${products.length} products`);
 
-        let importedCount = 0;
-        let skippedCount = 0;
+        const limit = pLimit(5);
 
-        const skipped: { sku: string; reason: string }[] = [];
+        let created = 0;
+        let updated = 0;
+        let skipped = 0;
+        let failed = 0;
+
         const errors: { sku: string; error: string }[] = [];
 
-        for (const product of products) {
-            try {
-                //this.logger.log(`Checking SKU: ${product.sku}`);
+        // Pre cargar variants por el sku
+        const skus = [...new Set(products.map(p => p.sku))];
+        this.logger.log(`Searching for ${skus.length} existing SKUs: ${skus.join(', ')}`);
 
-                // se valida por sku si el producto existe
-                const existingVariants =
-                    await this.productVariantService.findAll(adminCtx, {
-                        filter: {
-                            sku: { eq: product.sku },
-                        },
-                        take: 1,
-                    });
+        const existingVariants =
+            await this.productVariantService.findAll(adminCtx, {
+                filter: {
+                    sku: { in: skus },
+                },
+                skip: 0,
+                take: Math.max(skus.length, 100), // Asegurar que busca suficientes
+            });
 
-                if (existingVariants.totalItems > 0) {
-                    skippedCount++;
-                    skipped.push({
-                        sku: product.sku,
-                        reason: 'Variant already exists',
-                    });
+        this.logger.log(`Found ${existingVariants.items.length} existing variants`);
 
-                    /*this.logger.log(
-                                            `Skipping SKU ${product.sku} (already exists)`,
-                                        );*/
-                    continue;
-                }
+        const variantMap = new Map(
+            existingVariants.items.map(v => {
+                this.logger.debug(`Variant in map: SKU ${v.sku}`);
+                return [v.sku, v];
+            }),
+        );
 
-                const slug = slugify(product.name);
+        await Promise.all(
+            products.map(product =>
+                limit(async () => {
+                    try {
+                        if (
+                            !product.sku ||
+                            !product.name ||
+                            product.price == null ||
+                            product.stock == null
+                        ) {
+                            skipped++;
+                            return;
+                        }
 
-                this.logger.log(
-                    `Creating product: ${product.sku} - ${product.name}`,
-                );
+                        const existingVariant = variantMap.get(product.sku);
 
-                const newProduct = await this.productService.create(adminCtx, {
-                    enabled: true,
-                    translations: [
-                        {
-                            languageCode: adminCtx.languageCode,
-                            name: product.name,
-                            description: product.description,
-                            slug,
-                        },
-                    ],
-                });
+                        if (existingVariant) {
+                            // Obtener stock actual
+                            const raw = await this.connection
+                                .getRepository(adminCtx, 'StockMovement')
+                                .createQueryBuilder('sm')
+                                .select(
+                                    'COALESCE(SUM(sm.quantity), 0)',
+                                    'stock',
+                                )
+                                .where(
+                                    'sm.productVariantId = :id',
+                                    { id: existingVariant.id },
+                                )
+                                .getRawOne();
 
-                await this.productVariantService.create(adminCtx, [
-                    {
-                        productId: newProduct.id,
-                        sku: product.sku,
-                        price: product.price,
-                        stockOnHand: product.stock,
-                        translations: newProduct.translations,
-                    },
-                ]);
+                            const currentStock = Number(raw.stock);
 
-                importedCount++;
-                this.logger.log(`Successfully created SKU ${product.sku}`);
-            } catch (e: any) {
-                this.logger.error(
-                    `Error importing SKU ${product.sku}: ${e.message}`,
-                );
-                errors.push({
-                    sku: product.sku,
-                    error: e.message,
-                });
-            }
-        }
+                            // Comparar precio y stock
+                            const priceChanged = existingVariant.price !== product.price;
+                            const stockChanged = currentStock !== product.stock;
+
+                            if (!priceChanged && !stockChanged) {
+                                // Sin cambios, saltar
+                                skipped++;
+                                this.logger.log(
+                                    `Skipping SKU ${product.sku} (no changes - price: ${product.price}, stock: ${product.stock})`,
+                                );
+                                return;
+                            }
+
+                            // Hay cambios, actualizar
+                            if (priceChanged) {
+                                await this.productVariantService.update(adminCtx, [
+                                    {
+                                        id: existingVariant.id,
+                                        price: product.price,
+                                    },
+                                ]);
+                                this.logger.log(
+                                    `Updated price for SKU ${product.sku}: ${product.price}`,
+                                );
+                            }
+
+                            if (stockChanged) {
+                                const delta = product.stock - currentStock;
+                                await this.connection
+                                    .getRepository(
+                                        adminCtx,
+                                        'StockMovement',
+                                    )
+                                    .save({
+                                        productVariantId:
+                                            existingVariant.id,
+                                        quantity: delta,
+                                    });
+                                this.logger.log(
+                                    `Updated stock for SKU ${product.sku}: ${currentStock} -> ${product.stock}`,
+                                );
+                            }
+
+                            updated++;
+                            return;
+                        }
+
+                        // No existe, crear
+                        const slug = slugify(product.name);
+
+                        const newProduct =
+                            await this.productService.create(
+                                adminCtx,
+                                {
+                                    enabled: true,
+                                    translations: [
+                                        {
+                                            languageCode:
+                                                adminCtx.languageCode,
+                                            name: product.name,
+                                            description:
+                                                product.description,
+                                            slug,
+                                        },
+                                    ],
+                                },
+                            );
+
+                        await this.productVariantService.create(
+                            adminCtx,
+                            [
+                                {
+                                    productId: newProduct.id,
+                                    sku: product.sku,
+                                    price: product.price,
+                                    stockOnHand: product.stock,
+                                    translations:
+                                        newProduct.translations,
+                                },
+                            ],
+                        );
+
+                        created++;
+                    } catch (e: any) {
+                        failed++;
+                        errors.push({
+                            sku: product.sku,
+                            error: e.message,
+                        });
+                        this.logger.error(
+                            `Error importing SKU ${product.sku}: ${e.message}`,
+                        );
+                    }
+                }),
+            ),
+        );
 
         return {
-            success: errors.length === 0,
-            message: `Imported ${importedCount}/${products.length} products. Skipped: ${skippedCount}`,
-            importedCount,
-            skippedCount,
-            failedCount: errors.length,
-            skipped: skipped.length ? skipped : undefined,
+            success: failed === 0,
+            message:
+                [
+                    created && `Creados: ${created}`,
+                    updated && `Actualizados: ${updated}`,
+                    skipped && `Omitidos: ${skipped}`,
+                    failed && `Fallidos: ${failed}`,
+                ]
+                    .filter(Boolean)
+                    .join(' | ') || 'No hubo cambios (todos los productos ya existen)',
+            importedCount: created,
+            updatedCount: updated,
+            failedCount: failed,
+            skippedCount: skipped,
             errors: errors.length ? errors : undefined,
         };
     }

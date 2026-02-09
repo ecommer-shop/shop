@@ -50,6 +50,9 @@ export class ImportProductsResultType {
     importedCount: number;
 
     @Field()
+    updatedCount: number;
+
+    @Field()
     failedCount: number;
 
     @Field()

@@ -66,6 +66,7 @@ const googleSheetAdminApiExtensions = gql`
     success: Boolean!
     message: String!
     importedCount: Int!
+    updatedCount: Int!
     failedCount: Int!
     skippedCount: Int!
     errors: [ImportProductErrorDetail!]

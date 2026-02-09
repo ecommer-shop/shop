@@ -23,10 +23,16 @@ const IMPORT_PRODUCTS_MUTATION = `
       success
       message
       importedCount
+      updatedCount
       failedCount
+      skippedCount
       errors {
         sku
         error
+      }
+      skipped {
+        sku
+        reason
       }
     }
   }
@@ -137,6 +143,9 @@ function ExcelImportPage() {
                 let detailedMessage = result.message;
                 if (result.errors && result.errors.length > 0) {
                     detailedMessage += `\n\nErrores:\n${result.errors.map((e: any) => `- ${e.sku}: ${e.error}`).join('\n')}`;
+                }
+                if (result.skipped && result.skipped.length > 0) {
+                    detailedMessage += `\n\nSaltados:\n${result.skipped.map((s: any) => `- ${s.sku}: ${s.reason}`).join('\n')}`;
                 }
                 setMessage(detailedMessage);
                 setProducts([]);
