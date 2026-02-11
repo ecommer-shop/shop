@@ -42,6 +42,7 @@ import {
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
+import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.plugin';
 
 const useS3Storage =
   !!process.env.MINIO_ENDPOINT || !!process.env.MINIO_BUCKET;
@@ -140,7 +141,7 @@ export const plugins: VendureConfig['plugins'] = [
 
   CoinbasePlugin,
   ReviewsPlugin,
-  
+
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
@@ -153,6 +154,8 @@ export const plugins: VendureConfig['plugins'] = [
   }),
 
   SalesReportPlugin.init({}),
+
+  ExcelLoaderPlugin.init({}),
 
   InvoiceClientPlugin.init({
     invoiceServiceUrl: process.env.INVOICE_SERVICE_URL || 'http://localhost:3001/api',
