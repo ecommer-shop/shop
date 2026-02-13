@@ -151,5 +151,7 @@ export const plugins: VendureConfig['plugins'] = [
   InvoiceClientPlugin.init({
     invoiceServiceUrl: process.env.INVOICE_SERVICE_URL || 'http://localhost:3001/api',
     apiKey: process.env.INVOICE_SERVICE_API_KEY || '',
+    prefix: process.env.MATIAS_PREFIX,
+    resolutionNumber: process.env.MATIAS_RESOLUTION_NUMBER,
   }),
 ];
