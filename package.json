@@ -25,6 +25,7 @@
         "@lingui/react": "^5.9.0",
         "@pinelab/vendure-plugin-coinbase": "^1.5.0",
         "@pinelab/vendure-plugin-google-sheet-loader": "^1.0.2",
+        "@pinelab/vendure-plugin-metrics": "^3.1.0",
         "@tanstack/react-table": "^8.21.3",
         "@vendure/admin-ui-plugin": "3.5.0",
         "@vendure/asset-server-plugin": "3.5.0",
