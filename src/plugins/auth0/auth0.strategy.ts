@@ -108,7 +108,7 @@ export class ClerkAuthenticationStrategy implements AuthenticationStrategy<Clerk
     private async verifyToken(token: string): Promise<any> {
         try {
             const decoded = await verifyToken(token, {
-                secretKey: process.env.CLERK_SECRET_KEY || '',
+                secretKey: process.env.CLERK_SECRET_KEY!,
             });
             return decoded;
         } catch (error) {

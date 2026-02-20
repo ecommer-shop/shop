@@ -6,6 +6,7 @@ import { PaymentService } from './services/payment.service';
 import { paymentShopResolver } from './api/payment-shop.resolver';
 import { shopApiExtensions } from './api/api-extensions';
 import { PaymentController } from './api/payment.controller';
+import { PaymentPaymentHandler } from './payment-method-handler';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
@@ -16,6 +17,9 @@ import { PaymentController } from './api/payment.controller';
         // such as custom fields, custom permissions,
         // strategies etc. can be configured here by
         // modifying the `config` object.
+        config.paymentOptions.paymentMethodHandlers.push(
+            PaymentPaymentHandler,
+        );
         return config;
     },
     compatibility: '^3.0.0',
