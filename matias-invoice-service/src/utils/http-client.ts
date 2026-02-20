@@ -28,7 +28,10 @@ export class HttpClient {
         return config;
       },
       (error) => {
-        logger.error('HTTP Request Error:', error);
+        logger.error('HTTP Request Error:', {
+          message: error?.message,
+          stack: error?.stack,
+        });
         return Promise.reject(error);
       }
     );
@@ -42,18 +45,17 @@ export class HttpClient {
         return response;
       },
       (error: AxiosError) => {
+        const meta = { url: error.config?.url, message: error.message, stack: error.stack };
         if (error.response) {
           logger.error(`HTTP Error Response: ${error.response.status}`, {
-            url: error.config?.url,
+            ...meta,
             data: error.response.data,
             status: error.response.status,
           });
         } else if (error.request) {
-          logger.error('HTTP Error: No response received', {
-            url: error.config?.url,
-          });
+          logger.error('HTTP Error: No response received', meta);
         } else {
-          logger.error('HTTP Error:', error.message);
+          logger.error('HTTP Error:', meta);
         }
         return Promise.reject(error);
       }
