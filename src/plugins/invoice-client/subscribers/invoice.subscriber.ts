@@ -1,4 +1,4 @@
-import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import {
   EventBus,
   OrderStateTransitionEvent,
@@ -8,6 +8,9 @@ import {
   LanguageCode,
 } from '@vendure/core';
 import { InvoiceClientService } from '../services/invoice-client.service';
+import { InvoiceSequenceService } from '../services/invoice-sequence.service';
+import { INVOICE_CLIENT_PLUGIN_OPTIONS } from '../constants';
+import { PluginInitOptions } from '../types';
 
 const loggerCtx = 'InvoiceSubscriber';
 
@@ -17,8 +20,10 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
   constructor(
     private eventBus: EventBus,
     private invoiceClientService: InvoiceClientService,
+    private invoiceSequenceService: InvoiceSequenceService,
     private orderService: OrderService,
-    private requestContextService: RequestContextService
+    private requestContextService: RequestContextService,
+    @Inject(INVOICE_CLIENT_PLUGIN_OPTIONS) private options: PluginInitOptions,
   ) {}
 
   async onApplicationBootstrap() {
@@ -64,15 +69,16 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
       }
       Logger.info(`No existing invoice found for order ${order.code}, proceeding to create...`, loggerCtx);
 
-      // Generar número de documento 
-      const documentNumber = this.generateDocumentNumber(order.code);
-      Logger.info(`Generated document number: ${documentNumber} for order ${order.code}`, loggerCtx);
+      const prefix = this.options.prefix ?? process.env.MATIAS_PREFIX ?? 'LZT';
+      const resolutionNumber = this.options.resolutionNumber ?? process.env.MATIAS_RESOLUTION_NUMBER ?? '18764074347312';
 
-      // Crear factura
+      const documentNumber = await this.invoiceSequenceService.getNextDocumentNumber(prefix);
+      Logger.info(`Generated document number: ${documentNumber} for order ${order.code} (prefix: ${prefix})`, loggerCtx);
+
       Logger.info(`Calling createInvoiceFromOrder for order ${order.code}...`, loggerCtx);
       await this.invoiceClientService.createInvoiceFromOrder(ctx, order, {
-        resolutionNumber: process.env.MATIAS_RESOLUTION_NUMBER || '18764074347312',
-        prefix: process.env.MATIAS_PREFIX || 'LZT',
+        resolutionNumber,
+        prefix,
         documentNumber,
         operationTypeId: 1,
         typeDocumentId: 7, // Factura de venta
@@ -81,21 +87,7 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
 
       Logger.info(`Invoice created successfully for order ${order.code}`, loggerCtx);
     } catch (error: any) {
-      // No bloquear el flujo de la orden si falla la facturación
       Logger.error(`Error creating invoice for order ${orderId}: ${error.message}`, loggerCtx);
     }
-  }
-
-  /**
-   * Genera un número de documento único
-   * En producción, deberías usar una secuencia o contador en base de datos
-   * Matias requiere que el número esté entre 1 y 10000
-   */
-  private generateDocumentNumber(orderCode: string): string {
-    // Generar un número entre 1 y 10000 usando el timestamp
-    // Usamos módulo 10000 + 1 para asegurar que esté en el rango válido
-    const timestamp = Date.now();
-    const documentNumber = (timestamp % 10000) + 1;
-    return documentNumber.toString();
   }
 }
