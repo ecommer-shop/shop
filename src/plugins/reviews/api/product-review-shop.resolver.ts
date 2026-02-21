@@ -55,7 +55,9 @@ export class ProductReviewShopResolver {
         const review = new ProductReview(sanitizedInput);
         const product = await this.connection.getEntityOrThrow(ctx, Product, sanitizedInput.productId);
         review.product = product;
-        review.state = 'new';
+        // Auto-aprobada: solo usuarios con compra verificada pueden dejar reviews
+        review.state = 'approved';
+        review.verifiedPurchase = true;
         review.author = customer;
 
         if (sanitizedInput.variantId) {

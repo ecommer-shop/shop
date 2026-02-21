@@ -5,14 +5,16 @@ import { ProductEntityResolver } from './api/product-entity.resolver';
 import { ProductReviewAdminResolver } from './api/product-review-admin.resolver';
 import { ProductReviewEntityResolver } from './api/product-review-entity.resolver';
 import { ProductReviewShopResolver } from './api/product-review-shop.resolver';
-import { ProductReviewTranslation } from './entities/product-review-translation.entity';
+import { ProductAISummary } from './entities/product-ai-summary.entity';
+import { ProductAISummaryTranslation } from './entities/product-ai-summary-translation.entity';
 import { ProductReview } from './entities/product-review.entity';
 import { ProductReviewService } from './services/product-review.service';
+import { ReviewSummaryService } from './services/review-summary.service';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
-    providers: [ProductReviewService],
-    entities: [ProductReview, ProductReviewTranslation],
+    providers: [ProductReviewService, ReviewSummaryService],
+    entities: [ProductReview, ProductAISummary, ProductAISummaryTranslation],
     adminApiExtensions: {
         schema: adminApiExtensions,
         resolvers: [ProductEntityResolver, ProductReviewAdminResolver, ProductReviewEntityResolver],
