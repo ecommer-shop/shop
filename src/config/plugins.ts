@@ -45,6 +45,7 @@ import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plu
 import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.plugin';
 import { MetricsPlugin } from '@pinelab/vendure-plugin-metrics';
 import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
+import { LoginPlugin } from '../plugins/login/login.plugin';
 
 const useS3Storage =
   !!process.env.MINIO_ENDPOINT || !!process.env.MINIO_BUCKET;
@@ -167,4 +168,8 @@ export const plugins: VendureConfig['plugins'] = [
   }),
 
   MetricsDashboardPlugin.init(),
+
+  LoginPlugin.init({
+    googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
+  }),
 ];

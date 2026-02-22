@@ -1,41 +1,23 @@
 import {
     api,
-    Button,
     Card,
     CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
     Page,
     PageLayout,
     PageTitle,
     PageBlock,
-    Input,
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
 } from '@vendure/dashboard';
 import { useQuery } from '@tanstack/react-query';
-import { Download, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { DatePicker } from './date-picker';
-import {
-    AreaChart,
-    Area,
-    CartesianGrid,
-    Legend,
-    LineChart,
-    Line,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
+import { DatePicker } from './components/date-picker';
+import { VariantSelector } from './components/variant-selector';
+import { SummaryCard } from './components/summary-card';
+import { MetricsAreaChart, MetricsLineChart } from './components/metrics-charts';
+import { MetricsTable } from './components/metrics-table';
+import { FiltersSection } from './components/filters-section';
+import { formatPdfValue, formatDateForPdf, formatDateForFile } from './components/utils';
 
 const PRODUCT_VARIANTS_QUERY = `
   query GetProductVariants($options: ProductVariantListOptions) {
@@ -105,89 +87,6 @@ interface ProductVariantsResponse {
     };
 }
 
-export function VariantSelector({
-    variants,
-    selectedIds,
-    onChange,
-}: {
-    variants: ProductVariant[];
-    selectedIds: string[];
-    onChange: (ids: string[]) => void;
-}) {
-    const [searchTerm, setSearchTerm] = useState('');
-
-    const filteredVariants = useMemo(() => {
-        if (!searchTerm) return variants;
-        return variants.filter(
-            (v) =>
-                v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                v.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                v.product.name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [variants, searchTerm]);
-
-    const selectedVariants = variants.filter((v) => selectedIds.includes(v.id));
-
-    return (
-        <div className="space-y-2">
-            <Input
-                placeholder="Buscar por nombre, SKU o producto..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-            />
-            <div className="flex flex-wrap gap-2 pb-2">
-                {selectedVariants.map((v) => (
-                    <div
-                        key={v.id}
-                        className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 rounded text-xs"
-                    >
-                        <span>{v.product.name} - {v.sku}</span>
-                        <button
-                            className="ml-1 hover:opacity-70"
-                            onClick={() =>
-                                onChange(selectedIds.filter((id) => id !== v.id))
-                            }
-                            title="Remover"
-                        >
-                            ✕
-                        </button>
-                    </div>
-                ))}
-            </div>
-            {searchTerm && filteredVariants.length > 0 && (
-                <div className="border rounded-md max-h-48 overflow-y-auto bg-background">
-                    {filteredVariants.slice(0, 10).map((v) => {
-                        const isSelected = selectedIds.includes(v.id);
-                        return (
-                            <button
-                                key={v.id}
-                                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${isSelected ? 'bg-accent' : ''
-                                    }`}
-                                onClick={() => {
-                                    if (isSelected) {
-                                        onChange(selectedIds.filter((id) => id !== v.id));
-                                    } else {
-                                        onChange([...selectedIds, v.id]);
-                                    }
-                                    setSearchTerm('');
-                                }}
-                            >
-                                <div className="font-medium">{v.product.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                    SKU: {v.sku}
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
-    );
-}
-
-// Main Page Component
-
 export function MetricsDetailPage() {
     // State
     const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
@@ -196,13 +95,6 @@ export function MetricsDetailPage() {
         new Date(new Date().setMonth(new Date().getMonth() - 12))
     );
     const [dateTo, setDateTo] = useState<Date>(new Date());
-
-    console.log('MetricsDetailPage mounted', {
-        selectedVariantIds,
-        selectedMetrics,
-        dateFrom,
-        dateTo,
-    });
 
     // Fetch all variants for selector
     const { data: variantData, isLoading: variantsLoading, error: variantsError } = useQuery({
@@ -214,27 +106,21 @@ export function MetricsDetailPage() {
 
     const allVariants = variantData?.productVariants.items ?? [];
 
-    console.log('Variants loaded:', { variantCount: allVariants.length, isLoading: variantsLoading, error: variantsError });
-
     // Fetch metrics data
-    const { data: metricsData, refetch, isRefetching, isLoading: metricsLoading, error: metricsError } = useQuery({
-        queryKey: ['advanced-metrics', selectedVariantIds, dateFrom, dateTo],
-        queryFn: () => {
-            console.log('Fetching metrics with:', { selectedVariantIds, dateFrom, dateTo });
-            return api.query<AdvancedMetricSummariesResponse>(ADVANCED_METRICS_QUERY, {
+    const { data: metricsData, refetch, isRefetching, isLoading: metricsLoading } = useQuery({
+        queryKey: ['advanced-metrics', selectedVariantIds],
+        queryFn: () =>
+            api.query<AdvancedMetricSummariesResponse>(ADVANCED_METRICS_QUERY, {
                 input: {
                     variantIds: selectedVariantIds.length > 0 ? selectedVariantIds : undefined,
-                    dateFrom,
-                    dateTo,
                 },
-            });
-        },
+            }),
         staleTime: 5 * 60 * 1000,
     });
 
     const allMetrics = metricsData?.advancedMetricSummaries ?? [];
 
-    console.log('Metrics loaded:', { metricCount: allMetrics.length, isLoading: metricsLoading, error: metricsError, allMetrics });
+    console.log('Metrics loaded:', { count: allMetrics.length, allMetrics });
 
     // Filter metrics based on selection
     const visibleMetrics =
@@ -254,7 +140,7 @@ export function MetricsDetailPage() {
                     point[`${metric.code}-${series.name}`] = series.values[index] ?? 0;
                 }
             }
-            return point;
+            return point as Record<string, string | number> & { name: string };
         });
     }, [visibleMetrics]);
 
@@ -287,6 +173,28 @@ export function MetricsDetailPage() {
             .map((id) => lookup.get(id))
             .filter((label): label is string => Boolean(label));
     }, [allVariants, selectedVariantIds]);
+
+    const getSummaryCardLabel = (key: string): string => {
+        // Format: "revenue-per-product" or similar
+        const [metricCode, ...seriesParts] = key.split('-');
+        const seriesName = seriesParts.join('-');
+
+        // If variantes are selected, show the variante names
+        if (selectedVariantLabels.length > 0) {
+            if (selectedVariantLabels.length === 1) {
+                return selectedVariantLabels[0];
+            }
+            // For multiple variants, show all names (or truncated if too many)
+            if (selectedVariantLabels.length <= 3) {
+                return selectedVariantLabels.join(' + ');
+            }
+            return `${selectedVariantLabels.slice(0, 2).join(' + ')} + ${selectedVariantLabels.length - 2} más`;
+        }
+
+        // Otherwise show metric details
+        const metricTitle = visibleMetrics.find((m) => m.code === metricCode)?.title ?? metricCode;
+        return `${metricTitle} - ${seriesName}`;
+    };
 
     const handleDownload = () => {
         if (metricsLoading || visibleMetrics.length === 0 || chartData.length === 0) {
@@ -335,7 +243,7 @@ export function MetricsDetailPage() {
         addLines('Resumen', 16);
         doc.setFontSize(10);
         for (const [key, stats] of Object.entries(summary)) {
-            const label = key.split('-')[1] ?? key;
+            const label = getSummaryCardLabel(key);
             addLines(`${label}: ${formatPdfValue(stats.total, stats.type)}`);
         }
 
@@ -370,15 +278,8 @@ export function MetricsDetailPage() {
             alternateRowStyles: { fillColor: [245, 245, 245] },
         });
 
-        const docWithTable = doc as jsPDF & { lastAutoTable?: { finalY: number } };
-        if (docWithTable.lastAutoTable?.finalY) {
-            cursorY = docWithTable.lastAutoTable.finalY + 10;
-        }
-
         doc.save(`metrics-${formatDateForFile(new Date())}.pdf`);
     };
-
-    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
     return (
         <Page pageId="metrics-detail-page">
@@ -392,102 +293,26 @@ export function MetricsDetailPage() {
                     </div>
 
                     {/* Filters Section */}
-                    <Card className="mb-6">
-                        <CardHeader>
-                            <CardTitle className="text-lg">Filtros</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* Product Variant Selector */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Productos/Variantes</label>
-                                    <VariantSelector
-                                        variants={allVariants}
-                                        selectedIds={selectedVariantIds}
-                                        onChange={setSelectedVariantIds}
-                                    />
-                                    {selectedVariantIds.length > 0 && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {selectedVariantIds.length} variante(s) seleccionada(s)
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Date Range */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Desde</label>
-                                    <DatePicker
-                                        value={dateFrom}
-                                        onChange={setDateFrom}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Hasta</label>
-                                    <DatePicker
-                                        value={dateTo}
-                                        onChange={setDateTo}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Metric Selection */}
-                            <div>
-                                <label className="text-sm font-medium">Métricas a mostrar</label>
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {allMetrics.map((metric) => (
-                                        <Button
-                                            key={metric.code}
-                                            variant={
-                                                selectedMetrics.length === 0 ||
-                                                    selectedMetrics.includes(metric.code)
-                                                    ? 'default'
-                                                    : 'outline'
-                                            }
-                                            size="sm"
-                                            onClick={() => {
-                                                if (selectedMetrics.includes(metric.code)) {
-                                                    setSelectedMetrics(
-                                                        selectedMetrics.filter((c) => c !== metric.code)
-                                                    );
-                                                } else {
-                                                    setSelectedMetrics([...selectedMetrics, metric.code]);
-                                                }
-                                            }}
-                                        >
-                                            {metric.title}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-2 justify-end pt-4 border-t">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => refetch()}
-                                    disabled={isRefetching}
-                                >
-                                    <RefreshCw className={`h-4 w-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
-                                    Actualizar
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleDownload}
-                                    disabled={
-                                        metricsLoading ||
-                                        visibleMetrics.length === 0 ||
-                                        chartData.length === 0
-                                    }
-                                >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Descargar
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <FiltersSection
+                        allVariants={allVariants}
+                        selectedVariantIds={selectedVariantIds}
+                        onVariantChange={setSelectedVariantIds}
+                        dateFrom={dateFrom}
+                        onDateFromChange={setDateFrom}
+                        dateTo={dateTo}
+                        onDateToChange={setDateTo}
+                        allMetrics={allMetrics}
+                        selectedMetrics={selectedMetrics}
+                        onMetricsChange={setSelectedMetrics}
+                        onRefresh={() => refetch()}
+                        isRefetching={isRefetching}
+                        onDownload={handleDownload}
+                        isDownloadDisabled={
+                            metricsLoading ||
+                            visibleMetrics.length === 0 ||
+                            chartData.length === 0
+                        }
+                    />
 
                     {/* Summary Cards */}
                     {Object.entries(summary).length > 0 && (
@@ -497,7 +322,7 @@ export function MetricsDetailPage() {
                                     stats.type === 'currency' && (
                                         <SummaryCard
                                             key={key}
-                                            label={key.split('-')[1]}
+                                            label={getSummaryCardLabel(key)}
                                             value={stats.total}
                                             type="currency"
                                         />
@@ -508,7 +333,7 @@ export function MetricsDetailPage() {
                                     stats.type === 'number' && (
                                         <SummaryCard
                                             key={key}
-                                            label={key.split('-')[1]}
+                                            label={getSummaryCardLabel(key)}
                                             value={stats.total}
                                             type="number"
                                         />
@@ -528,146 +353,9 @@ export function MetricsDetailPage() {
 
                     {!metricsLoading && visibleMetrics.length > 0 && chartData.length > 0 && (
                         <div className="space-y-6">
-                            {/* Area Chart */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Tendencia de Métricas</CardTitle>
-                                    <CardDescription>Ver evolución en el tiempo</CardDescription>
-                                </CardHeader>
-                                <CardContent className="h-96">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={chartData}>
-                                            <defs>
-                                                {COLORS.map((color, idx) => (
-                                                    <linearGradient
-                                                        key={idx}
-                                                        id={`gradient${idx}`}
-                                                        x1="0"
-                                                        y1="0"
-                                                        x2="0"
-                                                        y2="1"
-                                                    >
-                                                        <stop
-                                                            offset="5%"
-                                                            stopColor={color}
-                                                            stopOpacity={0.8}
-                                                        />
-                                                        <stop
-                                                            offset="95%"
-                                                            stopColor={color}
-                                                            stopOpacity={0}
-                                                        />
-                                                    </linearGradient>
-                                                ))}
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="name" />
-                                            <YAxis />
-                                            <Tooltip />
-                                            <Legend />
-                                            {visibleMetrics.map((metric, metricIdx) =>
-                                                metric.series.map((series, seriesIdx) => (
-                                                    <Area
-                                                        key={`${metric.code}-${series.name}`}
-                                                        type="monotone"
-                                                        dataKey={`${metric.code}-${series.name}`}
-                                                        name={`${metric.title} - ${series.name}`}
-                                                        fill={`url(#gradient${(metricIdx + seriesIdx) % COLORS.length})`}
-                                                        stroke={COLORS[(metricIdx + seriesIdx) % COLORS.length]}
-                                                        fillOpacity={0.6}
-                                                    />
-                                                ))
-                                            )}
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </CardContent>
-                            </Card>
-
-                            {/* Line Chart */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Comparación Líneal</CardTitle>
-                                    <CardDescription>Análisis comparativo de métricas</CardDescription>
-                                </CardHeader>
-                                <CardContent className="h-96">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={chartData}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="name" />
-                                            <YAxis />
-                                            <Tooltip />
-                                            <Legend />
-                                            {visibleMetrics.map((metric, metricIdx) =>
-                                                metric.series.map((series, seriesIdx) => (
-                                                    <Line
-                                                        key={`${metric.code}-${series.name}`}
-                                                        type="monotone"
-                                                        dataKey={`${metric.code}-${series.name}`}
-                                                        name={`${metric.title} - ${series.name}`}
-                                                        stroke={COLORS[(metricIdx + seriesIdx) % COLORS.length]}
-                                                        strokeWidth={2}
-                                                        dot={{ r: 3 }}
-                                                        activeDot={{ r: 5 }}
-                                                    />
-                                                ))
-                                            )}
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                </CardContent>
-                            </Card>
-
-                            {/* Data Table */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Datos Detallados</CardTitle>
-                                    <CardDescription>Tabla con todos los valores</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Período</TableHead>
-                                                    {visibleMetrics.map((metric) =>
-                                                        metric.series.map((series) => (
-                                                            <TableHead
-                                                                key={`${metric.code}-${series.name}`}
-                                                                className="text-right"
-                                                            >
-                                                                {metric.title} - {series.name}
-                                                            </TableHead>
-                                                        ))
-                                                    )}
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {chartData.map((row, idx) => (
-                                                    <TableRow key={idx}>
-                                                        <TableCell className="font-medium">
-                                                            {row.name}
-                                                        </TableCell>
-                                                        {visibleMetrics.map((metric) =>
-                                                            metric.series.map((series) => (
-                                                                <TableCell
-                                                                    key={`${metric.code}-${series.name}`}
-                                                                    className="text-right"
-                                                                >
-                                                                    {formatTableValue(
-                                                                        row[
-                                                                        `${metric.code}-${series.name}`
-                                                                        ] as number,
-                                                                        metric.type
-                                                                    )}
-                                                                </TableCell>
-                                                            ))
-                                                        )}
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <MetricsAreaChart data={chartData} metrics={visibleMetrics} />
+                            <MetricsLineChart data={chartData} metrics={visibleMetrics} />
+                            <MetricsTable data={chartData} metrics={visibleMetrics} />
                         </div>
                     )}
 
@@ -675,7 +363,7 @@ export function MetricsDetailPage() {
                         <Card>
                             <CardContent className="flex items-center justify-center h-96">
                                 <div className="text-muted-foreground">
-                                    No hay datos disponibles. Selecciona métri cas o verifica tus filtros.
+                                    No hay datos disponibles. Selecciona métricas o verifica tus filtros.
                                 </div>
                             </CardContent>
                         </Card>
@@ -684,54 +372,4 @@ export function MetricsDetailPage() {
             </PageLayout>
         </Page>
     );
-}
-
-// Helper Components
-
-function SummaryCard({ label, value, type }: { label: string; value: number; type: string }) {
-    return (
-        <Card>
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {label}
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">
-                    {type === 'currency'
-                        ? `$${(value / 100).toLocaleString('es-CO', {
-                            minimumFractionDigits: 2,
-                        })}`
-                        : value.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">Total del período</p>
-            </CardContent>
-        </Card>
-    );
-}
-
-function formatTableValue(value: number, type: string): string {
-    if (type === 'currency') {
-        return `$${(value / 100).toLocaleString('es-CO', {
-            minimumFractionDigits: 0,
-        })}`;
-    }
-    return value.toLocaleString();
-}
-
-function formatPdfValue(value: number, type: string): string {
-    if (type === 'currency') {
-        return `$${(value / 100).toLocaleString('es-CO', {
-            minimumFractionDigits: 2,
-        })}`;
-    }
-    return value.toLocaleString('es-CO');
-}
-
-function formatDateForPdf(date: Date): string {
-    return date.toLocaleDateString('es-CO');
-}
-
-function formatDateForFile(date: Date): string {
-    return date.toISOString().slice(0, 10);
 }

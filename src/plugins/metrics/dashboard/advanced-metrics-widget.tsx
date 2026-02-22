@@ -201,6 +201,7 @@ export function AdvancedMetricsWidget() {
                                 tick={{ fontSize: 12 }}
                                 className="fill-muted-foreground"
                                 width={80}
+
                             />
                             <Tooltip
                                 formatter={(value: number, name: string) => [
