@@ -12,6 +12,7 @@ export const commonApiExtensions = gql`
         rating: Float!
         authorName: String!
         authorLocation: String
+        verifiedPurchase: Boolean!
         upvotes: Int!
         downvotes: Int!
         state: String!
