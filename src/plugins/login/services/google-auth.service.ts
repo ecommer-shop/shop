@@ -52,7 +52,7 @@ export class GoogleAuthService {
      * Primero intenta como ID token; si falla, como access_token via Google userinfo.
      */
     async verifyGoogleToken(token: string): Promise<TokenPayload> {
-        // 1. Try as ID token
+        const GOOGLE_API = 'https://www.googleapis.com/oauth2/v3/userinfo';
         try {
             const ticket = await this.client.verifyIdToken({
                 idToken: token,
@@ -61,13 +61,16 @@ export class GoogleAuthService {
             const payload = ticket.getPayload();
             if (payload?.email) return payload;
         } catch {
-            // Not a valid ID token — try as access_token below
+
         }
 
-        // 2. Try as access_token via Google userinfo API
         const res = await fetch(
-            'https://www.googleapis.com/oauth2/v3/userinfo',
-            { headers: { Authorization: `Bearer ${token}` } },
+            GOOGLE_API,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            },
         );
         if (!res.ok) {
             throw new Error(`Google userinfo request failed: ${res.status}`);
@@ -97,21 +100,16 @@ export class GoogleAuthService {
         } as TokenPayload;
     }
 
-    /**
-     * Registra un nuevo vendedor usando la información del token de Google.
-     * Crea: Seller → Channel → Role → Administrator → ShippingMethod → StockLocation
-     */
+    //Registra un nuevo vendedor usando la información del token de Google
     async registerSellerWithGoogle(
         ctx: RequestContext,
         input: { token: string; shopName: string },
     ): Promise<{ success: boolean; email: string }> {
-        // 1. Verificar el token de Google
         const payload = await this.verifyGoogleToken(input.token);
         const email = payload.email!;
         const firstName = payload.given_name || email.split('@')[0];
         const lastName = payload.family_name || '';
 
-        // 2. Verificar que no exista un admin con ese email
         const existingUser = await this.connection
             .getRepository(ctx, User)
             .findOne({ where: { identifier: email } });
@@ -122,7 +120,7 @@ export class GoogleAuthService {
             );
         }
 
-        // 3. Crear el vendedor usando contexto de superadmin
+        // Crear el vendedor usando contexto de superadmin
         const superAdminCtx = await this.getSuperAdminContext(ctx);
         const channel = await this.createSellerChannelRoleAdmin(superAdminCtx, {
             shopName: input.shopName,
@@ -145,10 +143,6 @@ export class GoogleAuthService {
         return { success: true, email };
     }
 
-    // ──────────────────────────────────────────────
-    // Métodos privados (lógica de creación de seller)
-    // ──────────────────────────────────────────────
-
     private async createSellerChannelRoleAdmin(
         ctx: RequestContext,
         input: {
@@ -168,6 +162,8 @@ export class GoogleAuthService {
             name: input.shopName,
             customFields: {
                 connectedAccountId: crypto.randomBytes(12).toString('hex'),
+                acceptedTermsAndPrivacy: true,
+                confirmedLegalAge: true,
             },
         });
 

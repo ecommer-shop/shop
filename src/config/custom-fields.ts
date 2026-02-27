@@ -6,6 +6,86 @@ import { LanguageCode } from '@vendure/core';
  * Si cambias esto recuerda generar migración de DB.
  */
 export const customFields: VendureConfig['customFields'] = {
+  Customer: [
+    {
+      name: 'acceptedTermsAndPrivacy',
+      type: 'boolean',
+      defaultValue: false,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Accepted Terms & Privacy Policy' },
+        { languageCode: LanguageCode.es, value: 'Aceptó Términos y Política de Privacidad' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Whether the customer accepted the terms and conditions and privacy policy at registration',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Si el cliente aceptó los términos y condiciones y la política de privacidad al registrarse',
+        },
+      ],
+    },
+    {
+      name: 'confirmedLegalAge',
+      type: 'boolean',
+      defaultValue: false,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Confirmed Legal Age' },
+        { languageCode: LanguageCode.es, value: 'Confirmó ser mayor de edad' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Whether the customer confirmed being of legal age at registration',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Si el cliente confirmó ser mayor de edad al registrarse',
+        },
+      ],
+    },
+  ],
+  Seller: [
+    {
+      name: 'acceptedTermsAndPrivacy',
+      type: 'boolean',
+      defaultValue: false,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Accepted Terms & Privacy Policy' },
+        { languageCode: LanguageCode.es, value: 'Aceptó Términos y Política de Privacidad' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Whether the seller accepted the terms and conditions and privacy policy at registration',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Si el vendedor aceptó los términos y condiciones y la política de privacidad al registrarse',
+        },
+      ],
+    },
+    {
+      name: 'confirmedLegalAge',
+      type: 'boolean',
+      defaultValue: false,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Confirmed Legal Age' },
+        { languageCode: LanguageCode.es, value: 'Confirmó ser mayor de edad' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Whether the seller confirmed being of legal age at registration',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Si el vendedor confirmó ser mayor de edad al registrarse',
+        },
+      ],
+    },
+  ],
   ProductVariant: [
     {
       name: 'weight',

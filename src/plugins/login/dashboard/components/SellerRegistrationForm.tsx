@@ -13,9 +13,15 @@ export function SellerRegistrationForm({
     adminApiUrl,
 }: SellerRegistrationFormProps) {
     const [shopName, setShopName] = useState('');
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+
+    const TERMS_URL = 'https://ecommer-stg-product-images.s3.us-east-2.amazonaws.com/TemsAndConds.pdf';
+    const PRIVACY_URL = 'https://ecommer-stg-product-images.s3.us-east-2.amazonaws.com/politica_de_privacidad.pdf';
+
+    const canSubmit = shopName.trim().length > 0 && acceptedTerms && !loading;
 
     const handleGoogleSuccess = async (idToken: string) => {
         if (!shopName.trim()) {
@@ -115,13 +121,45 @@ export function SellerRegistrationForm({
                         />
                     </div>
 
+                    <div className="flex items-start gap-2 mt-1">
+                        <input
+                            id="acceptTerms"
+                            type="checkbox"
+                            checked={acceptedTerms}
+                            onChange={e => setAcceptedTerms(e.target.checked)}
+                            disabled={loading}
+                            className="mt-0.5 h-4 w-4 shrink-0 rounded border border-input accent-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        <label htmlFor="acceptTerms" className="text-xs text-muted-foreground leading-snug cursor-pointer select-none">
+                            He leído y acepto los{' '}
+                            <a
+                                href={TERMS_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary underline hover:text-primary/80"
+                            >
+                                Términos y Condiciones
+                            </a>{' '}
+                            y la{' '}
+                            <a
+                                href={PRIVACY_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary underline hover:text-primary/80"
+                            >
+                                Política de Privacidad
+                            </a>
+                            , y confirmo que soy mayor de edad.
+                        </label>
+                    </div>
+
                     <div className="flex justify-center mt-1">
                         <GoogleLoginButton
                             clientId={clientId}
                             onSuccess={handleGoogleSuccess}
                             onError={msg => setError(msg)}
                             text="signup_with"
-                            disabled={loading || !shopName.trim()}
+                            disabled={!canSubmit}
                         />
                     </div>
 

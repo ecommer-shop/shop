@@ -1,11 +1,12 @@
 import {
     AuthenticationStrategy,
+    CustomerService,
     ExternalAuthenticationService,
     Injector,
-    RequestContext,
-    User,
-    TransactionalConnection,
     Logger,
+    RequestContext,
+    TransactionalConnection,
+    User,
 } from '@vendure/core';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
@@ -18,10 +19,8 @@ export interface ClerkData {
 export class ClerkAuthenticationStrategy implements AuthenticationStrategy<ClerkData> {
     readonly name = 'clerk';
     private externalAuthenticationService: ExternalAuthenticationService;
+    private customerService: CustomerService;
     private connection: TransactionalConnection;
-
-
-    constructor() { }
 
     defineInputType(): DocumentNode {
         return gql`
@@ -33,12 +32,13 @@ export class ClerkAuthenticationStrategy implements AuthenticationStrategy<Clerk
 
     init(injector: Injector) {
         this.externalAuthenticationService = injector.get(ExternalAuthenticationService);
+        this.customerService = injector.get(CustomerService);
         this.connection = injector.get(TransactionalConnection);
     }
 
     async authenticate(ctx: RequestContext, data: ClerkData): Promise<User | false> {
         try {
-            const decoded = await this.verifyToken(data.token);
+            const decoded = await this.verifyClerkToken(data.token);
 
             const email = decoded.email_addresses;
             if (!email) return false;
@@ -94,6 +94,8 @@ export class ClerkAuthenticationStrategy implements AuthenticationStrategy<Clerk
                 'ClerkStrategy'
             );
 
+            await this.setCustomerCustomFields(ctx, newUser, email);
+
             return newUser;
         } catch (error) {
             Logger.error(
@@ -105,14 +107,53 @@ export class ClerkAuthenticationStrategy implements AuthenticationStrategy<Clerk
     }
 
 
-    private async verifyToken(token: string): Promise<any> {
+    private async setCustomerCustomFields(
+        ctx: RequestContext,
+        user: User,
+        email: string,
+    ): Promise<void> {
         try {
-            const decoded = await verifyToken(token, {
+            const customer = await this.customerService.findOneByUserId(ctx, user.id);
+
+            if (!customer) {
+                Logger.warn(
+                    `No se encontró Customer para el User ${user.id} (${email})`,
+                    'ClerkStrategy',
+                );
+                return;
+            }
+
+            await this.customerService.update(ctx, {
+                id: customer.id,
+                customFields: {
+                    acceptedTermsAndPrivacy: true,
+                    confirmedLegalAge: true,
+                },
+            });
+
+            Logger.info(
+                `Custom fields seteados para Customer ${customer.id} (${email})`,
+                'ClerkStrategy',
+            );
+        } catch (error) {
+            // Non-blocking — el usuario fue creado, solo registramos el warning
+            Logger.warn(
+                `No se pudieron setear custom fields para ${email}: ${error instanceof Error ? error.message : error}`,
+                'ClerkStrategy',
+            );
+        }
+    }
+
+    private async verifyClerkToken(token: string): Promise<any> {
+        try {
+            return await verifyToken(token, {
                 secretKey: process.env.CLERK_SECRET_KEY!,
             });
-            return decoded;
         } catch (error) {
-            Logger.error(`Token verification error: ${error instanceof Error ? error.message : error}`, 'ClerkStrategy');
+            Logger.error(
+                `Token verification error: ${error instanceof Error ? error.message : error}`,
+                'ClerkStrategy',
+            );
             throw new Error('Invalid or expired token');
         }
     }

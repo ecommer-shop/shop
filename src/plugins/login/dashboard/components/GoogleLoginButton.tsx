@@ -28,9 +28,8 @@ interface GoogleLoginButtonProps {
 }
 
 /**
- * Google Sign-In button using OAuth2 popup flow (initTokenClient).
- * This opens a Google popup window for authentication — no iframe needed,
- * avoids the "origin not allowed" GIS iframe issue entirely.
+ * @description
+ * Abre el popup de google para iniciar sesion al hacer click. Acepta tanto ID tokens como access tokens, y delega la verificación al backend.
  */
 export function GoogleLoginButton({
     clientId,
@@ -43,7 +42,7 @@ export function GoogleLoginButton({
         NonNullable<Window['google']>['accounts']['oauth2']['initTokenClient']
     > | null>(null);
     const [ready, setReady] = useState(false);
-
+    const GOOGLE_SRC_API = 'https://accounts.google.com/gsi/client'
     useEffect(() => {
         const initializeGoogle = () => {
             if (!window.google) return;
@@ -78,7 +77,7 @@ export function GoogleLoginButton({
         if (!scriptLoaded.current) {
             scriptLoaded.current = true;
             const script = document.createElement('script');
-            script.src = 'https://accounts.google.com/gsi/client';
+            script.src = GOOGLE_SRC_API;
             script.async = true;
             script.defer = true;
             script.onload = initializeGoogle;

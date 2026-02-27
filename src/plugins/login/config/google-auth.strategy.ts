@@ -6,6 +6,7 @@ import {
     TransactionalConnection,
     Logger,
 } from '@vendure/core';
+import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
 import { OAuth2Client } from 'google-auth-library';
@@ -15,6 +16,7 @@ import { loggerCtx } from '../constants';
 export interface GoogleAuthData {
     token: string;
 }
+const GOOGLE_API = 'https://www.googleapis.com/oauth2/v3/userinfo'
 
 /**
  * @description
@@ -45,12 +47,9 @@ export class GoogleAdminAuthenticationStrategy
         this.connection = injector.get(TransactionalConnection);
     }
 
-    /**
-     * Extrae el email del token de Google.
-     * Primero intenta como ID token; si falla, como access_token.
-     */
+    // Extrae el email del token de Google, Primero intenta como ID token
+    // si falla, como access_token
     private async resolveEmail(token: string): Promise<string | undefined> {
-        // 1. Try as ID token
         try {
             const ticket = await this.client.verifyIdToken({
                 idToken: token,
@@ -58,14 +57,16 @@ export class GoogleAdminAuthenticationStrategy
             });
             const email = ticket.getPayload()?.email;
             if (email) return email;
-        } catch {
-            // Not a valid ID token — try as access_token below
+        } catch (err) {
+            Logger.warn(
+                `ID token verification failed: ${err instanceof Error ? err.message : err}`,
+                loggerCtx,
+            );
         }
 
-        // 2. Try as access_token via Google userinfo API
         try {
             const res = await fetch(
-                'https://www.googleapis.com/oauth2/v3/userinfo',
+                GOOGLE_API,
                 { headers: { Authorization: `Bearer ${token}` } },
             );
             if (res.ok) {
@@ -97,17 +98,21 @@ export class GoogleAdminAuthenticationStrategy
                 return false;
             }
 
-            // Buscar usuario administrador por email (identifier)
+            // Buscar únicamente usuarios que tengan al menos un rol que NO sea
+            // previene que un Customer con el mismo email pueda autenticarse en la Admin API.
             const user = await this.connection
                 .getRepository(ctx, User)
-                .findOne({
-                    where: { identifier: email },
-                    relations: ['roles', 'roles.channels'],
-                });
+                .createQueryBuilder('user')
+                .innerJoinAndSelect('user.roles', 'role')
+                .leftJoinAndSelect('role.channels', 'channel')
+                .where('user.identifier = :email', { email })
+                .andWhere('role.code != :customerRole', { customerRole: CUSTOMER_ROLE_CODE })
+                .getOne();
 
             if (!user) {
                 Logger.warn(
-                    `No admin/seller user found for email: ${email}`,
+                    `No admin/seller user found for email: ${email}. ` +
+                    `A customer account with this email may exist, but customers cannot access the admin API.`,
                     loggerCtx,
                 );
                 return false;
