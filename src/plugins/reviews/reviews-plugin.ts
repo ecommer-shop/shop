@@ -8,12 +8,21 @@ import { ProductReviewShopResolver } from './api/product-review-shop.resolver';
 import { ProductAISummary } from './entities/product-ai-summary.entity';
 import { ProductAISummaryTranslation } from './entities/product-ai-summary-translation.entity';
 import { ProductReview } from './entities/product-review.entity';
+import { AIReviewSummarizer } from './services/ai-review-summarizer.service';
 import { ProductReviewService } from './services/product-review.service';
+import { ReviewsStatsCalculator } from './services/reviews-stats-calculator.service';
 import { ReviewSummaryService } from './services/review-summary.service';
+import { SummaryRegenerationPolicy } from './services/summary-regeneration-policy';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
-    providers: [ProductReviewService, ReviewSummaryService],
+    providers: [
+        ProductReviewService,
+        ReviewSummaryService,
+        ReviewsStatsCalculator,
+        SummaryRegenerationPolicy,
+        AIReviewSummarizer,
+    ],
     entities: [ProductReview, ProductAISummary, ProductAISummaryTranslation],
     adminApiExtensions: {
         schema: adminApiExtensions,
