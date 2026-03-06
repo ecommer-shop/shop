@@ -13,6 +13,7 @@ import {
 import { ProductReview } from '../entities/product-review.entity';
 import { MutationSubmitProductReviewArgs, MutationVoteOnReviewArgs } from '../generated-shop-types';
 import { ProductReviewService } from '../services/product-review.service';
+import { ReviewSummaryService } from '../services/review-summary.service';
 
 @Resolver()
 export class ProductReviewShopResolver {
@@ -20,6 +21,7 @@ export class ProductReviewShopResolver {
         private connection: TransactionalConnection,
         private listQueryBuilder: ListQueryBuilder,
         private productReviewService: ProductReviewService,
+        private reviewSummaryService: ReviewSummaryService,
     ) {}
 
     @Transaction()
@@ -63,6 +65,20 @@ export class ProductReviewShopResolver {
         if (sanitizedInput.variantId) {
             const variant = await this.connection.getEntityOrThrow(ctx, ProductVariant, sanitizedInput.variantId);
             review.productVariant = variant;
+        }
+
+        // Trigger automático: verificar si se debe generar resumen de IA
+        // Las reviews de la tienda ya llegan aprobadas (compra verificada)
+        const shouldGenerate = await this.reviewSummaryService.shouldGenerateSummary(
+            ctx,
+            sanitizedInput.productId,
+        );
+
+        if (shouldGenerate) {
+            this.reviewSummaryService.generateSummary(ctx, sanitizedInput.productId)
+                .catch(err => {
+                    console.error('[AI Summary] Error generating summary:', err);
+                });
         }
 
         return this.connection.getRepository(ctx, ProductReview).save(review);
