@@ -1,13 +1,17 @@
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
-import { join, resolve } from 'path';
-import { pathToFileURL } from 'url';
+import { dirname } from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
 import { IS_DEV } from './src/config/environment';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export default defineConfig({
     base: '/dashboard',
     build: {
-        outDir: join(__dirname, 'dist/dashboard'),
+        outDir: `${__dirname}/dist/dashboard`,
+        emptyOutDir: true,
     },
     plugins: [
         vendureDashboardPlugin({
@@ -34,7 +38,7 @@ export default defineConfig({
         alias: {
             // This allows all plugins to reference a shared set of
             // GraphQL types.
-            '@/gql': resolve(__dirname, './src/gql/graphql.ts'),
+            '@/gql': `${__dirname}/src/gql/graphql.ts`,
         },
     },
 });
