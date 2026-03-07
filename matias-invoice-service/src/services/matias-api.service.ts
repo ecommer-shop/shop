@@ -11,9 +11,10 @@ import axios from 'axios';
 /** Extrae solo campos serializables de un error (evita circular refs en Axios) */
 function toLoggableError(err: unknown): Record<string, unknown> {
   if (err != null && typeof err === 'object' && 'message' in err) {
-    const e = err as { message?: string; response?: { status?: number; statusText?: string; data?: unknown }; code?: string; config?: { url?: string } };
+    const e = err as { message?: string; stack?: string; response?: { status?: number; statusText?: string; data?: unknown }; code?: string; config?: { url?: string } };
     return {
       message: e.message,
+      stack: e.stack,
       status: e.response?.status,
       statusText: e.response?.statusText,
       responseData: e.response?.data,
@@ -28,6 +29,8 @@ export class MatiasApiService {
   private httpClient: HttpClient;
   private accessToken: string | null = null;
   private tokenExpiresAt: Date | null = null;
+  /** Promesa compartida de autenticación en curso; evita múltiples logins simultáneos. */
+  private authPromise: Promise<string> | null = null;
 
   constructor() {
     this.httpClient = new HttpClient(config.matias.apiUrl);
@@ -51,10 +54,7 @@ export class MatiasApiService {
       const baseUrl = config.matias.apiUrl.replace(/\/+$/, '');
       const loginUrl = `${baseUrl}/auth/login`;
 
-      logger.info('Sending login request to Matias', {
-        url: loginUrl,
-        email: config.matias.email,
-      });
+      logger.info('Sending login request to Matias', { url: loginUrl });
 
       const response = await axios.post<MatiasAuthResponse>(
         loginUrl,
@@ -81,18 +81,14 @@ export class MatiasApiService {
 
       logger.info('Matias login response received', {
         status: response.status,
-        contentType,
         hasAccessToken: !!response.data?.access_token,
         success: response.data?.success,
-        message: response.data?.message,
-        responseData: JSON.stringify(response.data),
       });
+      logger.debug('Matias login response data', { responseData: JSON.stringify(response.data) });
 
       if (!response.data?.access_token) {
-        logger.error('No access token in response', {
-          responseData: JSON.stringify(response.data),
-          contentType,
-        });
+        logger.error('No access token in response', { status: response.status, contentType });
+        logger.debug('No access token - response data', { responseData: JSON.stringify(response.data) });
         throw new Error('No access token received');
       }
 
@@ -116,7 +112,6 @@ export class MatiasApiService {
 
       logger.info('Successfully authenticated with Matias API', {
         expiresAt: this.tokenExpiresAt.toISOString(),
-        user: response.data.user?.email,
       });
 
       return this.accessToken;
@@ -131,6 +126,7 @@ export class MatiasApiService {
       
       logger.error('Matias authentication error:', {
         message: error.message,
+        stack: error?.stack,
         status: error.response?.status,
         statusText: error.response?.statusText,
         contentType: error.response?.headers?.['content-type'],
@@ -153,16 +149,27 @@ export class MatiasApiService {
   }
 
   /**
-   * Verifica si el token es válido y lo renueva si es necesario
+   * Verifica si el token es válido y lo renueva si es necesario.
+   * Solo una llamada ejecuta authenticate(); el resto espera la misma promesa.
    */
   private async ensureAuthenticated(): Promise<void> {
     const now = new Date();
     const expiresAt = this.tokenExpiresAt || new Date(0);
+    const needsRefresh = !this.accessToken || expiresAt.getTime() - now.getTime() < 300000;
 
-    // Si no hay token o expira en menos de 5 minutos, renovar
-    if (!this.accessToken || expiresAt.getTime() - now.getTime() < 300000) {
-      await this.authenticate();
+    if (!needsRefresh) {
+      return;
     }
+
+    if (this.authPromise) {
+      await this.authPromise;
+      return;
+    }
+
+    this.authPromise = this.authenticate().finally(() => {
+      this.authPromise = null;
+    });
+    await this.authPromise;
   }
 
   /**
@@ -175,14 +182,13 @@ export class MatiasApiService {
       logger.info('Creating invoice in Matias API', {
         prefix: invoiceData.prefix,
         documentNumber: invoiceData.document_number,
-      });
-
-      // Log del payload completo para debugging
-      logger.info('Matias invoice payload (full)', {
-        payload: JSON.stringify(invoiceData, null, 2),
         payableAmount: invoiceData.legal_monetary_totals?.payable_amount,
         taxInclusiveAmount: invoiceData.legal_monetary_totals?.tax_inclusive_amount,
         lineExtensionAmount: invoiceData.legal_monetary_totals?.line_extension_amount,
+      });
+
+      logger.debug('Matias invoice payload (full)', {
+        payload: JSON.stringify(invoiceData, null, 2),
       });
 
       const response = await this.httpClient.post<MatiasInvoiceResponse>(
@@ -241,7 +247,8 @@ export class MatiasApiService {
     try {
       await this.ensureAuthenticated();
 
-      logger.info('Resending invoice email in Matias', { prefix, documentNumber, email });
+      logger.info('Resending invoice email in Matias', { prefix, documentNumber });
+      logger.debug('Resending invoice email', { prefix, documentNumber, email });
 
       const invoiceId = `${prefix}-${documentNumber}`;
       const response = await this.httpClient.post<{ success: boolean; message?: string }>(

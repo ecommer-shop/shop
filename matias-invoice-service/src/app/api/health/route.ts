@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server';
 
 /**
- * Health check endpoint
+ * Health check endpoint (minimal response to avoid info disclosure)
  * GET /api/health
  */
 export async function GET() {
-  return NextResponse.json({
-    status: 'ok',
-    service: 'matias-invoice-service',
-    timestamp: new Date().toISOString(),
-  });
+  return NextResponse.json({ status: 'ok' });
 }
 

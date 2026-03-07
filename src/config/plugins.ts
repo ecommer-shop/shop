@@ -42,41 +42,24 @@ import {
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
-
-const useS3Storage =
-  !!process.env.MINIO_ENDPOINT || !!process.env.MINIO_BUCKET;
+import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
   assetUploadDir,
-  assetUrlPrefix:
-    process.env.ASSET_URL_PREFIX ||
-    (IS_DEV ? undefined : process.env.MINIO_PUBLIC_URL),
+  assetUrlPrefix: process.env.ASSET_URL_PREFIX,
   namingStrategy: new DefaultAssetNamingStrategy(),
-  ...(useS3Storage
-    ? {
-      storageStrategyFactory: configureS3AssetStorage({
-        bucket: process.env.MINIO_BUCKET || 'e-assets',
-        credentials: {
-          accessKeyId:
-            process.env.MINIO_ACCESS_KEY ||
-            process.env.MINIO_ROOT_USER ||
-            'minio-admin',
-          secretAccessKey:
-            process.env.MINIO_SECRET_KEY ||
-            process.env.MINIO_ROOT_PASSWORD ||
-            'minio-admin',
-        },
-        nativeS3Configuration: {
-          endpoint:
-            process.env.MINIO_ENDPOINT || 'http://localhost:9000',
-          forcePathStyle: true,
-          signatureVersion: 'v4',
-          region: 'eu-west-1', // dummy requerido por aws-sdk
-        },
-      }),
-    }
-    : {}),
+  storageStrategyFactory: configureS3AssetStorage({
+    bucket: process.env.AWS_S3_BUCKET!,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    },
+    nativeS3Configuration: {
+      region: process.env.AWS_REGION || 'us-east-1',
+      signatureVersion: 'v4',
+    },
+  }),
 });
 
 
@@ -140,7 +123,7 @@ export const plugins: VendureConfig['plugins'] = [
 
   CoinbasePlugin,
   ReviewsPlugin,
-  
+
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
@@ -154,8 +137,12 @@ export const plugins: VendureConfig['plugins'] = [
 
   SalesReportPlugin.init({}),
 
+  ExcelLoaderPlugin.init({}),
+
   InvoiceClientPlugin.init({
     invoiceServiceUrl: process.env.INVOICE_SERVICE_URL || 'http://localhost:3001/api',
     apiKey: process.env.INVOICE_SERVICE_API_KEY || '',
+    prefix: process.env.MATIAS_PREFIX,
+    resolutionNumber: process.env.MATIAS_RESOLUTION_NUMBER,
   }),
 ];
