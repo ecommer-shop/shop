@@ -43,6 +43,7 @@ import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
 import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.plugin';
+import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -123,6 +124,7 @@ export const plugins: VendureConfig['plugins'] = [
 
   CoinbasePlugin,
   ReviewsPlugin,
+  AiChatPlugin,
 
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
