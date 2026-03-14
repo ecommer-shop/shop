@@ -1,8 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Order, RequestContext } from '@vendure/core';
+import { Order, RequestContext, TransactionalConnection } from '@vendure/core';
+import axios, { AxiosInstance } from 'axios';
 import { INVOICE_CLIENT_PLUGIN_OPTIONS } from '../constants';
 import { PluginInitOptions } from '../types';
-import axios, { AxiosInstance } from 'axios';
+import { Invoice } from '../entities/invoice.entity';
 
 interface CreateInvoiceRequest {
   orderCode: string;
@@ -67,7 +68,10 @@ export class InvoiceClientService {
   private readonly logger = new Logger(InvoiceClientService.name);
   private httpClient: AxiosInstance;
 
-  constructor(@Inject(INVOICE_CLIENT_PLUGIN_OPTIONS) private options: PluginInitOptions) {
+  constructor(
+    @Inject(INVOICE_CLIENT_PLUGIN_OPTIONS) private options: PluginInitOptions,
+    private connection: TransactionalConnection,
+  ) {
     this.httpClient = axios.create({
       baseURL: options.invoiceServiceUrl,
       timeout: 30000,
@@ -79,18 +83,14 @@ export class InvoiceClientService {
   }
 
   /**
-   * Mapea el nombre de ciudad a ID de Matias
-   * Por ahora retorna el ID por defecto (Bogotá: 836)
-   * En producción, deberías tener una tabla de mapeo ciudad -> ID de Matias
+   * De momento siempre retorna Bogotá (ID Matias 836).
    */
-  private mapCityToMatiasId(cityName?: string): string {
-    // Por ahora, siempre usar Bogotá por defecto
-    // En producción, implementar mapeo real basado en cityName
-    return '836'; // Bogotá
+  private mapCityToMatiasId(_cityName?: string): string {
+    return '836';
   }
 
   /**
-   * Crea una factura desde una orden de Vendure
+   * Crea una factura desde una orden de Vendure y la persiste en la tabla Invoice.
    */
   async createInvoiceFromOrder(
     ctx: RequestContext,
@@ -102,56 +102,62 @@ export class InvoiceClientService {
       operationTypeId?: number;
       typeDocumentId?: number;
       sendEmail?: number;
-    }
+    },
   ): Promise<InvoiceResponse> {
     try {
       this.logger.log(`Creating invoice for order ${order.code}`);
 
-      // Transformar orden de Vendure a formato del microservicio
       const customer = order.customer;
       if (!customer) {
         throw new Error('Order does not have a customer');
       }
 
-      const shippingAddress = order.shippingAddress;
-      const billingAddress = order.billingAddress || shippingAddress;
+      const billingAddress = order.billingAddress || order.shippingAddress;
+      const customerName =
+        (customer.firstName && customer.lastName
+          ? `${customer.firstName} ${customer.lastName}`
+          : customer.firstName || customer.lastName) || 'Cliente';
+      const customerDni =
+        (customer.customFields as Record<string, string> | undefined)?.dni ||
+        customer.phoneNumber ||
+        '0000000000';
 
-      // Transformar items de la orden
+      // Items de la orden -> items de Matias
       const items = order.lines.map((line) => {
         const productVariant = line.productVariant;
-        // Calcular precio unitario sin impuestos
-        const taxRate = line.taxRate || 19; // IVA por defecto 19%
+        const taxRate = line.taxRate || 19;
         const unitPrice = line.unitPriceWithTax / (1 + taxRate / 100);
-
-        // Manejar casos donde productVariant puede ser undefined o no tener propiedades cargadas
-        const description = productVariant?.name || line.productVariant?.name || line.productVariant?.product?.name || `Producto ${line.id}`;
+        const description =
+          productVariant?.name ||
+          line.productVariant?.name ||
+          line.productVariant?.product?.name ||
+          `Producto ${line.id}`;
         const sku = productVariant?.sku || `SKU-${productVariant?.id || line.id}`;
 
         return {
           description,
           code: sku,
           quantity: line.quantity,
-          unitPrice: Number(unitPrice.toFixed(2)), // Mantener 2 decimales
+          unitPrice: Number(unitPrice.toFixed(2)),
           taxPercent: taxRate,
-          quantityUnitsId: '1093', // Unidad por defecto
+          quantityUnitsId: '1093',
           typeItemIdentificationsId: '4',
           referencePriceId: '1',
         };
       });
 
-      // Calcular totales
-      const subtotal = order.subTotalWithTax / (1 + 19 / 100); // Asumiendo IVA 19%
+      // Totales (para guardar en BD)
+      const subtotal = order.subTotalWithTax / (1 + 19 / 100);
       const taxAmount = order.subTotalWithTax - subtotal;
       const total = order.totalWithTax;
 
-      // Transformar pagos
-      // El valuePaid debe ser el total de la orden, no el monto individual del pago
+      // Pagos: por simplicidad, un pago = total
       const totalPaid = order.totalWithTax;
       const payments = [
         {
-          paymentMethodId: 1, // Ajustar según tu configuración
-          meansPaymentId: 10, // Ajustar según tu configuración
-          valuePaid: Number(totalPaid.toFixed(2)), // Total de la orden con 2 decimales
+          paymentMethodId: 1,
+          meansPaymentId: 10,
+          valuePaid: Number(totalPaid.toFixed(2)),
         },
       ];
 
@@ -164,21 +170,17 @@ export class InvoiceClientService {
         graphicRepresentation: 0,
         sendEmail: config.sendEmail ?? 1,
         operationTypeId: config.operationTypeId ?? 1,
-        typeDocumentId: config.typeDocumentId ?? 7, // Factura de venta
+        typeDocumentId: config.typeDocumentId ?? 7,
         customer: {
-          companyName: customer.firstName && customer.lastName
-            ? `${customer.firstName} ${customer.lastName}`
-            : customer.firstName || customer.lastName || 'Cliente',
-          dni: (customer.customFields as any)?.dni || customer.phoneNumber || '0000000000',
+          companyName: customerName,
+          dni: customerDni,
           email: customer.emailAddress,
           mobile: customer.phoneNumber,
           address: billingAddress?.streetLine1 || '',
           postalCode: billingAddress?.postalCode || '',
-          countryId: '45', // Colombia (ID de Matias)
-          // cityId debe ser un ID numérico de Matias, no el nombre de la ciudad
-          // Por defecto usar Bogotá (836)
+          countryId: '45',
           cityId: this.mapCityToMatiasId(billingAddress?.city),
-          identityDocumentId: '1', // CC por defecto
+          identityDocumentId: '1',
           typeOrganizationId: 2,
           taxRegimeId: 2,
           taxLevelId: 5,
@@ -187,18 +189,52 @@ export class InvoiceClientService {
         payments,
       };
 
-      this.logger.log(`Sending POST request to ${this.options.invoiceServiceUrl}/invoices for order ${order.code}`);
-      this.logger.debug(`Request payload: ${JSON.stringify(request, null, 2)}`);
-      
-      const response = await this.httpClient.post<InvoiceResponse>('/invoices', request);
+      this.logger.log(
+        `Sending POST request to ${this.options.invoiceServiceUrl}/invoices for order ${order.code}`,
+      );
 
+      const response = await this.httpClient.post<InvoiceResponse>('/invoices', request);
       if (!response.data.success) {
         throw new Error(response.data.error || response.data.message || 'Failed to create invoice');
       }
 
+      const data = response.data.data;
+
+      // Persistir en Postgres
+      try {
+        const repo = this.connection.getRepository(ctx, Invoice);
+        const invoice = repo.create({
+          orderCode: order.code,
+          prefix: config.prefix,
+          documentNumber: config.documentNumber,
+          typeDocumentId: config.typeDocumentId ?? 7,
+          operationTypeId: config.operationTypeId ?? 1,
+          matiasInvoiceId: data?.id ?? null,
+          matiasInvoiceNumber: data?.matiasInvoiceNumber ?? null,
+          cufe: data?.cufe ?? null,
+          status: data?.status ?? 'UNKNOWN',
+          statusMessage: data?.message ?? response.data.message ?? null,
+          customerName,
+          customerDni,
+          customerEmail: customer.emailAddress,
+          subtotal: subtotal.toFixed(2),
+          taxTotal: taxAmount.toFixed(2),
+          total: total.toFixed(2),
+          currencyCode: order.currencyCode || 'COP',
+          pdfUrl: data?.pdfUrl ?? null,
+          xmlUrl: data?.xmlUrl ?? null,
+        });
+
+        await repo.save(invoice);
+      } catch (persistError: any) {
+        this.logger.error(
+          `Failed to persist invoice record for order ${order.code}: ${persistError.message}`,
+        );
+      }
+
       this.logger.log(`Invoice created successfully for order ${order.code}`, {
-        invoiceId: response.data.data?.id,
-        cufe: response.data.data?.cufe,
+        invoiceId: data?.id,
+        cufe: data?.cufe,
       });
 
       return response.data;
@@ -207,66 +243,5 @@ export class InvoiceClientService {
       throw error;
     }
   }
-
-  /**
-   * Obtiene una factura por código de orden
-   */
-  async getInvoiceByOrderCode(orderCode: string): Promise<InvoiceResponse | null> {
-    try {
-      const response = await this.httpClient.get<InvoiceResponse>(
-        `/invoices/by-order-code/${orderCode}`,
-      );
-
-      if (!response.data.success || !response.data.data) {
-        return null;
-      }
-
-      return response.data;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        return null;
-      }
-      this.logger.error(`Error getting invoice for order ${orderCode}:`, error.message);
-      throw error;
-    }
-  }
-
-  /**
-   * Obtiene el estado de una factura
-   */
-  async getInvoiceStatus(invoiceId: string): Promise<InvoiceResponse> {
-    try {
-      const response = await this.httpClient.get<InvoiceResponse>(`/invoices/${invoiceId}/status`);
-
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to get invoice status');
-      }
-
-      return response.data;
-    } catch (error: any) {
-      this.logger.error(`Error getting invoice status for ${invoiceId}:`, error.message);
-      throw error;
-    }
-  }
-
-  /**
-   * Reenvía una factura por email
-   */
-  async resendInvoice(invoiceId: string, email?: string): Promise<InvoiceResponse> {
-    try {
-      const response = await this.httpClient.post<InvoiceResponse>(
-        `/invoices/${invoiceId}/resend`,
-        email ? { email } : {}
-      );
-
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to resend invoice');
-      }
-
-      return response.data;
-    } catch (error: any) {
-      this.logger.error(`Error resending invoice ${invoiceId}:`, error.message);
-      throw error;
-    }
-  }
 }
+

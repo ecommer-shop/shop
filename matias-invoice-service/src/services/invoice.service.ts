@@ -112,10 +112,7 @@ export class InvoiceService {
         message: matiasResponse.response?.StatusMessage || 'Invoice created successfully',
       };
     } catch (error: any) {
-      logger.error('Error creating invoice:', {
-        message: error?.message,
-        stack: error?.stack,
-      });
+      logger.error('Error creating invoice:', error);
 
       // Guardar error en metadata si es posible
       const invoiceId = `inv_${Date.now()}_${dto.orderCode}`;
@@ -189,10 +186,7 @@ export class InvoiceService {
         
         invoiceStore.set(invoiceId, invoice);
       } catch (error: any) {
-        logger.warn('Could not fetch updated status from Matias:', {
-          message: error?.message,
-          stack: error?.stack,
-        });
+        logger.warn('Could not fetch updated status from Matias:', error);
         // Continuar con el estado local
       }
     }
@@ -244,10 +238,7 @@ export class InvoiceService {
         message: 'Invoice resent successfully',
       };
     } catch (error: any) {
-      logger.error('Error resending invoice:', {
-        message: error?.message,
-        stack: error?.stack,
-      });
+      logger.error('Error resending invoice:', error);
       throw error;
     }
   }
