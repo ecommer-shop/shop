@@ -45,6 +45,25 @@ export const customFields: VendureConfig['customFields'] = {
         },
       ],
     },
+    {
+      name: 'clerkId',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Clerk User ID' },
+        { languageCode: LanguageCode.es, value: 'ID de usuario en Clerk' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'The Clerk external user identifier linked to this customer',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Identificador externo de Clerk vinculado a este cliente',
+        },
+      ],
+    },
   ],
   Seller: [
     {

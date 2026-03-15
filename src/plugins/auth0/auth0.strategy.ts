@@ -94,7 +94,7 @@ export class ClerkAuthenticationStrategy implements AuthenticationStrategy<Clerk
                 'ClerkStrategy'
             );
 
-            await this.setCustomerCustomFields(ctx, newUser, email);
+            await this.setCustomerCustomFields(ctx, newUser, email, externalId);
 
             return newUser;
         } catch (error) {
@@ -111,6 +111,7 @@ export class ClerkAuthenticationStrategy implements AuthenticationStrategy<Clerk
         ctx: RequestContext,
         user: User,
         email: string,
+        clerkId: string,
     ): Promise<void> {
         try {
             const customer = await this.customerService.findOneByUserId(ctx, user.id);
@@ -128,6 +129,7 @@ export class ClerkAuthenticationStrategy implements AuthenticationStrategy<Clerk
                 customFields: {
                     acceptedTermsAndPrivacy: true,
                     confirmedLegalAge: true,
+                    clerkId,
                 },
             });
 
