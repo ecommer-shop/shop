@@ -9,26 +9,33 @@ import {
     RequestContext,
     Transaction,
     TransactionalConnection,
-    TranslatableSaver,
-    translateDeep,
 } from '@vendure/core';
 
-import { ProductReviewTranslation } from '../entities/product-review-translation.entity';
 import { ProductReview } from '../entities/product-review.entity';
+import { ReviewSummaryService } from '../services/review-summary.service';
 import {
     MutationApproveProductReviewArgs,
     MutationRejectProductReviewArgs,
-    MutationUpdateProductReviewArgs,
     QueryProductReviewArgs,
     QueryProductReviewsArgs,
+    UpdateProductReviewInput,
 } from '../generated-admin-types';
+// El tipo generado no incluye 'state' porque es un campo custom del schema.
+// Lo extendemos localmente para tener tipado correcto.
+interface UpdateProductReviewInputWithState extends UpdateProductReviewInput {
+    state?: string;
+}
+
+interface MutationUpdateProductReviewArgsWithState {
+    input: UpdateProductReviewInputWithState;
+}
 
 @Resolver()
 export class ProductReviewAdminResolver {
     constructor(
         private connection: TransactionalConnection,
         private listQueryBuilder: ListQueryBuilder,
-        private translatableSaver: TranslatableSaver,
+        private reviewSummaryService: ReviewSummaryService,
     ) {}
 
     @Query()
@@ -62,7 +69,7 @@ export class ProductReviewAdminResolver {
             throw new EntityNotFoundError(ProductReview.name, args.id);
         }
 
-        return translateDeep(review, ctx.languageCode);
+        return review;
     }
 
     @Transaction()
@@ -70,17 +77,27 @@ export class ProductReviewAdminResolver {
     @Allow(Permission.UpdateCatalog)
     async updateProductReview(
         @Ctx() ctx: RequestContext,
-        @Args() { input }: MutationUpdateProductReviewArgs,
+        @Args() { input }: MutationUpdateProductReviewArgsWithState,
     ) {
         const review = await this.connection.getEntityOrThrow(ctx, ProductReview, input.id);
-        const originalResponse = review.response;
 
-        return this.translatableSaver.update({
-            ctx,
-            input,
-            entityType: ProductReview,
-            translationType: ProductReviewTranslation,
-        });
+        if (input.summary !== undefined) {
+            review.summary = input.summary;
+        }
+        if (input.body !== undefined) {
+            review.body = input.body;
+        }
+        if (input.response !== undefined) {
+            review.response = input.response;
+            if (input.response && !review.responseCreatedAt) {
+                review.responseCreatedAt = new Date();
+            }
+        }
+        if (input.state !== undefined) {
+            review.state = input.state as any;
+        }
+
+        return this.connection.getRepository(ctx, ProductReview).save(review);
     }
 
     @Transaction()
@@ -99,7 +116,27 @@ export class ProductReviewAdminResolver {
         product.customFields.reviewRating = newRating;
         await this.connection.getRepository(ctx, Product).save(product);
         review.state = 'approved';
-        return this.connection.getRepository(ctx, ProductReview).save(review);
+        const savedReview = await this.connection.getRepository(ctx, ProductReview).save(review);
+
+        /**
+         * Trigger automático: Verificar si se debe generar/regenerar
+         * resumen de IA después de aprobar una review
+         */
+        const shouldGenerate = await this.reviewSummaryService.shouldGenerateSummary(
+            ctx,
+            review.product.id,
+        );
+
+        if (shouldGenerate) {
+            // Generar en background para no bloquear la respuesta
+            this.reviewSummaryService.generateSummary(ctx, review.product.id)
+                .catch(err => {
+                    // Log del error pero no fallar la aprobación
+                    console.error('[AI Summary] Error generating summary:', err);
+                });
+        }
+
+        return savedReview;
     }
 
     @Transaction()
