@@ -17,7 +17,13 @@ import { SummaryCard } from './components/summary-card';
 import { MetricsAreaChart, MetricsLineChart } from './components/metrics-charts';
 import { MetricsTable } from './components/metrics-table';
 import { FiltersSection } from './components/filters-section';
-import { formatPdfValue, formatDateForPdf, formatDateForFile } from './components/utils';
+import {
+    buildMetricsComparisonChartData,
+    formatPdfValue,
+    formatDateForPdf,
+    formatDateForFile,
+} from './components/utils';
+import { useAdvancedMetrics } from './hooks/use-advanced-metrics';
 
 const PRODUCT_VARIANTS_QUERY = `
   query GetProductVariants($options: ProductVariantListOptions) {
@@ -36,22 +42,6 @@ const PRODUCT_VARIANTS_QUERY = `
   }
 `;
 
-const ADVANCED_METRICS_QUERY = `
-  query AdvancedMetricSummaries($input: AdvancedMetricSummaryInput) {
-    advancedMetricSummaries(input: $input) {
-      code
-      title
-      type
-      allowProductSelection
-      labels
-      series {
-        name
-        values
-      }
-    }
-  }
-`;
-
 interface ProductVariant {
     id: string;
     name: string;
@@ -60,24 +50,6 @@ interface ProductVariant {
         id: string;
         name: string;
     };
-}
-
-interface AdvancedMetricSeries {
-    name: string;
-    values: number[];
-}
-
-interface AdvancedMetricSummary {
-    code: string;
-    title: string;
-    type: 'currency' | 'number';
-    allowProductSelection: boolean;
-    labels: string[];
-    series: AdvancedMetricSeries[];
-}
-
-interface AdvancedMetricSummariesResponse {
-    advancedMetricSummaries: AdvancedMetricSummary[];
 }
 
 interface ProductVariantsResponse {
@@ -107,15 +79,8 @@ export function MetricsDetailPage() {
     const allVariants = variantData?.productVariants.items ?? [];
 
     // Fetch metrics data
-    const { data: metricsData, refetch, isRefetching, isLoading: metricsLoading } = useQuery({
-        queryKey: ['advanced-metrics', selectedVariantIds],
-        queryFn: () =>
-            api.query<AdvancedMetricSummariesResponse>(ADVANCED_METRICS_QUERY, {
-                input: {
-                    variantIds: selectedVariantIds.length > 0 ? selectedVariantIds : undefined,
-                },
-            }),
-        staleTime: 5 * 60 * 1000,
+    const { data: metricsData, refetch, isRefetching, isLoading: metricsLoading } = useAdvancedMetrics({
+        variantIds: selectedVariantIds,
     });
 
     const allMetrics = metricsData?.advancedMetricSummaries ?? [];
@@ -129,20 +94,10 @@ export function MetricsDetailPage() {
             : allMetrics;
 
     // Transform data for charts
-    const chartData = useMemo(() => {
-        if (visibleMetrics.length === 0) return [];
-
-        const labels = visibleMetrics[0]?.labels ?? [];
-        return labels.map((label, index) => {
-            const point: Record<string, string | number> = { name: label };
-            for (const metric of visibleMetrics) {
-                for (const series of metric.series) {
-                    point[`${metric.code}-${series.name}`] = series.values[index] ?? 0;
-                }
-            }
-            return point as Record<string, string | number> & { name: string };
-        });
-    }, [visibleMetrics]);
+    const chartData = useMemo(
+        () => buildMetricsComparisonChartData(visibleMetrics),
+        [visibleMetrics]
+    );
 
     // Calculate summary statistics
     const summary = useMemo(() => {

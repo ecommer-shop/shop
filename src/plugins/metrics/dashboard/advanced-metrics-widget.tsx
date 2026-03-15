@@ -1,19 +1,10 @@
 import {
-    api,
     DashboardBaseWidget,
     useWidgetDimensions,
     useLocalFormat,
     useChannel,
     Button,
-    Card,
-    CardContent,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
 } from '@vendure/dashboard';
-import { useQuery } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
@@ -26,44 +17,8 @@ import {
     Legend,
     ResponsiveContainer,
 } from 'recharts';
-
-// GraphQL query - matches the schema from @pinelab/vendure-plugin-metrics
-
-const ADVANCED_METRICS_QUERY = `
-  query AdvancedMetricSummaries($input: AdvancedMetricSummaryInput) {
-    advancedMetricSummaries(input: $input) {
-      code
-      title
-      type
-      allowProductSelection
-      labels
-      series {
-        name
-        values
-      }
-    }
-  }
-`;
-
-// Types matching the GraphQL schema
-
-interface AdvancedMetricSeries {
-    name: string;
-    values: number[];
-}
-
-interface AdvancedMetricSummary {
-    code: string;
-    title: string;
-    type: 'currency' | 'number';
-    allowProductSelection: boolean;
-    labels: string[];
-    series: AdvancedMetricSeries[];
-}
-
-interface AdvancedMetricSummariesResponse {
-    advancedMetricSummaries: AdvancedMetricSummary[];
-}
+import { buildSingleMetricChartData } from './components/utils';
+import { useAdvancedMetrics } from './hooks/use-advanced-metrics';
 
 // Color palette for multiple series lines
 
@@ -83,20 +38,14 @@ const CHART_COLORS = [
 // Widget Component
 
 export function AdvancedMetricsWidget() {
-    const { width, height } = useWidgetDimensions();
+    const { height } = useWidgetDimensions();
     const { formatCurrency } = useLocalFormat();
     const { activeChannel } = useChannel();
 
     const [selectedMetricCode, setSelectedMetricCode] = useState<string | null>(null);
 
-    // Fetch all advanced metric summaries
-    const { data, refetch, isRefetching, isLoading, error } = useQuery({
-        queryKey: ['advanced-metrics', activeChannel?.id],
-        queryFn: () =>
-            api.query<AdvancedMetricSummariesResponse>(ADVANCED_METRICS_QUERY, {
-                input: {},
-            }),
-        staleTime: 5 * 60 * 1000, // 5 minutes cache
+    const { data, refetch, isRefetching, isLoading, error } = useAdvancedMetrics({
+        channelId: activeChannel?.id,
     });
 
     const metrics = data?.advancedMetricSummaries ?? [];
@@ -105,17 +54,8 @@ export function AdvancedMetricsWidget() {
     const activeMetricCode = selectedMetricCode ?? metrics[0]?.code ?? null;
     const activeMetric = metrics.find((m) => m.code === activeMetricCode) ?? null;
 
-    // Transform metric data into recharts-compatible format
     const chartData = useMemo(() => {
-        if (!activeMetric) return [];
-
-        return activeMetric.labels.map((label, index) => {
-            const point: Record<string, string | number> = { name: label };
-            for (const series of activeMetric.series) {
-                point[series.name] = series.values[index] ?? 0;
-            }
-            return point;
-        });
+        return buildSingleMetricChartData(activeMetric);
     }, [activeMetric]);
 
     // Value formatter based on metric type
@@ -204,8 +144,8 @@ export function AdvancedMetricsWidget() {
 
                             />
                             <Tooltip
-                                formatter={(value: number, name: string) => [
-                                    formatValue(value),
+                                formatter={(value: number | string, name: string) => [
+                                    formatValue(Number(value)),
                                     name,
                                 ]}
                                 contentStyle={{
