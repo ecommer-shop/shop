@@ -2,29 +2,25 @@ import {
     Customer,
     DeepPartial,
     HasCustomFields,
-    LocaleString,
     Product,
     ProductVariant,
-    Translatable,
-    Translation,
     VendureEntity,
 } from '@vendure/core';
-import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, ManyToOne } from 'typeorm';
 import { ReviewState } from '../types';
-import { ProductReviewTranslation } from './product-review-translation.entity';
 
 export class CustomReviewFields {}
+
 @Entity()
-export class ProductReview extends VendureEntity implements Translatable, HasCustomFields {
+export class ProductReview extends VendureEntity implements HasCustomFields {
     constructor(input?: DeepPartial<ProductReview>) {
         super(input);
     }
-    @ManyToOne(type => Product)
+
+    @ManyToOne(type => Product, { onDelete: 'CASCADE' })
     product: Product;
 
-    text: LocaleString;
-
-    @ManyToOne(type => ProductVariant)
+    @ManyToOne(type => ProductVariant, { nullable: true })
     productVariant: ProductVariant | null;
 
     @Column()
@@ -33,11 +29,14 @@ export class ProductReview extends VendureEntity implements Translatable, HasCus
     @Column('text')
     body: string;
 
-    @Column()
+    @Column('decimal', { precision: 2, scale: 1 })
     rating: number;
 
-    @ManyToOne(type => Customer)
-    author: Customer;
+    @Column({ default: false })
+    verifiedPurchase: boolean;
+
+    @ManyToOne(type => Customer, { nullable: true, onDelete: 'SET NULL' })
+    author: Customer | null;
 
     @Column()
     authorName: string;
@@ -59,9 +58,6 @@ export class ProductReview extends VendureEntity implements Translatable, HasCus
 
     @Column({ nullable: true, default: null })
     responseCreatedAt: Date;
-
-    @OneToMany(() => ProductReviewTranslation, translation => translation.base, { eager: true })
-    translations: Array<Translation<ProductReview>>;
 
     @Column(type => CustomReviewFields)
     customFields: CustomReviewFields;

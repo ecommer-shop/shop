@@ -46,6 +46,7 @@ import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.
 import { MetricsPlugin } from '@pinelab/vendure-plugin-metrics';
 import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
 import { LoginPlugin } from '../plugins/login/login.plugin';
+import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -126,6 +127,7 @@ export const plugins: VendureConfig['plugins'] = [
 
   CoinbasePlugin,
   ReviewsPlugin,
+  AiChatPlugin,
 
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
