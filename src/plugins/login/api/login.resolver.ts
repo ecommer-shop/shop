@@ -3,6 +3,7 @@ import { Allow, Ctx, Logger, Permission, RequestContext, Transaction } from '@ve
 
 import { GoogleAuthService } from '../services/google-auth.service';
 import { loggerCtx } from '../constants';
+import { RegisterSellerWithGoogleInput } from '../types';
 
 @Resolver()
 export class LoginResolver {
@@ -13,7 +14,7 @@ export class LoginResolver {
     @Allow(Permission.Public)
     async registerSellerWithGoogle(
         @Ctx() ctx: RequestContext,
-        @Args() args: { input: { token: string; shopName: string } },
+        @Args() args: { input: RegisterSellerWithGoogleInput },
     ) {
         try {
             const result = await this.googleAuthService.registerSellerWithGoogle(

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { GoogleLoginButton } from './components/GoogleLoginButton';
 import { SellerRegistrationForm } from './components/SellerRegistrationForm';
+import { POST_LOGIN_RELOAD_KEY } from './components/PostLoginReloadBlock';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '';
 
@@ -78,6 +79,7 @@ export function App() {
 
                 if (authResult?.id) {
                     setStatus('¡Sesión iniciada! Redirigiendo...');
+                    sessionStorage.setItem(POST_LOGIN_RELOAD_KEY, '1');
                     window.location.href = '/dashboard';
                 } else {
                     setError('No se encontró una cuenta con este email. Regístrate como vendedor primero.');

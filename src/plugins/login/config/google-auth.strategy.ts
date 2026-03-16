@@ -16,7 +16,8 @@ import { loggerCtx } from '../constants';
 export interface GoogleAuthData {
     token: string;
 }
-const GOOGLE_API = 'https://www.googleapis.com/oauth2/v3/userinfo'
+const GOOGLE_API = 'https://www.googleapis.com/oauth2/v3/userinfo';
+const GOOGLE_TOKEN_INFO_API = 'https://oauth2.googleapis.com/tokeninfo';
 
 /**
  * @description
@@ -65,6 +66,28 @@ export class GoogleAdminAuthenticationStrategy
         }
 
         try {
+            const tokenInfoRes = await fetch(
+                `${GOOGLE_TOKEN_INFO_API}?access_token=${encodeURIComponent(token)}`,
+            );
+
+            if (!tokenInfoRes.ok) {
+                Logger.warn('Google access token validation failed', loggerCtx);
+                return undefined;
+            }
+
+            const tokenInfo = (await tokenInfoRes.json()) as {
+                aud?: string;
+                azp?: string;
+            };
+
+            if (tokenInfo.aud !== this.clientId) {
+                Logger.warn(
+                    `Access token belongs to a different OAuth client (aud=${tokenInfo.aud ?? 'unknown'})`,
+                    loggerCtx,
+                );
+                return undefined;
+            }
+
             const res = await fetch(
                 GOOGLE_API,
                 { headers: { Authorization: `Bearer ${token}` } },

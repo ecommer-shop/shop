@@ -1,6 +1,7 @@
 import { defineDashboardExtension } from '@vendure/dashboard';
 import { App } from './App';
 import { LoginLogo } from './components/LoginLogo';
+import { PostLoginReloadBlock, POST_LOGIN_RELOAD_KEY } from './components/PostLoginReloadBlock';
 
 defineDashboardExtension({
     routes: [{
@@ -30,4 +31,22 @@ defineDashboardExtension({
             },
         },
     },
+
+    pageBlocks: [
+        {
+            id: 'post-login-reload-block',
+            location: {
+                pageId: 'insights',
+                column: 'full',
+                position: { blockId: 'widgets', order: 'before' },
+            },
+            component: PostLoginReloadBlock,
+            shouldRender: () => {
+                if (typeof window === 'undefined') {
+                    return false;
+                }
+                return sessionStorage.getItem(POST_LOGIN_RELOAD_KEY) === '1';
+            },
+        },
+    ],
 });

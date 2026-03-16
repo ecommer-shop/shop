@@ -4,6 +4,8 @@ import { LOGIN_PLUGIN_OPTIONS } from './constants';
 import { PluginInitOptions } from './types';
 import { GoogleAdminAuthenticationStrategy } from './config/google-auth.strategy';
 import { GoogleAuthService } from './services/google-auth.service';
+import { GoogleTokenVerificationService } from './services/google-token-verification.service';
+import { SellerOnboardingService } from './services/seller-onboarding.service';
 import { LoginResolver } from './api/login.resolver';
 import { adminApiExtensions } from './api/api-extensions';
 
@@ -12,6 +14,8 @@ import { adminApiExtensions } from './api/api-extensions';
     providers: [
         { provide: LOGIN_PLUGIN_OPTIONS, useFactory: () => LoginPlugin.options },
         GoogleAuthService,
+        GoogleTokenVerificationService,
+        SellerOnboardingService,
     ],
     adminApiExtensions: {
         schema: adminApiExtensions,
