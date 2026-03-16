@@ -2,6 +2,7 @@ import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { ClerkAuthenticationStrategy } from './auth0.strategy';
 import { AuthorizationService } from './services/auth.service';
 import { ExternalAuthService } from './services/external-auth.service';
+import { DeleteCustomerService } from './services/delete-customer.service';
 import { shopApiExtensions } from './api/api-external-extensions';
 import { ExternalAuthResolver } from './api/external-auth.resolver';
 
@@ -11,7 +12,7 @@ import { ExternalAuthResolver } from './api/external-auth.resolver';
         schema: shopApiExtensions,
         resolvers: [ExternalAuthResolver],
     },
-    providers: [AuthorizationService, ExternalAuthService],
+    providers: [AuthorizationService, ExternalAuthService, DeleteCustomerService],
     exports: [AuthorizationService],
     configuration: config => {
         config.authOptions.shopAuthenticationStrategy.push(
