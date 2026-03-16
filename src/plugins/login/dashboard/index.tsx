@@ -1,41 +1,52 @@
-import { Button, defineDashboardExtension, Page, PageBlock, PageLayout, PageTitle } from '@vendure/dashboard';
-import { StrictMode, useState } from 'react';
-import { ClerkProvider, SignIn } from '@clerk/clerk-react'
+import { defineDashboardExtension } from '@vendure/dashboard';
 import { App } from './App';
-
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
-    || 'pk_test_Z29sZGVuLWZsZWEtNDEuY2xlcmsuYWNjb3VudHMuZGV2JA'
-
-if (!PUBLISHABLE_KEY) {
-    console.warn('[Clerk] Missing publishable key');
-}
+import { LoginLogo } from './components/LoginLogo';
+import { PostLoginReloadBlock, POST_LOGIN_RELOAD_KEY } from './components/PostLoginReloadBlock';
 
 defineDashboardExtension({
-    routes: [
-        {
-            path: '/custom-login',
-            authenticated: false,
-            component: () => (
-                <StrictMode>
-                    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-                        <App />
-                    </ClerkProvider>
-                </StrictMode>
-            ),
-        },
-    ],
+    routes: [{
+        path: '/login-custom',
+        authenticated: false,
+        component: () => {
+            return <App />;
+        }
+    }],
+
+    // Inject into the default `/login` page
     login: {
+        logo: {
+            component: LoginLogo,
+        },
         beforeForm: {
-            component: () => <div>Ecommer</div>
+            component: () => (
+                <div className="flex flex-col items-center text-center gap-2">
+                    <h1 className="text-2xl font-semibold tracking-tight">Bienvenido a Ecommer</h1>
+                    <p className="text-sm text-muted-foreground">Inicia sesión para acceder al panel de administración</p>
+                </div>
+            ),
         },
         afterForm: {
-            component: () => (
-                <StrictMode>
-                    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-                        <App />
-                    </ClerkProvider>
-                </StrictMode>
-            ),
-        }
-    }
+            component: () => {
+                return <App />;
+            },
+        },
+    },
+
+    pageBlocks: [
+        {
+            id: 'post-login-reload-block',
+            location: {
+                pageId: 'insights',
+                column: 'full',
+                position: { blockId: 'widgets', order: 'before' },
+            },
+            component: PostLoginReloadBlock,
+            shouldRender: () => {
+                if (typeof window === 'undefined') {
+                    return false;
+                }
+                return sessionStorage.getItem(POST_LOGIN_RELOAD_KEY) === '1';
+            },
+        },
+    ],
 });

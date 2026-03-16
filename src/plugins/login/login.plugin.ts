@@ -2,15 +2,36 @@ import { PluginCommonModule, Type, VendurePlugin } from '@vendure/core';
 
 import { LOGIN_PLUGIN_OPTIONS } from './constants';
 import { PluginInitOptions } from './types';
+import { GoogleAdminAuthenticationStrategy } from './config/google-auth.strategy';
+import { GoogleAuthService } from './services/google-auth.service';
+import { GoogleTokenVerificationService } from './services/google-token-verification.service';
+import { SellerOnboardingService } from './services/seller-onboarding.service';
+import { LoginResolver } from './api/login.resolver';
+import { adminApiExtensions } from './api/api-extensions';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
-    providers: [{ provide: LOGIN_PLUGIN_OPTIONS, useFactory: () => LoginPlugin.options }],
+    providers: [
+        { provide: LOGIN_PLUGIN_OPTIONS, useFactory: () => LoginPlugin.options },
+        GoogleAuthService,
+        GoogleTokenVerificationService,
+        SellerOnboardingService,
+    ],
+    adminApiExtensions: {
+        schema: adminApiExtensions,
+        resolvers: [LoginResolver],
+    },
     configuration: config => {
-        // Plugin-specific configuration
-        // such as custom fields, custom permissions,
-        // strategies etc. can be configured here by
-        // modifying the `config` object.
+        const clientId =
+            LoginPlugin.options?.googleOAuthClientId ||
+            process.env.GOOGLE_OAUTH_CLIENT_ID ||
+            '';
+
+        if (clientId) {
+            config.authOptions.adminAuthenticationStrategy.push(
+                new GoogleAdminAuthenticationStrategy(clientId),
+            );
+        }
         return config;
     },
     compatibility: '^3.0.0',
