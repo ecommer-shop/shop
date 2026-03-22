@@ -17,17 +17,6 @@ import { ReviewSelectWithCreate } from './review-select-with-create';
 import { routeWithoutAuth } from './route-without-auth';
 
 defineDashboardExtension({
-    login: {
-        afterForm: {
-            component: () => (
-                <div>
-                    <Button variant="secondary" className="w-full">
-                        Login with Vendure ID
-                    </Button>
-                </div>
-            ),
-        },
-    },
     routes: [reviewList, reviewDetail, routeWithoutAuth],
     widgets: [
         {
@@ -154,7 +143,7 @@ defineDashboardExtension({
                                 toast.message(`There are ${props.selection.length} selected items`);
                             }}
                             label="My Custom Action"
-                            icon={InfoIcon}
+
                         />
                     ),
                 },

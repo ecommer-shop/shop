@@ -1,12 +1,6 @@
 import { gql } from 'graphql-tag';
 
 export const commonApiExtensions = gql`
-    type ProductReviewTranslation {
-        id: ID!
-        languageCode: LanguageCode!
-        text: String!
-    }
-
     type ProductReview implements Node {
         id: ID!
         createdAt: DateTime!
@@ -18,12 +12,12 @@ export const commonApiExtensions = gql`
         rating: Float!
         authorName: String!
         authorLocation: String
+        verifiedPurchase: Boolean!
         upvotes: Int!
         downvotes: Int!
         state: String!
         response: String
         responseCreatedAt: DateTime
-        translations: [ProductReviewTranslation!]!
     }
 
     type ProductReviewList implements PaginatedList {
@@ -36,9 +30,18 @@ export const commonApiExtensions = gql`
         frequency: Int!
     }
 
+    type ProductAISummary {
+        id: ID!
+        title: String!
+        summary: String!
+        basedOnReviewsCount: Int!
+        generatedAt: DateTime!
+    }
+
     extend type Product {
         reviews(options: ProductReviewListOptions): ProductReviewList!
         reviewsHistogram: [ProductReviewHistogramItem!]!
+        aiSummary: ProductAISummary
     }
 
     # Auto-generated at runtime
@@ -48,18 +51,12 @@ export const commonApiExtensions = gql`
 export const adminApiExtensions = gql`
     ${commonApiExtensions}
 
-    input ProductReviewTranslationInput {
-        languageCode: LanguageCode!
-        text: String!
-    }
-
     input UpdateProductReviewInput {
         id: ID!
         summary: String
         body: String
         response: String
         state: String
-        translations: [ProductReviewTranslationInput!]!
     }
 
     extend type ProductReview {
