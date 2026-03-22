@@ -4,6 +4,7 @@ declare global {
    namespace NodeJS {
       interface ProcessEnv {
          ADMIN_UI_API_PORT: number;
+         HOST_URL: string;
          APP_ENV: string;
          ASSET_UPLOAD_DIR: string;
          COOKIE_SECRET: string;
@@ -13,6 +14,7 @@ declare global {
          SUPERADMIN_USERNAME: string;
          STATIC_DIR: string;
          ASSET_URL_PREFIX: string;
+         GOOGLE_OAUTH_CLIENT_ID: string;
       }
    }
 }

@@ -4,9 +4,35 @@ import {
     ID,
     RequestContext,
     TransactionalConnection,
-    User
+    User,
+    Logger
 } from "@vendure/core"
-import jwt from 'jsonwebtoken';
+import { verifyToken } from '@clerk/backend';
+
+type TokenUser = {
+    exp: number,
+    iat: number,
+    iss: string;
+    jti: string,
+    nbf: number,
+    sub: string,
+    userEmail: string,
+    userFirstname?: string,
+    userLastname?: string
+}
+
+function extractEmail(decoded: Record<string, any>): string | undefined {
+    if (typeof decoded.userEmail === 'string' && decoded.userEmail) return decoded.userEmail;
+    if (typeof decoded.email === 'string' && decoded.email) return decoded.email;
+    if (typeof decoded.email_addresses === 'string' && decoded.email_addresses) return decoded.email_addresses;
+
+    if (decoded.email_addresses && typeof decoded.email_addresses === 'object') {
+        if (typeof decoded.email_addresses.emailAddress === 'string') return decoded.email_addresses.emailAddress;
+        if (typeof decoded.email_addresses.email_address === 'string') return decoded.email_addresses.email_address;
+    }
+
+    return undefined;
+}
 
 export class ExternalAuthService {
     constructor(
@@ -29,19 +55,35 @@ export class ExternalAuthService {
             };
         }
 
-        // Decodificar token JWT (no hace verificación con firma, solo lectura)
-        const decoded: any = jwt.decode(token);
-        if (!decoded || !decoded.email) {
+        let decoded: any;
+        try {
+            decoded = await verifyToken(token, {
+                secretKey: process.env.CLERK_SECRET_KEY || '',
+            });
+
+        } catch (error) {
+            Logger.error(`Error verificando token de Clerk: ${error instanceof Error ? error.message : error}`, 'ExternalAuthService');
+            throw new Error('Token inválido o expirado');
+        }
+        const email = extractEmail(decoded);
+        const clerkId = decoded?.sub;
+
+        if (!decoded || !email) {
+
             throw new Error('Token inválido: no contiene email');
         }
 
-        const email = decoded.email;
-        const name = decoded.name ?? decoded.given_name ?? 'Usuario Externo';
+        const firstName = decoded.userFirstname ?? decoded.first_name ?? 'Usuario Externo';
+        const lastName = decoded.userLastname ?? decoded.last_name ?? '';
 
         // Crear o actualizar Customer (esto crea el User si no existe)
         const customer = await this.customerService.createOrUpdate(ctx, {
             emailAddress: email,
-            firstName: name,
+            firstName,
+            lastName,
+            customFields: {
+                ...(clerkId ? { clerkId } : {}),
+            },
         });
 
         // Buscar el User asociado a ese Customer
@@ -52,7 +94,7 @@ export class ExternalAuthService {
         const session = await this.authService.createAuthenticatedSessionForUser(
             ctx,
             userEntity,
-            'external',
+            'clerk',
         );
 
         // Cargar roles del usuario (para incluir el code)

@@ -11,7 +11,7 @@ export const shopApiExtensions = gql`
     description: String
   }
 
-    type ExternalAuthPermission {
+  type ExternalAuthPermission {
     code: String!
     permission: String
   }
@@ -25,8 +25,18 @@ export const shopApiExtensions = gql`
     permissions: JSON!
   }
 
+  type DeleteAccountResult {
+    success: Boolean!
+    message: String!
+  }
+
+  input DeleteMyAccountInput {
+    clerkId: String!
+  }
+
   extend type Mutation {
     authenticateExternal(input: AuthExternalInputTest!): ExternalAuthResult!
+    deleteMyAccount(input: DeleteMyAccountInput!): DeleteAccountResult!
   }
 
 `;

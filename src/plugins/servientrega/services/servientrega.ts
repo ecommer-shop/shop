@@ -20,11 +20,9 @@ export class Servientrega {
         const countryId = args.countryId;
         const language = args.language;
         const urlw = `${url}/Cotizador/CiudadesDepartamento/${countryId}/${language}`
-        console.log(urlw)
         const agent = new https.Agent({ rejectUnauthorized: false });
         const { data } = await axios.get(urlw, {
             headers: { Accept: "application/json" },
-            timeout: 15000,
             httpsAgent: agent
         });
         return data;
@@ -83,10 +81,7 @@ export class Servientrega {
         const lang = String(arg.language ?? "es");
 
         const urlw = `${base}/Cotizador/Tarifas/${o}/${d}/${L}/${A}/${W}/${P}/${V}/${pr}/${lang}`;
-        console.log(urlw)
 
-
-        console.log("holis", urlw);
         const agent = new https.Agent({ rejectUnauthorized: false });
 
         const { data } = await axios.get(urlw, {
@@ -131,7 +126,6 @@ export class Servientrega {
         const urlw = `https://app.servientrega.com/co/rest/locations/v1.0/api/Productos/1`;
         const agent = new https.Agent({ rejectUnauthorized: false });
         const { data } = await axios.get(urlw, { headers: { Accept: 'application/json' }, timeout: 15000, httpsAgent: agent });
-        console.log(data);
         return data;
     }
 }
