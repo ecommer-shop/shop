@@ -16,6 +16,7 @@ export class InvoiceAdminResolver {
         dateTo?: string;
         customerDni?: string;
         status?: string;
+        orderCode?: string;
       };
       take?: number;
       skip?: number;
@@ -27,6 +28,7 @@ export class InvoiceAdminResolver {
           dateTo: options.filter.dateTo ? new Date(options.filter.dateTo) : undefined,
           customerDni: options.filter.customerDni ?? undefined,
           status: options.filter.status ?? undefined,
+          orderCode: options.filter.orderCode ?? undefined,
         }
       : {};
 

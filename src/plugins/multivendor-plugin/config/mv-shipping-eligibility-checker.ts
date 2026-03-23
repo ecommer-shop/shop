@@ -1,8 +1,13 @@
 import { LanguageCode } from '@vendure/common/lib/generated-types';
 import { DEFAULT_CHANNEL_CODE } from '@vendure/common/lib/shared-constants';
-import { EntityHydrator, idsAreEqual, ShippingEligibilityChecker } from '@vendure/core';
+import {
+    Channel,
+    idsAreEqual,
+    ShippingEligibilityChecker,
+    TransactionalConnection,
+} from '@vendure/core';
 
-let entityHydrator: EntityHydrator;
+let connection: TransactionalConnection;
 
 /**
  * @description
@@ -13,12 +18,17 @@ export const multivendorShippingEligibilityChecker = new ShippingEligibilityChec
     description: [{ languageCode: LanguageCode.en, value: 'Multivendor Shipping Eligibility Checker' }],
     args: {},
     init(injector) {
-        entityHydrator = injector.get(EntityHydrator);
+        connection = injector.get(TransactionalConnection);
     },
     check: async (ctx, order, args, method) => {
-        await entityHydrator.hydrate(ctx, method, { relations: ['channels'] });
-        await entityHydrator.hydrate(ctx, order, { relations: ['lines.sellerChannel'] });
-        const sellerChannel = method.channels.find(c => c.code !== DEFAULT_CHANNEL_CODE);
+        const channels = await connection
+            .getRepository(ctx, Channel)
+            .createQueryBuilder('channel')
+            .leftJoin('channel.shippingMethods', 'shippingMethod')
+            .where('shippingMethod.id = :shippingMethodId', { shippingMethodId: method.id })
+            .getMany();
+
+        const sellerChannel = channels.find(c => c.code !== DEFAULT_CHANNEL_CODE);
         if (!sellerChannel) {
             return false;
         }

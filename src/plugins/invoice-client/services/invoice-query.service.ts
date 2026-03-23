@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RequestContext, TransactionalConnection } from '@vendure/core';
-import { Invoice } from '../entities/invoice.entity';
+import { RequestContext } from '@vendure/core';
 import type {
   ListInvoicesFilter,
   ListInvoicesPagination,
@@ -8,191 +7,123 @@ import type {
   InvoiceTotalsByDay,
   InvoiceTotalsByMonth,
 } from './invoice-query.types';
+import { InvoiceMicroHttpClient } from './invoice-micro-http.client';
 
 /**
- * Servicio de consultas de facturas: listado por filtros (QueryBuilder)
- * y totales por día/mes (raw SQL con parámetros).
+ * Consultas de facturas vía API del microservicio (sin tablas locales en Vendure).
  */
 @Injectable()
 export class InvoiceQueryService {
-  constructor(private connection: TransactionalConnection) {}
+  constructor(private readonly microHttp: InvoiceMicroHttpClient) {}
 
-  /**
-   * Obtiene la primera factura por código de orden.
-   */
-  async getInvoiceByOrderCode(
-    ctx: RequestContext,
-    orderCode: string,
-  ): Promise<ListInvoicesResult['items'][0] | null> {
-    const result = await this.listInvoices(ctx, { orderCode }, { take: 1 });
-    return result.items[0] ?? null;
-  }
-
-  /**
-   * Listado de facturas por rango de fechas, cliente (NIT/DNI) y/o estado.
-   */
   async listInvoices(
-    ctx: RequestContext,
+    _ctx: RequestContext,
     filter: ListInvoicesFilter,
     pagination?: ListInvoicesPagination,
   ): Promise<ListInvoicesResult> {
-    const repo = this.connection.getRepository(ctx, Invoice);
-    const qb = repo
-      .createQueryBuilder('invoice')
-      .select([
-        'invoice.id',
-        'invoice.orderCode',
-        'invoice.prefix',
-        'invoice.documentNumber',
-        'invoice.typeDocumentId',
-        'invoice.operationTypeId',
-        'invoice.status',
-        'invoice.statusMessage',
-        'invoice.customerName',
-        'invoice.customerDni',
-        'invoice.customerEmail',
-        'invoice.subtotal',
-        'invoice.taxTotal',
-        'invoice.total',
-        'invoice.currencyCode',
-        'invoice.pdfUrl',
-        'invoice.xmlUrl',
-        'invoice.createdAt',
-      ]);
+    const res = await this.microHttp.axios.get<{
+      success: boolean;
+      data?: { items: Array<Record<string, unknown>>; total: number };
+      error?: string;
+      message?: string;
+    }>('/invoices/list', {
+      params: {
+        dateFrom: filter.dateFrom?.toISOString(),
+        dateTo: filter.dateTo?.toISOString(),
+        customerDni: filter.customerDni,
+        status: filter.status,
+        orderCode: filter.orderCode,
+        take: pagination?.take,
+        skip: pagination?.skip,
+      },
+      validateStatus: (s) => s < 500,
+    });
 
-    if (filter.dateFrom) {
-      qb.andWhere('invoice.createdAt >= :dateFrom', { dateFrom: filter.dateFrom });
-    }
-    if (filter.dateTo) {
-      qb.andWhere('invoice.createdAt <= :dateTo', { dateTo: filter.dateTo });
-    }
-    if (filter.customerDni) {
-      qb.andWhere('invoice.customerDni = :customerDni', { customerDni: filter.customerDni });
-    }
-    if (filter.status) {
-      qb.andWhere('invoice.status = :status', { status: filter.status });
-    }
-    if (filter.orderCode) {
-      qb.andWhere('invoice.orderCode = :orderCode', { orderCode: filter.orderCode });
+    if (res.status === 503) {
+      throw new Error(
+        res.data?.message ||
+          'Invoice microservice database not configured (INVOICE_SERVICE_DATABASE_URL).',
+      );
     }
 
-    const total = await qb.getCount();
-
-    qb.orderBy('invoice.createdAt', 'DESC');
-
-    if (pagination?.skip != null) {
-      qb.skip(pagination.skip);
-    }
-    if (pagination?.take != null) {
-      qb.take(pagination.take);
+    if (!res.data.success || !res.data.data) {
+      throw new Error(res.data.error || res.data.message || 'Failed to list invoices');
     }
 
-    const items = await qb.getMany();
+    const items = res.data.data.items.map((row) => ({
+      id: String(row.id),
+      orderCode: row.orderCode as string,
+      prefix: row.prefix as string,
+      documentNumber: row.documentNumber as string,
+      typeDocumentId: Number(row.typeDocumentId),
+      operationTypeId: Number(row.operationTypeId),
+      status: row.status as string,
+      statusMessage: (row.statusMessage as string) ?? null,
+      customerName: row.customerName as string,
+      customerDni: row.customerDni as string,
+      customerEmail: (row.customerEmail as string) ?? null,
+      subtotal: row.subtotal as string,
+      taxTotal: row.taxTotal as string,
+      total: row.total as string,
+      currencyCode: row.currencyCode as string,
+      pdfUrl: (row.pdfUrl as string) ?? null,
+      xmlUrl: (row.xmlUrl as string) ?? null,
+      createdAt: new Date(row.createdAt as string),
+    }));
 
     return {
-      items: items.map((row) => ({
-        id: row.id,
-        orderCode: row.orderCode,
-        prefix: row.prefix,
-        documentNumber: row.documentNumber,
-        typeDocumentId: row.typeDocumentId,
-        operationTypeId: row.operationTypeId,
-        status: row.status,
-        statusMessage: row.statusMessage ?? null,
-        customerName: row.customerName,
-        customerDni: row.customerDni,
-        customerEmail: row.customerEmail ?? null,
-        subtotal: row.subtotal,
-        taxTotal: row.taxTotal,
-        total: row.total,
-        currencyCode: row.currencyCode,
-        pdfUrl: row.pdfUrl ?? null,
-        xmlUrl: row.xmlUrl ?? null,
-        createdAt: row.createdAt,
-      })),
-      total,
+      items,
+      total: res.data.data.total,
     };
   }
 
-  /**
-   * Totales por día (ventas e impuestos) en el rango dado.
-   */
   async getTotalsByDay(
-    ctx: RequestContext,
+    _ctx: RequestContext,
     dateFrom: Date,
     dateTo: Date,
   ): Promise<InvoiceTotalsByDay[]> {
-    const repo = this.connection.getRepository(ctx, Invoice);
-    const meta = repo.metadata;
-    const tableName = meta.tableName;
-    const schema = meta.schema;
-    const fullTable = schema ? `"${schema}".${tableName}` : tableName;
-    const createdCol =
-      meta.columns.find((c) => c.propertyName === 'createdAt')?.databaseName ?? 'created_at';
-    const subtotalCol =
-      meta.columns.find((c) => c.propertyName === 'subtotal')?.databaseName ?? 'subtotal';
-    const taxCol =
-      meta.columns.find((c) => c.propertyName === 'taxTotal')?.databaseName ?? 'tax_total';
-    const totalCol =
-      meta.columns.find((c) => c.propertyName === 'total')?.databaseName ?? 'total';
+    const res = await this.microHttp.axios.get<{
+      success: boolean;
+      data?: InvoiceTotalsByDay[];
+    }>('/invoices/totals/day', {
+      params: {
+        dateFrom: dateFrom.toISOString(),
+        dateTo: dateTo.toISOString(),
+      },
+      validateStatus: (s) => s < 500,
+    });
 
-    const raw = await this.connection.rawConnection.query(
-      `SELECT
-        (invoice."${createdCol}"::date)::text AS date,
-        COALESCE(SUM((invoice."${subtotalCol}")::numeric), 0)::text AS subtotal,
-        COALESCE(SUM((invoice."${taxCol}")::numeric), 0)::text AS "taxTotal",
-        COALESCE(SUM((invoice."${totalCol}")::numeric), 0)::text AS total,
-        COUNT(*)::int AS count
-       FROM ${fullTable} AS invoice
-       WHERE invoice."${createdCol}" >= $1 AND invoice."${createdCol}" <= $2
-       GROUP BY (invoice."${createdCol}"::date)
-       ORDER BY (invoice."${createdCol}"::date) ASC`,
-      [dateFrom, dateTo],
-    );
-
-    const rows = Array.isArray(raw) ? raw : (raw as { rows?: InvoiceTotalsByDay[] }).rows ?? [];
-    return rows as InvoiceTotalsByDay[];
+    if (res.status === 503) {
+      throw new Error('Invoice microservice database not configured.');
+    }
+    if (!res.data.success || !res.data.data) {
+      throw new Error('Failed to load invoice totals by day');
+    }
+    return res.data.data;
   }
 
-  /**
-   * Totales por mes (ventas e impuestos) en el rango dado.
-   */
   async getTotalsByMonth(
-    ctx: RequestContext,
+    _ctx: RequestContext,
     dateFrom: Date,
     dateTo: Date,
   ): Promise<InvoiceTotalsByMonth[]> {
-    const repo = this.connection.getRepository(ctx, Invoice);
-    const meta = repo.metadata;
-    const tableName = meta.tableName;
-    const schema = meta.schema;
-    const fullTable = schema ? `"${schema}".${tableName}` : tableName;
-    const createdCol =
-      meta.columns.find((c) => c.propertyName === 'createdAt')?.databaseName ?? 'created_at';
-    const subtotalCol =
-      meta.columns.find((c) => c.propertyName === 'subtotal')?.databaseName ?? 'subtotal';
-    const taxCol =
-      meta.columns.find((c) => c.propertyName === 'taxTotal')?.databaseName ?? 'tax_total';
-    const totalCol =
-      meta.columns.find((c) => c.propertyName === 'total')?.databaseName ?? 'total';
+    const res = await this.microHttp.axios.get<{
+      success: boolean;
+      data?: InvoiceTotalsByMonth[];
+    }>('/invoices/totals/month', {
+      params: {
+        dateFrom: dateFrom.toISOString(),
+        dateTo: dateTo.toISOString(),
+      },
+      validateStatus: (s) => s < 500,
+    });
 
-    const raw = await this.connection.rawConnection.query(
-      `SELECT
-        EXTRACT(YEAR FROM invoice."${createdCol}")::int AS year,
-        EXTRACT(MONTH FROM invoice."${createdCol}")::int AS month,
-        COALESCE(SUM((invoice."${subtotalCol}")::numeric), 0)::text AS subtotal,
-        COALESCE(SUM((invoice."${taxCol}")::numeric), 0)::text AS "taxTotal",
-        COALESCE(SUM((invoice."${totalCol}")::numeric), 0)::text AS total,
-        COUNT(*)::int AS count
-       FROM ${fullTable} AS invoice
-       WHERE invoice."${createdCol}" >= $1 AND invoice."${createdCol}" <= $2
-       GROUP BY EXTRACT(YEAR FROM invoice."${createdCol}"), EXTRACT(MONTH FROM invoice."${createdCol}")
-       ORDER BY year ASC, month ASC`,
-      [dateFrom, dateTo],
-    );
-
-    const rows = Array.isArray(raw) ? raw : (raw as { rows?: InvoiceTotalsByMonth[] }).rows ?? [];
-    return rows as InvoiceTotalsByMonth[];
+    if (res.status === 503) {
+      throw new Error('Invoice microservice database not configured.');
+    }
+    if (!res.data.success || !res.data.data) {
+      throw new Error('Failed to load invoice totals by month');
+    }
+    return res.data.data;
   }
 }
-

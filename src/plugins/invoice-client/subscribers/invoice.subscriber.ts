@@ -8,8 +8,6 @@ import {
   RequestContextService,
 } from '@vendure/core';
 import { InvoiceClientService } from '../services/invoice-client.service';
-import { InvoiceSequenceService } from '../services/invoice-sequence.service';
-import { InvoiceQueryService } from '../services/invoice-query.service';
 import { INVOICE_CLIENT_PLUGIN_OPTIONS } from '../constants';
 import { PluginInitOptions } from '../types';
 
@@ -20,8 +18,6 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
   constructor(
     private eventBus: EventBus,
     private invoiceClientService: InvoiceClientService,
-    private invoiceSequenceService: InvoiceSequenceService,
-    private invoiceQueryService: InvoiceQueryService,
     private orderService: OrderService,
     private requestContextService: RequestContextService,
     @Inject(INVOICE_CLIENT_PLUGIN_OPTIONS) private options: PluginInitOptions,
@@ -58,7 +54,7 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
       }
 
       Logger.info(`Checking if invoice exists for order ${order.code}...`, loggerCtx);
-      const existing = await this.invoiceQueryService.getInvoiceByOrderCode(ctx, order.code);
+      const existing = await this.invoiceClientService.getInvoiceByOrderCode(order.code);
       if (existing) {
         Logger.info(`Invoice already exists for order ${order.code}`, loggerCtx);
         return;
@@ -70,7 +66,7 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
         process.env.MATIAS_RESOLUTION_NUMBER ??
         '18764074347312';
 
-      const documentNumber = await this.invoiceSequenceService.getNextDocumentNumber(prefix);
+      const documentNumber = await this.invoiceClientService.fetchNextDocumentNumber(prefix);
       Logger.info(
         `Generated document number ${documentNumber} for order ${order.code} (prefix ${prefix})`,
         loggerCtx,
@@ -91,4 +87,3 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
     }
   }
 }
-

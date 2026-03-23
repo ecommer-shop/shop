@@ -1,9 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Order, RequestContext, TransactionalConnection } from '@vendure/core';
-import axios, { AxiosInstance } from 'axios';
+import { Order, RequestContext } from '@vendure/core';
 import { INVOICE_CLIENT_PLUGIN_OPTIONS } from '../constants';
-import { PluginInitOptions } from '../types';
-import { Invoice } from '../entities/invoice.entity';
+import type { PluginInitOptions } from '../types';
+import { InvoiceMicroHttpClient } from './invoice-micro-http.client';
 
 interface CreateInvoiceRequest {
   orderCode: string;
@@ -15,6 +14,10 @@ interface CreateInvoiceRequest {
   sendEmail?: number;
   operationTypeId: number;
   typeDocumentId: number;
+  reportSubtotal?: string;
+  reportTaxTotal?: string;
+  reportTotal?: string;
+  currencyCode?: string;
   customer: {
     companyName: string;
     dni: string;
@@ -46,19 +49,21 @@ interface CreateInvoiceRequest {
   }>;
 }
 
+export interface InvoiceCreateResponseData {
+  id: string;
+  orderCode: string;
+  status: string;
+  matiasInvoiceId?: string;
+  matiasInvoiceNumber?: string;
+  cufe?: string;
+  pdfUrl?: string;
+  xmlUrl?: string;
+  message?: string;
+}
+
 interface InvoiceResponse {
   success: boolean;
-  data?: {
-    id: string;
-    orderCode: string;
-    status: string;
-    matiasInvoiceId?: string;
-    matiasInvoiceNumber?: string;
-    cufe?: string;
-    pdfUrl?: string;
-    xmlUrl?: string;
-    message?: string;
-  };
+  data?: InvoiceCreateResponseData;
   error?: string;
   message?: string;
 }
@@ -66,34 +71,57 @@ interface InvoiceResponse {
 @Injectable()
 export class InvoiceClientService {
   private readonly logger = new Logger(InvoiceClientService.name);
-  private httpClient: AxiosInstance;
 
   constructor(
-    @Inject(INVOICE_CLIENT_PLUGIN_OPTIONS) private options: PluginInitOptions,
-    private connection: TransactionalConnection,
-  ) {
-    this.httpClient = axios.create({
-      baseURL: options.invoiceServiceUrl,
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': options.apiKey,
-      },
-    });
+    private readonly microHttp: InvoiceMicroHttpClient,
+    @Inject(INVOICE_CLIENT_PLUGIN_OPTIONS) private readonly options: PluginInitOptions,
+  ) {}
+
+  /**
+   * Siguiente número de documento (persistido en la BD del microservicio).
+   */
+  async fetchNextDocumentNumber(prefix: string): Promise<string> {
+    const res = await this.microHttp.axios.get<{
+      success: boolean;
+      data?: { documentNumber: string };
+      error?: string;
+    }>('/sequence/next', { params: { prefix } });
+
+    if (!res.data.success || !res.data.data?.documentNumber) {
+      throw new Error(res.data.error || 'Failed to get next document number from invoice service');
+    }
+    return res.data.data.documentNumber;
   }
 
   /**
-   * De momento siempre retorna Bogotá (ID Matias 836).
+   * Comprueba si ya existe factura para la orden (solo lectura en el micro).
    */
+  async getInvoiceByOrderCode(orderCode: string): Promise<InvoiceCreateResponseData | null> {
+    try {
+      const res = await this.microHttp.axios.get<InvoiceResponse>(
+        `/invoices/by-order-code/${encodeURIComponent(orderCode)}`,
+      );
+      if (!res.data.success || !res.data.data) {
+        return null;
+      }
+      return res.data.data;
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        return null;
+      }
+      throw err;
+    }
+  }
+
   private mapCityToMatiasId(_cityName?: string): string {
     return '836';
   }
 
   /**
-   * Crea una factura desde una orden de Vendure y la persiste en la tabla Invoice.
+   * Crea una factura vía microservicio Matias. No persiste nada en la BD de Vendure.
    */
   async createInvoiceFromOrder(
-    ctx: RequestContext,
+    _ctx: RequestContext,
     order: Order,
     config: {
       resolutionNumber: string;
@@ -122,14 +150,12 @@ export class InvoiceClientService {
         customer.phoneNumber ||
         '0000000000';
 
-      // Items de la orden -> items de Matias
       const items = order.lines.map((line) => {
         const productVariant = line.productVariant;
         const taxRate = line.taxRate || 19;
         const unitPrice = line.unitPriceWithTax / (1 + taxRate / 100);
         const description =
           productVariant?.name ||
-          line.productVariant?.name ||
           line.productVariant?.product?.name ||
           `Producto ${line.id}`;
         const sku = productVariant?.sku || `SKU-${productVariant?.id || line.id}`;
@@ -146,13 +172,15 @@ export class InvoiceClientService {
         };
       });
 
-      // Totales (para guardar en BD)
-      const subtotal = order.subTotalWithTax / (1 + 19 / 100);
-      const taxAmount = order.subTotalWithTax - subtotal;
-      const total = order.totalWithTax;
+      // Totales coherentes con las líneas enviadas al micro/Matias
+      const subtotal = items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
+      const taxAmount = items.reduce(
+        (acc, item) => acc + item.unitPrice * item.quantity * ((item.taxPercent ?? 0) / 100),
+        0,
+      );
+      const total = subtotal + taxAmount;
 
-      // Pagos: por simplicidad, un pago = total
-      const totalPaid = order.totalWithTax;
+      const totalPaid = total;
       const payments = [
         {
           paymentMethodId: 1,
@@ -171,6 +199,10 @@ export class InvoiceClientService {
         sendEmail: config.sendEmail ?? 1,
         operationTypeId: config.operationTypeId ?? 1,
         typeDocumentId: config.typeDocumentId ?? 7,
+        reportSubtotal: subtotal.toFixed(2),
+        reportTaxTotal: taxAmount.toFixed(2),
+        reportTotal: total.toFixed(2),
+        currencyCode: order.currencyCode || 'COP',
         customer: {
           companyName: customerName,
           dni: customerDni,
@@ -190,47 +222,15 @@ export class InvoiceClientService {
       };
 
       this.logger.log(
-        `Sending POST request to ${this.options.invoiceServiceUrl}/invoices for order ${order.code}`,
+        `Sending POST ${this.options.invoiceServiceUrl.replace(/\/+$/, '')}/invoices for order ${order.code}`,
       );
 
-      const response = await this.httpClient.post<InvoiceResponse>('/invoices', request);
+      const response = await this.microHttp.axios.post<InvoiceResponse>('/invoices', request);
       if (!response.data.success) {
         throw new Error(response.data.error || response.data.message || 'Failed to create invoice');
       }
 
       const data = response.data.data;
-
-      // Persistir en Postgres
-      try {
-        const repo = this.connection.getRepository(ctx, Invoice);
-        const invoice = repo.create({
-          orderCode: order.code,
-          prefix: config.prefix,
-          documentNumber: config.documentNumber,
-          typeDocumentId: config.typeDocumentId ?? 7,
-          operationTypeId: config.operationTypeId ?? 1,
-          matiasInvoiceId: data?.id ?? null,
-          matiasInvoiceNumber: data?.matiasInvoiceNumber ?? null,
-          cufe: data?.cufe ?? null,
-          status: data?.status ?? 'UNKNOWN',
-          statusMessage: data?.message ?? response.data.message ?? null,
-          customerName,
-          customerDni,
-          customerEmail: customer.emailAddress,
-          subtotal: subtotal.toFixed(2),
-          taxTotal: taxAmount.toFixed(2),
-          total: total.toFixed(2),
-          currencyCode: order.currencyCode || 'COP',
-          pdfUrl: data?.pdfUrl ?? null,
-          xmlUrl: data?.xmlUrl ?? null,
-        });
-
-        await repo.save(invoice);
-      } catch (persistError: any) {
-        this.logger.error(
-          `Failed to persist invoice record for order ${order.code}: ${persistError.message}`,
-        );
-      }
 
       this.logger.log(`Invoice created successfully for order ${order.code}`, {
         invoiceId: data?.id,
@@ -244,4 +244,3 @@ export class InvoiceClientService {
     }
   }
 }
-

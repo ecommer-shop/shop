@@ -27,7 +27,7 @@ export interface ListInvoicesPagination {
  */
 export interface ListInvoicesResult {
   items: Array<{
-    id: number;
+    id: string;
     orderCode: string;
     prefix: string;
     documentNumber: string;

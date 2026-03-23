@@ -1,6 +1,6 @@
 import {
     ChannelService,
-    EntityHydrator,
+    Channel,
     idsAreEqual,
     Injector,
     Order,
@@ -8,23 +8,30 @@ import {
     RequestContext,
     ShippingLine,
     ShippingLineAssignmentStrategy,
+    TransactionalConnection,
 } from '@vendure/core';
 
 export class MultivendorShippingLineAssignmentStrategy implements ShippingLineAssignmentStrategy {
-    private entityHydrator: EntityHydrator;
     private channelService: ChannelService;
+    private connection: TransactionalConnection;
 
     init(injector: Injector) {
-        this.entityHydrator = injector.get(EntityHydrator);
         this.channelService = injector.get(ChannelService);
+        this.connection = injector.get(TransactionalConnection);
     }
 
     async assignShippingLineToOrderLines(ctx: RequestContext, shippingLine: ShippingLine, order: Order) {
         // First we need to ensure the required relations are available
         // to work with.
         const defaultChannel = await this.channelService.getDefaultChannel();
-        await this.entityHydrator.hydrate(ctx, shippingLine, { relations: ['shippingMethod.channels'] });
-        const { channels } = shippingLine.shippingMethod;
+        const channels = await this.connection
+            .getRepository(ctx, Channel)
+            .createQueryBuilder('channel')
+            .leftJoin('channel.shippingMethods', 'shippingMethod')
+            .where('shippingMethod.id = :shippingMethodId', {
+                shippingMethodId: shippingLine.shippingMethodId,
+            })
+            .getMany();
 
         // We assume that, if a ShippingMethod is assigned to exactly 2 Channels,
         // then one is the default Channel and the other is the seller's Channel.

@@ -32,6 +32,7 @@ const invoiceType = gql`
     dateTo: DateTime
     customerDni: String
     status: String
+    orderCode: String
   }
 
   input InvoiceListOptionsInput {
