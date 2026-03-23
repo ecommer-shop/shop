@@ -14,6 +14,7 @@ declare global {
          SUPERADMIN_USERNAME: string;
          STATIC_DIR: string;
          ASSET_URL_PREFIX: string;
+         GOOGLE_OAUTH_CLIENT_ID: string;
       }
    }
 }
