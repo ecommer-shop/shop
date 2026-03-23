@@ -19,8 +19,7 @@ export class AiChat {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ 
-                    message: message,
-                    history: history 
+                    message
                 }),
             });
 
@@ -31,7 +30,7 @@ export class AiChat {
             const data = await response.json();
 
             return {
-                response: data.response || ''
+                response: data.answer || ''
             };
         } catch (error) {
             throw new Error(`Failed to call AI service: ${error instanceof Error ? error.message : 'Unknown error'}`);
