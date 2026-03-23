@@ -1,5 +1,3 @@
--- Opcional: el servicio crea la tabla al arrancar (`ensureSchema`).
--- Úsalo si prefieres migraciones manuales o revisión del esquema.
 
 CREATE TABLE IF NOT EXISTS matias_invoice_record (
   id TEXT PRIMARY KEY,

@@ -181,8 +181,6 @@ docker run -p 3010:3010 --env-file .env matias-invoice-service
 2. **Persistencia y base de datos**:
    - **Producción**: define `INVOICE_SERVICE_DATABASE_URL` con un **PostgreSQL dedicado al microservicio** (no reutilices el `DATABASE_URL` de Vendure/shop). El servicio crea la tabla `matias_invoice_record` al arrancar.
    - **Desarrollo**: si no defines esa variable, se usa almacenamiento en memoria (con advertencia en logs).
-   - **Separación**: Vendure sigue guardando su copia en la BD del shop (plugin `invoice-client`) para reportes; el micro solo necesita su propia BD para estado interno, reenvíos y consultas por `invoiceId` del micro.
-   - **Health**: `GET /api/health` incluye `persistence`: `postgres` | `memory` | `postgres_error`.
 
 3. **Endpoints de Matias**: Los endpoints de la API de Matias en el código tienen marcadores `TODO`. Debes ajustarlos según la documentación real de Matias.
 
