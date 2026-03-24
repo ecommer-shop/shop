@@ -130,6 +130,7 @@ export const plugins: VendureConfig['plugins'] = [
   AiChatPlugin,
 
   PaymentPlugin.init({
+    integrityKey: process.env.PAYMENT_INTEGRITY_KEY,
     secretKey: process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
   }),

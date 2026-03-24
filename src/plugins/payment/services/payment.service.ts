@@ -18,11 +18,12 @@ export class PaymentService {
             currency: this.options.currency
         }));
 
-        if (!this.options.secretKey) {
-            throw new Error('PAYMENT_SECRET_KEY environment variable is not set');
+        const integrityKey = this.options.integrityKey ?? this.options.secretKey;
+        if (!integrityKey) {
+            throw new Error('Wompi integrity key is not set (PAYMENT_INTEGRITY_KEY)');
         }
 
-        const concatenated = `${paymentReference}${amountInCents}${this.options.currency}${this.options.secretKey}`;
+        const concatenated = `${paymentReference}${amountInCents}${this.options.currency}${integrityKey}`;
         Logger.debug('PaymentService: Concatenated string', concatenated);
 
         const hash = crypto.createHash('sha256').update(concatenated).digest('hex');
