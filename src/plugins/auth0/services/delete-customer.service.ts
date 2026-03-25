@@ -18,6 +18,10 @@ export class DeleteCustomerService {
         private userService: UserService,
     ) { }
 
+    /**
+     * Elimina un customer y su información en cascada identificándolo por su clerkId.
+     * Anonimiza los datos personales (GDPR) y soft-deletes el User para preservar el historial de órdenes.
+     */
     async deleteCustomerByClerkId(
         ctx: RequestContext,
         clerkId: string,
@@ -74,7 +78,7 @@ export class DeleteCustomerService {
             );
         }
 
-        // Anonimizar y soft-delete del User
+        //Anonimizar y soft-delete del User
         if (customer.user) {
             const anonymizedIdentifier = `deleted_${customer.user.id}@deleted.invalid`;
             await userRepo.update(customer.user.id, {
@@ -87,7 +91,7 @@ export class DeleteCustomerService {
             );
         }
 
-        // Anonimiza datos personales y soft-delete del Customer
+        // Anonimizar datos personales y soft-delete del Customer
         const anonymizedEmail = `deleted_${customer.id}@deleted.invalid`;
         await customerRepo
             .createQueryBuilder()
@@ -103,10 +107,11 @@ export class DeleteCustomerService {
             .execute();
 
         // Limpiar el clerkId en custom fields
-        await this.connection.rawConnection.query(
-            `UPDATE "customer" SET "customFieldsClerkid" = NULL WHERE id = $1`,
-            [customer.id],
-        );
+        await customerRepo.update(customer.id, {
+            customFields: {
+                clerkId: null,
+            } as any,
+        });
 
         Logger.info(
             `Customer ${customer.id} eliminado correctamente en cascada (clerkId: ${clerkId})`,
