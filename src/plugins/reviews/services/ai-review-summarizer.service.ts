@@ -2,16 +2,11 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AIReviewSummarizer {
-    // TODO: Reemplazar mock cuando el equipo entregue el endpoint de IA
     async generateSummary(reviews: string[]): Promise<{ title: string; summary: string }> {
         const aiServiceUrl = process.env.AI_SERVICE_URL;
 
         if (!aiServiceUrl) {
-            // Mock temporal hasta que esté disponible el endpoint
-            return {
-                title: 'Opinión general',
-                summary: 'Resumen pendiente de integración con servicio de IA.',
-            };
+            throw new Error('AI_SERVICE_URL environment variable is not defined');
         }
 
         try {
@@ -29,10 +24,11 @@ export class AIReviewSummarizer {
 
             const data = await response.json();
 
-            return {
-                title: 'Opinión general',
-                summary: data.review || 'No se pudo generar un resumen.',
-            };
+            // Extraer título del primer fortaleza detectada, si existe
+            const title = data.fortalezas?.[0]?.tema ?? 'Opinión general';
+            const summary = data.resumen_ejecutivo ?? 'No se pudo generar un resumen.';
+
+            return { title, summary };
         } catch (error) {
             throw new Error(`Failed to call AI service: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
