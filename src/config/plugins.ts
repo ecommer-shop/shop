@@ -43,6 +43,10 @@ import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
 import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.plugin';
+import { MetricsPlugin } from '@pinelab/vendure-plugin-metrics';
+import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
+import { LoginPlugin } from '../plugins/login/login.plugin';
+import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -123,13 +127,12 @@ export const plugins: VendureConfig['plugins'] = [
 
   CoinbasePlugin,
   ReviewsPlugin,
+  AiChatPlugin,
 
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
   }),
-
-  //PaymentMercadopagoPlugin.init({}),
 
   ServientregaPlugin.init({
     url: process.env.SERVIENTREGA_BASE!,
@@ -144,5 +147,15 @@ export const plugins: VendureConfig['plugins'] = [
     apiKey: process.env.INVOICE_SERVICE_API_KEY || '',
     prefix: process.env.MATIAS_PREFIX,
     resolutionNumber: process.env.MATIAS_RESOLUTION_NUMBER,
+  }),
+
+  MetricsPlugin.init({
+    displayPastMonths: 13,
+  }),
+
+  MetricsDashboardPlugin.init(),
+
+  LoginPlugin.init({
+    googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
   }),
 ];

@@ -7,7 +7,6 @@ import {
     User,
     Logger
 } from "@vendure/core"
-import jwt from 'jsonwebtoken';
 import { verifyToken } from '@clerk/backend';
 
 type TokenUser = {
@@ -20,6 +19,19 @@ type TokenUser = {
     userEmail: string,
     userFirstname?: string,
     userLastname?: string
+}
+
+function extractEmail(decoded: Record<string, any>): string | undefined {
+    if (typeof decoded.userEmail === 'string' && decoded.userEmail) return decoded.userEmail;
+    if (typeof decoded.email === 'string' && decoded.email) return decoded.email;
+    if (typeof decoded.email_addresses === 'string' && decoded.email_addresses) return decoded.email_addresses;
+
+    if (decoded.email_addresses && typeof decoded.email_addresses === 'object') {
+        if (typeof decoded.email_addresses.emailAddress === 'string') return decoded.email_addresses.emailAddress;
+        if (typeof decoded.email_addresses.email_address === 'string') return decoded.email_addresses.email_address;
+    }
+
+    return undefined;
 }
 
 export class ExternalAuthService {
@@ -53,21 +65,25 @@ export class ExternalAuthService {
             Logger.error(`Error verificando token de Clerk: ${error instanceof Error ? error.message : error}`, 'ExternalAuthService');
             throw new Error('Token inválido o expirado');
         }
-        console.log("TOKEN email", decoded.userEmail);
-        if (!decoded || !decoded.userEmail) {
+        const email = extractEmail(decoded);
+        const clerkId = decoded?.sub;
 
-            throw new Error('Token inválido: no contiene email, contiene:');
+        if (!decoded || !email) {
+
+            throw new Error('Token inválido: no contiene email');
         }
 
-        const email = decoded.userEmail;
-        const firstName = decoded.userFirstname ?? 'Usuario Externo';
-        const lastName = decoded.userLastname ?? '';
+        const firstName = decoded.userFirstname ?? decoded.first_name ?? 'Usuario Externo';
+        const lastName = decoded.userLastname ?? decoded.last_name ?? '';
 
         // Crear o actualizar Customer (esto crea el User si no existe)
         const customer = await this.customerService.createOrUpdate(ctx, {
             emailAddress: email,
             firstName,
             lastName,
+            customFields: {
+                ...(clerkId ? { clerkId } : {}),
+            },
         });
 
         // Buscar el User asociado a ese Customer

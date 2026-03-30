@@ -16,6 +16,7 @@ export const apiOptions: VendureConfig['apiOptions'] = {
     origin: [
       'http://localhost:5173',
       'http://localhost:3000',
+      'http://localhost:3001',
       process.env.HOST_URL as string,
     ]
   }
