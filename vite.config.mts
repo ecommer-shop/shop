@@ -7,6 +7,69 @@ import { IS_DEV } from './src/config/environment';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function patchVendureDashboardChannelPermissions() {
+    return {
+        name: 'patch-vendure-dashboard-channel-permissions',
+        enforce: 'pre' as const,
+        transform(code: string, id: string) {
+            const normalizedId = id.replace(/\\/g, '/');
+            let nextCode = code;
+
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/channel-switcher.tsx')) {
+                if (!nextCode.includes("import { usePermissions } from '@/vdb/hooks/use-permissions.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { useUserSettings } from '@/vdb/hooks/use-user-settings.js';",
+                        "import { useUserSettings } from '@/vdb/hooks/use-user-settings.js';\nimport { usePermissions } from '@/vdb/hooks/use-permissions.js';",
+                    );
+                }
+
+                if (!nextCode.includes('const { hasPermissions } = usePermissions();')) {
+                    nextCode = nextCode.replace(
+                        '    const { channels, activeChannel, setActiveChannel } = useChannel();',
+                        '    const { channels, activeChannel, setActiveChannel } = useChannel();\n    const { hasPermissions } = usePermissions();',
+                    );
+                }
+
+                if (!nextCode.includes("{hasPermissions(['CreateChannel']) &&")) {
+                    nextCode = nextCode.replace(
+                        `                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="gap-2 p-2 cursor-pointer" asChild>
+                                <Link to={'/channels/new'}>
+                                    <div className="bg-background flex size-6 items-center justify-center rounded-md border">
+                                        <Plus className="size-4" />
+                                    </div>
+                                    <div className="text-muted-foreground font-medium">Add channel</div>
+                                </Link>
+                            </DropdownMenuItem>`,
+                        `                            {hasPermissions(['CreateChannel']) && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="gap-2 p-2 cursor-pointer" asChild>
+                                        <Link to={'/channels/new'}>
+                                            <div className="bg-background flex size-6 items-center justify-center rounded-md border">
+                                                <Plus className="size-4" />
+                                            </div>
+                                            <div className="text-muted-foreground font-medium">Add channel</div>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                </>
+                            )}`,
+                    );
+                }
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_channels/channels_.$id.tsx')) {
+                nextCode = nextCode.replace(
+                    "<PermissionGuard requires={['UpdateChannel']}>",
+                    "<PermissionGuard requires={creatingNewEntity ? ['CreateChannel'] : ['UpdateChannel']}>",
+                );
+            }
+
+            return nextCode === code ? null : nextCode;
+        },
+    };
+}
+
 export default defineConfig({
     base: '/dashboard',
     build: {
@@ -14,6 +77,7 @@ export default defineConfig({
         emptyOutDir: true,
     },
     plugins: [
+        patchVendureDashboardChannelPermissions(),
         vendureDashboardPlugin({
             // The vendureDashboardPlugin will scan your configuration in order
             // to find any plugins which have dashboard extensions, as well as

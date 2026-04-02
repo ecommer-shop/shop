@@ -13,17 +13,37 @@ function getAdminApiUrl(): string {
 
 type AuthView = 'login' | 'register';
 
+interface GoogleLoginOptions {
+    fromRegistration?: boolean;
+}
+
 export function App() {
     const [view, setView] = useState<AuthView>('login');
     const [status, setStatus] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [registerNotice, setRegisterNotice] = useState<string | null>(null);
 
     const adminApiUrl = getAdminApiUrl();
 
+    const redirectToRegisterFlow = useCallback(() => {
+        setView('register');
+        setError(null);
+        setStatus(null);
+        setRegisterNotice(
+            'No encontramos una cuenta registrada con este correo. Completa el formulario para crear tu tienda.',
+        );
+    }, []);
+
     const handleGoogleLogin = useCallback(
-        async (idToken: string) => {
+        async (idToken: string, options?: GoogleLoginOptions) => {
+            const fromRegistration = options?.fromRegistration === true;
             setError(null);
-            setStatus('Iniciando sesión...');
+            setRegisterNotice(null);
+            setStatus(
+                fromRegistration
+                    ? 'Registro exitoso. Iniciando sesión automáticamente...'
+                    : 'Iniciando sesión...',
+            );
 
             try {
                 const response = await fetch(adminApiUrl, {
@@ -61,7 +81,21 @@ export function App() {
                 const result = await response.json();
 
                 if (result.errors?.length) {
-                    setError(result.errors[0]?.message || 'Error de autenticación');
+                    const errorMessage = result.errors[0]?.message || 'Error de autenticación';
+                    const looksLikeInvalidCredentials = /invalid credentials|credenciales/i.test(
+                        errorMessage,
+                    );
+
+                    if (!fromRegistration && looksLikeInvalidCredentials) {
+                        redirectToRegisterFlow();
+                        return;
+                    }
+
+                    setError(
+                        fromRegistration
+                            ? 'Tu cuenta fue creada, pero no pudimos iniciar sesión automáticamente. Haz clic en "Iniciar sesión con Google".'
+                            : errorMessage,
+                    );
                     setStatus(null);
                     return;
                 }
@@ -69,9 +103,16 @@ export function App() {
                 const authResult = result.data?.authenticate;
 
                 if (authResult?.__typename === 'InvalidCredentialsError' || authResult?.errorCode) {
+                    if (!fromRegistration) {
+                        redirectToRegisterFlow();
+                        return;
+                    }
+
                     setError(
                         authResult.message ||
-                        'Credenciales inválidas. ¿Ya tienes una cuenta de administrador/vendedor?',
+                        (fromRegistration
+                            ? 'Tu cuenta fue creada, pero no pudimos iniciar sesión automáticamente. Haz clic en "Iniciar sesión con Google".'
+                            : 'Credenciales inválidas. ¿Ya tienes una cuenta de administrador/vendedor?'),
                     );
                     setStatus(null);
                     return;
@@ -82,20 +123,38 @@ export function App() {
                     sessionStorage.setItem(POST_LOGIN_RELOAD_KEY, '1');
                     window.location.href = '/dashboard';
                 } else {
-                    setError('No se encontró una cuenta con este email. Regístrate como vendedor primero.');
+                    if (!fromRegistration) {
+                        redirectToRegisterFlow();
+                        return;
+                    }
+
+                    setError(
+                        fromRegistration
+                            ? 'Tu cuenta fue creada, pero no pudimos iniciar sesión automáticamente. Haz clic en "Iniciar sesión con Google".'
+                            : 'No se encontró una cuenta con este email. Regístrate como vendedor primero.',
+                    );
                     setStatus(null);
                 }
             } catch (err) {
-                setError(err instanceof Error ? err.message : 'Error de conexión');
+                setError(
+                    fromRegistration
+                        ? 'Tu cuenta fue creada, pero ocurrió un error al iniciar sesión automáticamente. Intenta iniciar sesión con Google.'
+                        : (err instanceof Error ? err.message : 'Error de conexión'),
+                );
                 setStatus(null);
             }
         },
-        [adminApiUrl],
+        [adminApiUrl, redirectToRegisterFlow],
     );
 
-    const handleRegistered = useCallback((_email: string) => {
-        setTimeout(() => setView('login'), 3000);
-    }, []);
+    const handleRegistered = useCallback(
+        async (_email: string, token: string) => {
+            setView('login');
+            setError(null);
+            await handleGoogleLogin(token, { fromRegistration: true });
+        },
+        [handleGoogleLogin],
+    );
 
     if (!GOOGLE_CLIENT_ID) {
         return (
@@ -151,6 +210,7 @@ export function App() {
                             setView('register');
                             setError(null);
                             setStatus(null);
+                            setRegisterNotice(null);
                         }}
                     >
                         Registrarse como Vendedor
@@ -160,6 +220,12 @@ export function App() {
 
             {view === 'register' && (
                 <div className="flex flex-col items-center gap-4">
+                    {registerNotice && (
+                        <p className="w-full text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+                            {registerNotice}
+                        </p>
+                    )}
+
                     <SellerRegistrationForm
                         clientId={GOOGLE_CLIENT_ID}
                         onRegistered={handleRegistered}
@@ -181,6 +247,7 @@ export function App() {
                             setView('login');
                             setError(null);
                             setStatus(null);
+                            setRegisterNotice(null);
                         }}
                     >
                         Iniciar sesión

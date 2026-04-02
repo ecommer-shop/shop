@@ -1,4 +1,5 @@
 import type { VendureConfig } from '@vendure/core';
+import type { Request, Response, NextFunction } from 'express';
 import { ROUTE } from '../consts';
 import { IS_DEV, serverPort } from './environment';
 
@@ -19,5 +20,18 @@ export const apiOptions: VendureConfig['apiOptions'] = {
       'http://localhost:3001',
       process.env.HOST_URL as string,
     ]
-  }
+  },
+  middleware: [
+    {
+      route: '/',
+      beforeListen: true,
+      handler: (req: Request, res: Response, next: NextFunction) => {
+        if (req.method === 'GET' && req.path === '/') {
+          res.redirect('/dashboard');
+          return;
+        }
+        next();
+      },
+    },
+  ],
 };
