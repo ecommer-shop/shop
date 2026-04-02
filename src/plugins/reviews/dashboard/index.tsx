@@ -1,6 +1,4 @@
-import { Button, DataTableBulkActionItem, defineDashboardExtension, usePage } from '@vendure/dashboard';
-import { InfoIcon } from 'lucide-react';
-import { toast } from 'sonner';
+import { defineDashboardExtension } from '@vendure/dashboard';
 
 import {
     BodyInputComponent,
@@ -24,38 +22,6 @@ defineDashboardExtension({
             name: 'Custom Widget',
             component: CustomWidget,
             defaultSize: { w: 3, h: 3 },
-        },
-    ],
-    actionBarItems: [
-        {
-            pageId: 'product-detail',
-            component: props => {
-                const page = usePage();
-                return (
-                    <Button
-                        type="button"
-                        onClick={() => {
-                            console.log('Clicked custom action bar item');
-                        }}
-                    >
-                        Test Button
-                    </Button>
-                );
-            },
-        },
-    ],
-    pageBlocks: [
-        {
-            id: 'my-block',
-            component: ({ context }) => {
-                return <div>Here is my custom block!</div>;
-            },
-            title: 'My Custom Block',
-            location: {
-                pageId: 'product-detail',
-                column: 'side',
-                position: { blockId: 'main-form', order: 'after' },
-            },
         },
     ],
     customFormComponents: {
@@ -134,20 +100,6 @@ defineDashboardExtension({
     dataTables: [
         {
             pageId: 'product-list',
-            bulkActions: [
-                {
-                    component: props => (
-                        <DataTableBulkActionItem
-                            onClick={() => {
-                                console.log('Selection:', props.selection);
-                                toast.message(`There are ${props.selection.length} selected items`);
-                            }}
-                            label="My Custom Action"
-
-                        />
-                    ),
-                },
-            ],
             // extendListDocument: `
             //     query {
             //         products {
