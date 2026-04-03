@@ -8,6 +8,7 @@ import {
 } from '@vendure/dashboard';
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
+import { ImportFormatGuide } from './components/import-format-guide';
 
 type ImportProduct = {
     sku: string;
@@ -198,6 +199,8 @@ function ExcelImportPage() {
                             </div>
                         )}
                     </div>
+
+                    <ImportFormatGuide />
                 </PageBlock>
             </PageLayout>
         </Page>

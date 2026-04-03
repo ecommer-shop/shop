@@ -19,7 +19,8 @@ export const apiOptions: VendureConfig['apiOptions'] = {
       'http://localhost:3000',
       'http://localhost:3001',
       process.env.HOST_URL as string,
-    ]
+    ],
+    credentials: true,
   },
   middleware: [
     {

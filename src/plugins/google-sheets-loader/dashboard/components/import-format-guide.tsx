@@ -33,7 +33,7 @@ const FIELD_SPECS: FieldSpec[] = [
     {
         key: 'price',
         required: true,
-        description: 'Precio numerico sin simbolo de moneda',
+        description: 'Precio numerico (en .xlsm la macro lo convierte a centavos)',
         example: '89900',
     },
     {
@@ -46,6 +46,10 @@ const FIELD_SPECS: FieldSpec[] = [
 
 const TEMPLATE_HEADERS = ['sku', 'name', 'description', 'price', 'stock'];
 const MACRO_TEMPLATE_URL = 'https://ecommer-assets.s3.us-east-2.amazonaws.com/plantilla-carga-de-productos-ecommer.xlsm';
+const EXAMPLE_IMAGE_DRIVE_URL =
+    'https://drive.google.com/file/d/1ggCQgy8SlepWhM9WQiSnLn12QFiOHgi2/view?usp=sharing';
+const EXAMPLE_IMAGE_URL =
+    'https://drive.google.com/thumbnail?id=1ggCQgy8SlepWhM9WQiSnLn12QFiOHgi2&sz=w2000';
 
 const TEMPLATE_ROWS = [
     {
@@ -67,24 +71,18 @@ const TEMPLATE_ROWS = [
 export function ImportFormatGuide() {
     const [templateFormat, setTemplateFormat] = useState<TemplateFormat>('xlsx');
     const [downloadError, setDownloadError] = useState('');
+    const [showExampleImage, setShowExampleImage] = useState(false);
+    const [imageLoadError, setImageLoadError] = useState(false);
 
-    const downloadMacroTemplate = async () => {
-        const response = await fetch(MACRO_TEMPLATE_URL);
-        if (!response.ok) {
-            throw new Error(
-                response.status === 404
-                    ? 'La plantilla .xlsm no está disponible aún. Contacta al administrador.'
-                    : `Error del servidor (${response.status}) al descargar la plantilla.`
-            );
-        }
-
-        const macroBlob = await response.blob();
-        const objectUrl = URL.createObjectURL(macroBlob);
+    const downloadMacroTemplate = () => {
         const link = document.createElement('a');
-        link.href = objectUrl;
+        link.href = MACRO_TEMPLATE_URL;
         link.download = 'plantilla-importacion-productos.xlsm';
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
         link.click();
-        URL.revokeObjectURL(objectUrl);
+        document.body.removeChild(link);
     };
 
     const handleTemplateDownload = async () => {
@@ -92,9 +90,12 @@ export function ImportFormatGuide() {
 
         if (templateFormat === 'xlsm') {
             try {
-                await downloadMacroTemplate();
+                downloadMacroTemplate();
             } catch (error: any) {
-                setDownloadError(error.message || 'Error descargando la plantilla .xlsm.');
+                setDownloadError(
+                    error.message ||
+                    'No se pudo iniciar la descarga .xlsm. Usa el enlace directo de abajo.'
+                );
             }
             return;
         }
@@ -153,6 +154,14 @@ export function ImportFormatGuide() {
                     <p className="text-xs text-muted-foreground">
                         Si eliges .xlsm, se descarga la plantilla con macro para formateo de precio y tabla.
                     </p>
+                    <a
+                        href={MACRO_TEMPLATE_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary underline"
+                    >
+                        Descargar .xlsm directamente
+                    </a>
                     {downloadError && (
                         <p className="text-xs text-destructive">{downloadError}</p>
                     )}
@@ -163,8 +172,32 @@ export function ImportFormatGuide() {
                 <li>Crea un archivo Excel (.xlsx, .xls, .xlsm) o CSV con esos encabezados.</li>
                 <li>Completa una fila por producto, sin dejar vacios sku, name, price ni stock.</li>
                 <li>Usa valores numericos en price y stock (sin simbolos ni texto extra).</li>
+                <li>Usa valores de texto en los demás campos.</li>
                 <li>Guarda el archivo y cargalo desde el boton de esta pantalla.</li>
             </ol>
+
+            <div className="mt-4 rounded-md border border-amber-300/40 bg-amber-50/40 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-200">
+                <p className="font-medium">Importante sobre decimales en la plantilla .xlsm</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>
+                        En la columna <span className="font-mono">price</span>, la macro convierte el valor a
+                        centavos multiplicando por 100 y quitando decimales.
+                    </li>
+                    <li>
+                        Ejemplo: si escribes <span className="font-mono">899.90</span>, la celda se convierte a
+                        <span className="font-mono"> 89990</span>.
+                    </li>
+                    <li>
+                        Si usas <span className="font-mono">.xlsx</span>, <span className="font-mono">.xls</span>{' '}
+                        o <span className="font-mono">.csv</span> (sin macro), debes escribir directamente el valor
+                        final en centavos (ejemplo: <span className="font-mono">89990</span>).
+                    </li>
+                    <li>
+                        Evita editar dos veces la misma celda de <span className="font-mono">price</span> en
+                        <span className="font-mono"> .xlsm</span>, porque la macro volvera a multiplicar por 100.
+                    </li>
+                </ul>
+            </div>
 
             <div className="mt-4 overflow-x-auto rounded border border-border">
                 <table className="min-w-full text-left text-sm">
@@ -196,40 +229,42 @@ export function ImportFormatGuide() {
             </div>
 
             <div className="mt-4 rounded border border-dashed border-border p-3">
-                <p className="mb-2 text-sm font-medium text-foreground">Imagen ilustrativa:</p>
-                <svg
-                    viewBox="0 0 980 210"
-                    role="img"
-                    aria-label="Ejemplo visual de columnas requeridas en Excel o CSV"
-                    className="h-auto w-full text-muted-foreground"
-                >
-                    <rect x="1" y="1" width="978" height="208" fill="none" stroke="currentColor" opacity="0.35" />
-                    <rect x="1" y="1" width="978" height="44" fill="currentColor" opacity="0.08" stroke="currentColor" />
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm font-medium text-foreground">Imagen de ejemplo del archivo</p>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowExampleImage((current) => !current)}
+                    >
+                        cómo subir el archivo
+                    </Button>
+                </div>
 
-                    <line x1="196" y1="1" x2="196" y2="209" stroke="currentColor" opacity="0.35" />
-                    <line x1="392" y1="1" x2="392" y2="209" stroke="currentColor" opacity="0.35" />
-                    <line x1="588" y1="1" x2="588" y2="209" stroke="currentColor" opacity="0.35" />
-                    <line x1="784" y1="1" x2="784" y2="209" stroke="currentColor" opacity="0.35" />
-                    <line x1="1" y1="106" x2="979" y2="106" stroke="currentColor" opacity="0.35" />
-
-                    <text x="98" y="29" textAnchor="middle" fontSize="16" fontWeight="700" fill="currentColor">sku *</text>
-                    <text x="294" y="29" textAnchor="middle" fontSize="16" fontWeight="700" fill="currentColor">name *</text>
-                    <text x="490" y="29" textAnchor="middle" fontSize="16" fontWeight="700" fill="currentColor">description</text>
-                    <text x="686" y="29" textAnchor="middle" fontSize="16" fontWeight="700" fill="currentColor">price *</text>
-                    <text x="882" y="29" textAnchor="middle" fontSize="16" fontWeight="700" fill="currentColor">stock *</text>
-
-                    <text x="98" y="82" textAnchor="middle" fontSize="14" fill="currentColor">SKU-001</text>
-                    <text x="294" y="82" textAnchor="middle" fontSize="14" fill="currentColor">Camiseta Algodon Blanca</text>
-                    <text x="490" y="82" textAnchor="middle" fontSize="14" fill="currentColor">Tela suave, manga corta</text>
-                    <text x="686" y="82" textAnchor="middle" fontSize="14" fill="currentColor">89900</text>
-                    <text x="882" y="82" textAnchor="middle" fontSize="14" fill="currentColor">25</text>
-
-                    <text x="98" y="156" textAnchor="middle" fontSize="14" fill="currentColor" opacity="0.85">SKU-002</text>
-                    <text x="294" y="156" textAnchor="middle" fontSize="14" fill="currentColor" opacity="0.85">Jean Regular Azul</text>
-                    <text x="490" y="156" textAnchor="middle" fontSize="14" fill="currentColor" opacity="0.85">Denim stretch</text>
-                    <text x="686" y="156" textAnchor="middle" fontSize="14" fill="currentColor" opacity="0.85">129900</text>
-                    <text x="882" y="156" textAnchor="middle" fontSize="14" fill="currentColor" opacity="0.85">14</text>
-                </svg>
+                {showExampleImage && (
+                    <div className="mt-3 rounded border border-border p-2">
+                        {!imageLoadError ? (
+                            <img
+                                src={EXAMPLE_IMAGE_URL}
+                                alt="Ejemplo de como debe verse el archivo de carga de productos"
+                                className="h-auto w-full rounded"
+                                loading="lazy"
+                                onError={() => setImageLoadError(true)}
+                            />
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                No se pudo cargar la vista previa de Google Drive. Puedes abrirla aqui:{' '}
+                                <a
+                                    href={EXAMPLE_IMAGE_DRIVE_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary underline"
+                                >
+                                    Ver imagen de ejemplo
+                                </a>
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
         </section>
     );
