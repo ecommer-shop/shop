@@ -11,8 +11,8 @@
     "strict": true,
     "sourceMap": false,
     "skipLibCheck": true,
-    "outDir": "./dist",
-    "baseUrl": "./"
+    "rootDir": "./src",
+    "outDir": "./dist"
   },
   "include": [
     "src/**/*.ts"

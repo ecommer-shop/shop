@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
+// import { UrlFormatter } from './url-formatter';
 
 @Injectable()
 export class AiChat {
+    // private readonly urlFormatter = new UrlFormatter();
     /**
      * Envía un mensaje al servicio de IA y recibe una respuesta
      */
-    async sendMessage(message: string, history: Array<{role: string, content: string}>): Promise<{response: string}> {
+    async sendMessage(query: string, history: Array<{role: string, content: string}>): Promise<{response: string}> {
         try {
             const aiChatUrl = process.env.AI_CHAT_URL;
             if (!aiChatUrl) {
@@ -19,7 +21,7 @@ export class AiChat {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ 
-                    message
+                    query
                 }),
             });
 
@@ -28,9 +30,16 @@ export class AiChat {
             }
 
             const data = await response.json();
+            const rawResponse = data.answer || '';
 
+            // TEMPORALMENTE DESACTIVADO: El formateo de URLs está desactivado hasta que
+            // el equipo de IA estandarice las respuestas con URLs de productos.
+            // Cuando esté listo, descomentar las siguientes 2 líneas y comentar la línea de 'return' actual:
+            // const formattedResponse = this.urlFormatter.formatUrls(rawResponse);
+            // return { response: formattedResponse };
+            
             return {
-                response: data.answer || ''
+                response: rawResponse
             };
         } catch (error) {
             throw new Error(`Failed to call AI service: ${error instanceof Error ? error.message : 'Unknown error'}`);
