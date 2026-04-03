@@ -23,6 +23,8 @@ export class PaymentService {
         }
 
         const concatenated = `${paymentReference}${amountInCents}${this.options.currency}${this.options.secretKey}`;
+        console.log(concatenated, "desdel el backend");
+        
         Logger.debug('PaymentService: Concatenated string', concatenated);
 
         const hash = crypto.createHash('sha256').update(concatenated).digest('hex');

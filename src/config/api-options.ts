@@ -18,6 +18,7 @@ export const apiOptions: VendureConfig['apiOptions'] = {
       'http://localhost:5173',
       'http://localhost:3000',
       'http://localhost:3001',
+      'https://store-next-stage.up.railway.app',
       process.env.HOST_URL as string,
     ],
     credentials: true,

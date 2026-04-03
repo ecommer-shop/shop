@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { GoogleLoginButton } from './components/GoogleLoginButton';
 import { SellerRegistrationForm } from './components/SellerRegistrationForm';
 import { POST_LOGIN_RELOAD_KEY } from './components/PostLoginReloadBlock';
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '';
+const FALLBACK_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '';
 
 // Detectar la URL del Admin API basándose en la URL actual del dashboard
 function getAdminApiUrl(): string {
@@ -22,8 +22,8 @@ export function App() {
     const [status, setStatus] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [registerNotice, setRegisterNotice] = useState<string | null>(null);
-
-    const adminApiUrl = getAdminApiUrl();
+    const [googleClientId, setGoogleClientId] = useState<string>(FALLBACK_GOOGLE_CLIENT_ID);
+    const [configLoaded, setConfigLoaded] = useState<boolean>(!!FALLBACK_GOOGLE_CLIENT_ID);
 
     const redirectToRegisterFlow = useCallback(() => {
         setView('register');
@@ -33,6 +33,47 @@ export function App() {
             'No encontramos una cuenta registrada con este correo. Completa el formulario para crear tu tienda.',
         );
     }, []);
+
+    const adminApiUrl = getAdminApiUrl();
+
+    useEffect(() => {
+        // Resolve public login config at runtime to avoid depending on Vite build-time env vars.
+        if (googleClientId) {
+            return;
+        }
+
+        const loadLoginConfig = async () => {
+            try {
+                const response = await fetch(adminApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        query: `
+                            query LoginConfig {
+                                loginConfig {
+                                    googleOAuthClientId
+                                }
+                            }
+                        `,
+                    }),
+                });
+
+                const result = await response.json();
+                const runtimeClientId = result?.data?.loginConfig?.googleOAuthClientId;
+
+                if (typeof runtimeClientId === 'string' && runtimeClientId.trim()) {
+                    setGoogleClientId(runtimeClientId);
+                }
+            } catch {
+                // Keep existing fallback behavior when runtime config cannot be fetched.
+            } finally {
+                setConfigLoaded(true);
+            }
+        };
+
+        void loadLoginConfig();
+    }, [adminApiUrl, googleClientId]);
 
     const handleGoogleLogin = useCallback(
         async (idToken: string, options?: GoogleLoginOptions) => {
@@ -156,12 +197,22 @@ export function App() {
         [handleGoogleLogin],
     );
 
-    if (!GOOGLE_CLIENT_ID) {
+    if (!configLoaded) {
+        return (
+            <div className="w-full max-w-sm mx-auto px-4">
+                <p className="text-sm text-muted-foreground bg-muted border border-border rounded-md px-3 py-2">
+                    Cargando configuración de login...
+                </p>
+            </div>
+        );
+    }
+
+    if (!googleClientId) {
         return (
             <div className="w-full max-w-sm mx-auto px-4">
                 <p className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
-                    Error: VITE_GOOGLE_OAUTH_CLIENT_ID no está configurado. Agrega la variable de entorno
-                    para habilitar el login con Google.
+                    Error: GOOGLE_OAUTH_CLIENT_ID no está configurado en el backend. Agrega la variable de
+                    entorno para habilitar el login con Google.
                 </p>
             </div>
         );
@@ -188,7 +239,7 @@ export function App() {
 
                     <div className="flex justify-center">
                         <GoogleLoginButton
-                            clientId={GOOGLE_CLIENT_ID}
+                            clientId={googleClientId}
                             onSuccess={handleGoogleLogin}
                             onError={msg => setError(msg)}
                             text="signin_with"
@@ -227,7 +278,7 @@ export function App() {
                     )}
 
                     <SellerRegistrationForm
-                        clientId={GOOGLE_CLIENT_ID}
+                        clientId={googleClientId}
                         onRegistered={handleRegistered}
                         adminApiUrl={adminApiUrl}
                     />

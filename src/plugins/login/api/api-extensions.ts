@@ -1,6 +1,13 @@
 import gql from 'graphql-tag';
 
 export const adminApiExtensions = gql`
+    type LoginConfig {
+        """
+        Google OAuth Client ID usado por el dashboard de login.
+        """
+        googleOAuthClientId: String!
+    }
+
     input RegisterSellerWithGoogleInput {
         """
         ID Token de Google obtenido desde Google Identity Services
@@ -15,6 +22,13 @@ export const adminApiExtensions = gql`
     type GoogleSellerRegistrationResult {
         success: Boolean!
         email: String!
+    }
+
+    extend type Query {
+        """
+        Retorna configuracion publica del login para el dashboard.
+        """
+        loginConfig: LoginConfig!
     }
 
     extend type Mutation {

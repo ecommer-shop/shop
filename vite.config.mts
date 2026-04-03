@@ -184,6 +184,64 @@ export default defineConfig({
                 },
             },
         }),
+        {
+            name: 'html-title',
+            transformIndexHtml(html) {
+                return html.replace(
+                    '<meta charset="UTF-8" />',
+                    `<meta charset="UTF-8" />
+    <title>Ecommer | Admin</title>
+    <script>
+      // Mantener título personalizado aunque el JS de Vendure lo sobreescriba
+      Object.defineProperty(document, 'title', {
+        set: function(val) {
+          // ignorar cualquier cambio al título
+        },
+        get: function() {
+          return 'Ecommer | Admin';
+        },
+        configurable: true
+      });
+    </script>
+    <script>
+      // Cerrar sidebar móvil al hacer click en item de navegación
+      document.addEventListener('click', function(e) {
+        const target = e.target;
+        const menuButton = target.closest('[data-sidebar="menu-button"]');
+        const menuSubButton = target.closest('[data-sidebar="menu-sub-button"]');
+        
+        if (!menuButton && !menuSubButton) return;
+        
+        const activeEl = menuButton || menuSubButton;
+        const isCollapsibleTrigger = activeEl.getAttribute('data-slot') === 'collapsible-trigger';
+        
+        if (!isCollapsibleTrigger) {
+          setTimeout(function() {
+            const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+            if (closeBtn) closeBtn.click();
+          }, 50);
+        }
+      }, true);
+    </script>
+    <style>
+      /* Fix: ancho de app en móvil */
+      html, body, #app {
+        max-width: 100vw;
+        overflow-x: hidden;
+        width: 100%;
+      }
+
+      /* Fix: sidebar-inset no desborde en móvil */
+      @media (max-width: 768px) {
+        [data-slot="sidebar-inset"] {
+          width: 100% !important;
+          min-width: 0 !important;
+        }
+      }
+    </style>`
+                );
+            },
+        },
     ],
     resolve: {
         alias: {
