@@ -139,17 +139,12 @@ export class ExcelImportService {
                             }
 
                             if (stockChanged) {
-                                const delta = product.stock - currentStock;
-                                await this.connection
-                                    .getRepository(
-                                        adminCtx,
-                                        'StockMovement',
-                                    )
-                                    .save({
-                                        productVariantId:
-                                            existingVariant.id,
-                                        quantity: delta,
-                                    });
+                                await this.productVariantService.update(adminCtx, [
+                                    {
+                                        id: existingVariant.id,
+                                        stockOnHand: product.stock,
+                                    },
+                                ]);
                                 this.logger.log(
                                     `Updated stock for SKU ${product.sku}: ${currentStock} -> ${product.stock}`,
                                 );

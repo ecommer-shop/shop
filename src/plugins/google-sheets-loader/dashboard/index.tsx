@@ -103,7 +103,7 @@ function ExcelImportPage() {
 
     const handleUpload = async () => {
         setStatus('loading');
-        const channelToken = localStorage.getItem('vendure-selected-channel-token');
+        const channelToken = localStorage.getItem('vnd__activeChannelToken')?.replace(/"/g, '');
 
         if (!channelToken) {
             setStatus('error');
