@@ -74,7 +74,7 @@ export default defineConfig({
     base: '/dashboard',
     build: {
         outDir: `${__dirname}/dist/dashboard`,
-        emptyOutDir: true,
+        emptyOutDir: false,  // Evita borrar el backend compilado, ponerlo en true si falla
     },
     plugins: [
         patchVendureDashboardChannelPermissions(),
@@ -184,10 +184,22 @@ export default defineConfig({
                 },
             },
         }),
+        // Plugin post-dashboard-html: modifica el HTML después de que vendureDashboardPlugin lo genera
         {
-            name: 'html-title',
-            transformIndexHtml(html) {
-                return html.replace(
+            name: 'post-dashboard-html',
+            enforce: 'post',  // Se ejecuta DESPUÉS de todos los plugins
+            generateBundle(options, bundle) {
+                // Buscar el index.html en el bundle
+                const indexHtml = bundle['index.html'];
+                if (!indexHtml || indexHtml.type !== 'asset') {
+                    console.warn('[post-dashboard-html] No se encontró index.html en el bundle');
+                    return;
+                }
+
+                let html = indexHtml.source as string;
+
+                // Inyectar título personalizado y scripts
+                html = html.replace(
                     '<meta charset="UTF-8" />',
                     `<meta charset="UTF-8" />
     <title>Ecommer | Admin</title>
@@ -240,7 +252,10 @@ export default defineConfig({
       }
     </style>`
                 );
-            },
+
+                // Actualizar el bundle con el HTML modificado
+                indexHtml.source = html;
+            }
         },
     ],
     resolve: {
