@@ -1,8 +1,8 @@
 import { LanguageCode } from '@vendure/common/lib/generated-types';
 import { DEFAULT_CHANNEL_CODE } from '@vendure/common/lib/shared-constants';
-import { EntityHydrator, idsAreEqual, ShippingEligibilityChecker } from '@vendure/core';
+import { idsAreEqual, Injector, ShippingEligibilityChecker, ShippingMethod, TransactionalConnection } from '@vendure/core';
 
-let entityHydrator: EntityHydrator;
+let connection: TransactionalConnection;
 
 /**
  * @description
@@ -12,17 +12,25 @@ export const multivendorShippingEligibilityChecker = new ShippingEligibilityChec
     code: 'multivendor-shipping-eligibility-checker',
     description: [{ languageCode: LanguageCode.en, value: 'Multivendor Shipping Eligibility Checker' }],
     args: {},
-    init(injector) {
-        entityHydrator = injector.get(EntityHydrator);
+    init(injector: Injector) {
+        connection = injector.get(TransactionalConnection);
     },
     check: async (ctx, order, args, method) => {
-        await entityHydrator.hydrate(ctx, method, { relations: ['channels'] });
-        await entityHydrator.hydrate(ctx, order, { relations: ['lines.sellerChannel'] });
-        const sellerChannel = method.channels.find(c => c.code !== DEFAULT_CHANNEL_CODE);
+        // Query channels directly to avoid entityHydrator $Command redefine error
+        const methodWithChannels = await connection
+            .getRepository(ctx, ShippingMethod)
+            .createQueryBuilder('sm')
+            .innerJoinAndSelect('sm.channels', 'channel')
+            .where('sm.id = :id', { id: method.id })
+            .getOne();
+        const channels = methodWithChannels?.channels ?? [];
+        const sellerChannel = channels.find(c => c.code !== DEFAULT_CHANNEL_CODE);
         if (!sellerChannel) {
             return false;
         }
-        for (const line of order.lines) {
+        // Ensure order lines have sellerChannelId loaded
+        const lines = order.lines ?? [];
+        for (const line of lines) {
             if (line.sellerChannelId && idsAreEqual(line.sellerChannelId, sellerChannel.id)) {
                 return true;
             }

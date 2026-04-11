@@ -7,13 +7,77 @@ import { IS_DEV } from './src/config/environment';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function patchVendureDashboardChannelPermissions() {
+    return {
+        name: 'patch-vendure-dashboard-channel-permissions',
+        enforce: 'pre' as const,
+        transform(code: string, id: string) {
+            const normalizedId = id.replace(/\\/g, '/');
+            let nextCode = code;
+
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/channel-switcher.tsx')) {
+                if (!nextCode.includes("import { usePermissions } from '@/vdb/hooks/use-permissions.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { useUserSettings } from '@/vdb/hooks/use-user-settings.js';",
+                        "import { useUserSettings } from '@/vdb/hooks/use-user-settings.js';\nimport { usePermissions } from '@/vdb/hooks/use-permissions.js';",
+                    );
+                }
+
+                if (!nextCode.includes('const { hasPermissions } = usePermissions();')) {
+                    nextCode = nextCode.replace(
+                        '    const { channels, activeChannel, setActiveChannel } = useChannel();',
+                        '    const { channels, activeChannel, setActiveChannel } = useChannel();\n    const { hasPermissions } = usePermissions();',
+                    );
+                }
+
+                if (!nextCode.includes("{hasPermissions(['CreateChannel']) &&")) {
+                    nextCode = nextCode.replace(
+                        `                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="gap-2 p-2 cursor-pointer" asChild>
+                                <Link to={'/channels/new'}>
+                                    <div className="bg-background flex size-6 items-center justify-center rounded-md border">
+                                        <Plus className="size-4" />
+                                    </div>
+                                    <div className="text-muted-foreground font-medium">Add channel</div>
+                                </Link>
+                            </DropdownMenuItem>`,
+                        `                            {hasPermissions(['CreateChannel']) && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="gap-2 p-2 cursor-pointer" asChild>
+                                        <Link to={'/channels/new'}>
+                                            <div className="bg-background flex size-6 items-center justify-center rounded-md border">
+                                                <Plus className="size-4" />
+                                            </div>
+                                            <div className="text-muted-foreground font-medium">Add channel</div>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                </>
+                            )}`,
+                    );
+                }
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_channels/channels_.$id.tsx')) {
+                nextCode = nextCode.replace(
+                    "<PermissionGuard requires={['UpdateChannel']}>",
+                    "<PermissionGuard requires={creatingNewEntity ? ['CreateChannel'] : ['UpdateChannel']}>",
+                );
+            }
+
+            return nextCode === code ? null : nextCode;
+        },
+    };
+}
+
 export default defineConfig({
     base: '/dashboard',
     build: {
         outDir: `${__dirname}/dist/dashboard`,
-        emptyOutDir: true,
+        emptyOutDir: false,  // Evita borrar el backend compilado, ponerlo en true si falla
     },
     plugins: [
+        patchVendureDashboardChannelPermissions(),
         vendureDashboardPlugin({
             // The vendureDashboardPlugin will scan your configuration in order
             // to find any plugins which have dashboard extensions, as well as
@@ -120,6 +184,79 @@ export default defineConfig({
                 },
             },
         }),
+        // Plugin post-dashboard-html: modifica el HTML después de que vendureDashboardPlugin lo genera
+        {
+            name: 'post-dashboard-html',
+            enforce: 'post',  // Se ejecuta DESPUÉS de todos los plugins
+            generateBundle(options, bundle) {
+                // Buscar el index.html en el bundle
+                const indexHtml = bundle['index.html'];
+                if (!indexHtml || indexHtml.type !== 'asset') {
+                    console.warn('[post-dashboard-html] No se encontró index.html en el bundle');
+                    return;
+                }
+
+                let html = indexHtml.source as string;
+
+                // Inyectar título personalizado y scripts
+                html = html.replace(
+                    '<meta charset="UTF-8" />',
+                    `<meta charset="UTF-8" />
+    <title>Ecommer | Admin</title>
+    <script>
+      // Mantener título personalizado aunque el JS de Vendure lo sobreescriba
+      Object.defineProperty(document, 'title', {
+        set: function(val) {
+          // ignorar cualquier cambio al título
+        },
+        get: function() {
+          return 'Ecommer | Admin';
+        },
+        configurable: true
+      });
+    </script>
+    <script>
+      // Cerrar sidebar móvil al hacer click en item de navegación
+      document.addEventListener('click', function(e) {
+        const target = e.target;
+        const menuButton = target.closest('[data-sidebar="menu-button"]');
+        const menuSubButton = target.closest('[data-sidebar="menu-sub-button"]');
+        
+        if (!menuButton && !menuSubButton) return;
+        
+        const activeEl = menuButton || menuSubButton;
+        const isCollapsibleTrigger = activeEl.getAttribute('data-slot') === 'collapsible-trigger';
+        
+        if (!isCollapsibleTrigger) {
+          setTimeout(function() {
+            const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+            if (closeBtn) closeBtn.click();
+          }, 50);
+        }
+      }, true);
+    </script>
+    <style>
+      /* Fix: ancho de app en móvil */
+      html, body, #app {
+        max-width: 100vw;
+        overflow-x: hidden;
+        width: 100%;
+      }
+
+      /* Fix: sidebar-inset no desborde en móvil */
+      @media (max-width: 768px) {
+        [data-slot="sidebar-inset"] {
+          width: 100% !important;
+          min-width: 0 !important;
+        }
+      }
+    </style>`
+                );
+
+                // Actualizar el bundle con el HTML modificado
+                indexHtml.source = html;
+            }
+        },
     ],
     resolve: {
         alias: {

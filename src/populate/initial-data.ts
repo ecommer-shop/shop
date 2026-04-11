@@ -95,7 +95,7 @@ export const initialData: InitialData = {
       ],
     },
   ],
-  defaultLanguage: LanguageCode.en,
+  defaultLanguage: LanguageCode.es,
   countries: [
     { name: 'Austria', code: 'AT', zone: 'Europe' },
     { name: 'Malaysia', code: 'MY', zone: 'Asia' },

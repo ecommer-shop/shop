@@ -115,7 +115,7 @@ export const plugins: VendureConfig['plugins'] = [
     port: serverPort + 2,
     adminUiConfig: {
       defaultLanguage: LanguageCode.es,
-      defaultLocale: 'CO',
+      defaultLocale: 'es-CO',
     },
   }),
 
