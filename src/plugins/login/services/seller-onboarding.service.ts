@@ -159,6 +159,9 @@ export class SellerOnboardingService {
                 Permission.ReadTag,
                 Permission.UpdateTag,
                 Permission.DeleteTag,
+                Permission.ReadCollection,
+                Permission.ReadFacet,
+                Permission.ReadStockLocation,
             ],
         });
 

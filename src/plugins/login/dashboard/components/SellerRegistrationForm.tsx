@@ -3,7 +3,7 @@ import { GoogleLoginButton } from './GoogleLoginButton';
 
 interface SellerRegistrationFormProps {
     clientId: string;
-    onRegistered: (email: string) => void;
+    onRegistered: (email: string, token: string) => void | Promise<void>;
     adminApiUrl: string;
 }
 
@@ -66,9 +66,9 @@ export function SellerRegistrationForm({
             const data = result.data?.registerSellerWithGoogle;
             if (data?.success) {
                 setSuccess(
-                    `¡Registro exitoso! Se creó tu tienda "${shopName}" con el email ${data.email}. Ahora inicia sesión con Google.`,
+                    `¡Registro exitoso! Se creó tu tienda "${shopName}" con el email ${data.email}. Iniciando sesión automáticamente...`,
                 );
-                onRegistered(data.email);
+                await onRegistered(data.email, idToken);
             } else {
                 setError('Error inesperado en el registro');
             }

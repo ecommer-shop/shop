@@ -1,3 +1,4 @@
+import { DEFAULT_CHANNEL_CODE } from '@vendure/common/lib/shared-constants';
 import {
     ChannelService,
     EntityHydrator,
@@ -14,6 +15,7 @@ import {
     PaymentMethodService,
     PaymentService,
     RequestContext,
+    ShippingMethod,
     SplitOrderContents,
     Surcharge,
     TransactionalConnection,
@@ -82,10 +84,51 @@ export class MultivendorSellerStrategy implements OrderSellerStrategy {
             }
         }
 
+        // Determine which shipping lines are seller-specific vs global (default channel only).
+        // We query the DB directly to avoid entityHydrator triggering $Command redefine errors.
+        const defaultChannel = await this.channelService.getDefaultChannel();
+        const shippingMethodIds = order.shippingLines
+            .map(sl => sl.shippingMethodId)
+            .filter((id): id is ID => id != null);
+        const sellerShippingMethodIds = new Set<ID>();
+        if (shippingMethodIds.length > 0) {
+            const methods = await this.connection
+                .getRepository(ctx, ShippingMethod)
+                .createQueryBuilder('sm')
+                .innerJoin('sm.channels', 'channel')
+                .select('sm.id', 'id')
+                .addSelect('channel.id', 'channelId')
+                .where('sm.id IN (:...ids)', { ids: shippingMethodIds })
+                .getRawMany<{ id: string; channelId: string }>();
+            const methodChannels = new Map<string, string[]>();
+            for (const row of methods) {
+                const list = methodChannels.get(row.id) ?? [];
+                list.push(row.channelId);
+                methodChannels.set(row.id, list);
+            }
+            for (const [methodId, channelIds] of methodChannels) {
+                const hasSellerChannel = channelIds.some(cId => !idsAreEqual(cId, defaultChannel.id));
+                if (hasSellerChannel) {
+                    sellerShippingMethodIds.add(methodId);
+                }
+            }
+        }
+        const sellerShippingLineIds = new Set<ID>(
+            order.shippingLines
+                .filter(sl => sl.shippingMethodId != null && sellerShippingMethodIds.has(sl.shippingMethodId))
+                .map(sl => sl.id),
+        );
+
         for (const partialOrder of Array.from(partialOrders.values())) {
-            const shippingLineIds = new Set(partialOrder.lines.map(l => l.shippingLineId));
+            // Only assign seller-specific shipping lines to sub-orders.
+            // Global shipping lines (default-shipping-eligibility-checker) remain on the aggregate order.
+            const lineShippingLineIds = new Set(
+                partialOrder.lines
+                    .map(l => l.shippingLineId)
+                    .filter(id => id != null && sellerShippingLineIds.has(id as ID)),
+            );
             partialOrder.shippingLines = order.shippingLines.filter(shippingLine =>
-                shippingLineIds.has(shippingLine.id),
+                lineShippingLineIds.has(shippingLine.id),
             );
         }
 
