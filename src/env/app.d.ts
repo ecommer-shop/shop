@@ -15,6 +15,10 @@ declare global {
          STATIC_DIR: string;
          ASSET_URL_PREFIX: string;
          GOOGLE_OAUTH_CLIENT_ID: string;
+         /** Idioma por defecto del panel de administración (ej: 'es', 'en'). Default: 'es' */
+         DASHBOARD_DEFAULT_LANGUAGE?: string;
+         /** Locale por defecto del panel de administración (ej: 'es-CO', 'en-US'). Default: 'es-CO' */
+         DASHBOARD_DEFAULT_LOCALE?: string;
       }
    }
 }
