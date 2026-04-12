@@ -8,6 +8,7 @@ import {
 } from '@vendure/dashboard';
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
+import { ImportFormatGuide } from './components/import-format-guide';
 
 type ImportProduct = {
     sku: string;
@@ -103,7 +104,7 @@ function ExcelImportPage() {
 
     const handleUpload = async () => {
         setStatus('loading');
-        const channelToken = localStorage.getItem('vendure-selected-channel-token');
+        const channelToken = localStorage.getItem('vnd__activeChannelToken')?.replace(/"/g, '');
 
         if (!channelToken) {
             setStatus('error');
@@ -198,6 +199,8 @@ function ExcelImportPage() {
                             </div>
                         )}
                     </div>
+
+                    <ImportFormatGuide />
                 </PageBlock>
             </PageLayout>
         </Page>

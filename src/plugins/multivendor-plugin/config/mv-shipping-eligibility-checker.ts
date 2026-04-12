@@ -1,11 +1,6 @@
 import { LanguageCode } from '@vendure/common/lib/generated-types';
 import { DEFAULT_CHANNEL_CODE } from '@vendure/common/lib/shared-constants';
-import {
-    Channel,
-    idsAreEqual,
-    ShippingEligibilityChecker,
-    TransactionalConnection,
-} from '@vendure/core';
+import { idsAreEqual, Injector, ShippingEligibilityChecker, ShippingMethod, TransactionalConnection } from '@vendure/core';
 
 let connection: TransactionalConnection;
 
@@ -17,22 +12,25 @@ export const multivendorShippingEligibilityChecker = new ShippingEligibilityChec
     code: 'multivendor-shipping-eligibility-checker',
     description: [{ languageCode: LanguageCode.en, value: 'Multivendor Shipping Eligibility Checker' }],
     args: {},
-    init(injector) {
+    init(injector: Injector) {
         connection = injector.get(TransactionalConnection);
     },
     check: async (ctx, order, args, method) => {
-        const channels = await connection
-            .getRepository(ctx, Channel)
-            .createQueryBuilder('channel')
-            .leftJoin('channel.shippingMethods', 'shippingMethod')
-            .where('shippingMethod.id = :shippingMethodId', { shippingMethodId: method.id })
-            .getMany();
-
+        // Query channels directly to avoid entityHydrator $Command redefine error
+        const methodWithChannels = await connection
+            .getRepository(ctx, ShippingMethod)
+            .createQueryBuilder('sm')
+            .innerJoinAndSelect('sm.channels', 'channel')
+            .where('sm.id = :id', { id: method.id })
+            .getOne();
+        const channels = methodWithChannels?.channels ?? [];
         const sellerChannel = channels.find(c => c.code !== DEFAULT_CHANNEL_CODE);
         if (!sellerChannel) {
             return false;
         }
-        for (const line of order.lines) {
+        // Ensure order lines have sellerChannelId loaded
+        const lines = order.lines ?? [];
+        for (const line of lines) {
             if (line.sellerChannelId && idsAreEqual(line.sellerChannelId, sellerChannel.id)) {
                 return true;
             }

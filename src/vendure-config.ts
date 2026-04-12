@@ -3,6 +3,7 @@ import {
   VendureConfig,
   DefaultLogger,
   LogLevel,
+  LanguageCode,
 } from '@vendure/core';
 
 import { IS_DEV } from './config/environment';
@@ -21,6 +22,7 @@ export const config: VendureConfig = {
   logger: new DefaultLogger({
     level: IS_DEV ? LogLevel.Debug : LogLevel.Info,
   }),
+  defaultLanguageCode: LanguageCode.es,
   apiOptions,
   authOptions,
   dbConnectionOptions,

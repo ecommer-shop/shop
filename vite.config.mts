@@ -1,4 +1,5 @@
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
+import { LanguageCode } from '@vendure/core';
 import { dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
@@ -7,13 +8,77 @@ import { IS_DEV } from './src/config/environment';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function patchVendureDashboardChannelPermissions() {
+    return {
+        name: 'patch-vendure-dashboard-channel-permissions',
+        enforce: 'pre' as const,
+        transform(code: string, id: string) {
+            const normalizedId = id.replace(/\\/g, '/');
+            let nextCode = code;
+
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/channel-switcher.tsx')) {
+                if (!nextCode.includes("import { usePermissions } from '@/vdb/hooks/use-permissions.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { useUserSettings } from '@/vdb/hooks/use-user-settings.js';",
+                        "import { useUserSettings } from '@/vdb/hooks/use-user-settings.js';\nimport { usePermissions } from '@/vdb/hooks/use-permissions.js';",
+                    );
+                }
+
+                if (!nextCode.includes('const { hasPermissions } = usePermissions();')) {
+                    nextCode = nextCode.replace(
+                        '    const { channels, activeChannel, setActiveChannel } = useChannel();',
+                        '    const { channels, activeChannel, setActiveChannel } = useChannel();\n    const { hasPermissions } = usePermissions();',
+                    );
+                }
+
+                if (!nextCode.includes("{hasPermissions(['CreateChannel']) &&")) {
+                    nextCode = nextCode.replace(
+                        `                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="gap-2 p-2 cursor-pointer" asChild>
+                                <Link to={'/channels/new'}>
+                                    <div className="bg-background flex size-6 items-center justify-center rounded-md border">
+                                        <Plus className="size-4" />
+                                    </div>
+                                    <div className="text-muted-foreground font-medium">Add channel</div>
+                                </Link>
+                            </DropdownMenuItem>`,
+                        `                            {hasPermissions(['CreateChannel']) && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="gap-2 p-2 cursor-pointer" asChild>
+                                        <Link to={'/channels/new'}>
+                                            <div className="bg-background flex size-6 items-center justify-center rounded-md border">
+                                                <Plus className="size-4" />
+                                            </div>
+                                            <div className="text-muted-foreground font-medium">Add channel</div>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                </>
+                            )}`,
+                    );
+                }
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_channels/channels_.$id.tsx')) {
+                nextCode = nextCode.replace(
+                    "<PermissionGuard requires={['UpdateChannel']}>",
+                    "<PermissionGuard requires={creatingNewEntity ? ['CreateChannel'] : ['UpdateChannel']}>",
+                );
+            }
+
+            return nextCode === code ? null : nextCode;
+        },
+    };
+}
+
 export default defineConfig({
     base: '/dashboard',
     build: {
         outDir: `${__dirname}/dist/dashboard`,
-        emptyOutDir: true,
+        emptyOutDir: false,  // Evita borrar el backend compilado, ponerlo en true si falla
     },
     plugins: [
+        patchVendureDashboardChannelPermissions(),
         vendureDashboardPlugin({
             // The vendureDashboardPlugin will scan your configuration in order
             // to find any plugins which have dashboard extensions, as well as
@@ -32,6 +97,15 @@ export default defineConfig({
             // These types can be used in your dashboard extensions to provide
             // type safety when writing queries and mutations.
             gqlOutputPath: './src/gql',
+            // Configuración de idioma y región para el panel de administración.
+            // Controla el idioma y formato de fechas/monedas que ven los usuarios
+            // cuando acceden por primera vez. Configurable vía variables de entorno.
+            i18n: {
+                defaultLanguage: (process.env.DASHBOARD_DEFAULT_LANGUAGE as LanguageCode) ?? LanguageCode.es,
+                defaultLocale: process.env.DASHBOARD_DEFAULT_LOCALE ?? 'es-CO',
+                availableLanguages: [LanguageCode.es, LanguageCode.en],
+                availableLocales: ['es-CO', 'en-US'],
+            },
             // ─── Ecommer brand palette ───────────────────────────────────────
             // #12123F Deadly Depths     → hsl(240 56% 16%)
             // #9969F8 Candy Grape Fizz  → hsl(260 91% 69%)
@@ -120,10 +194,22 @@ export default defineConfig({
                 },
             },
         }),
+        // Plugin post-dashboard-html: modifica el HTML después de que vendureDashboardPlugin lo genera
         {
-            name: 'html-title',
-            transformIndexHtml(html) {
-                return html.replace(
+            name: 'post-dashboard-html',
+            enforce: 'post',  // Se ejecuta DESPUÉS de todos los plugins
+            generateBundle(options, bundle) {
+                // Buscar el index.html en el bundle
+                const indexHtml = bundle['index.html'];
+                if (!indexHtml || indexHtml.type !== 'asset') {
+                    console.warn('[post-dashboard-html] No se encontró index.html en el bundle');
+                    return;
+                }
+
+                let html = indexHtml.source as string;
+
+                // Inyectar título personalizado y scripts
+                html = html.replace(
                     '<meta charset="UTF-8" />',
                     `<meta charset="UTF-8" />
     <title>Ecommer | Admin</title>
@@ -176,7 +262,10 @@ export default defineConfig({
       }
     </style>`
                 );
-            },
+
+                // Actualizar el bundle con el HTML modificado
+                indexHtml.source = html;
+            }
         },
     ],
     resolve: {
