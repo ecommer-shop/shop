@@ -16,6 +16,12 @@ interface EnvironmentConfig {
   logging: {
     level: string;
   };
+  /**
+   * Base de datos **solo del microservicio** (no usar el `DATABASE_URL` de Vendure/shop).
+   * En Railway: crea un Postgres aparte y pega aquí su URL.
+   */
+  databaseUrl: string | null;
+  databaseSsl: boolean;
 }
 
 function getEnvVar(key: string, defaultValue?: string): string {
@@ -25,7 +31,6 @@ function getEnvVar(key: string, defaultValue?: string): string {
   }
   return value!;
 }
-
 
 function normalizeApiKey(raw: string): string {
   if (!raw) return raw;
@@ -40,7 +45,7 @@ function normalizeApiKey(raw: string): string {
 }
 
 export const config: EnvironmentConfig = {
-  port: parseInt(getEnvVar('PORT', '3001'), 10),
+  port: parseInt(getEnvVar('PORT', '3010'), 10),
   nodeEnv: getEnvVar('NODE_ENV', 'development'),
   matias: {
     apiUrl: getEnvVar('MATIAS_API_URL'),
@@ -53,8 +58,9 @@ export const config: EnvironmentConfig = {
   logging: {
     level: getEnvVar('LOG_LEVEL', 'info'),
   },
+  databaseUrl: process.env.INVOICE_SERVICE_DATABASE_URL?.trim() || null,
+  databaseSsl: process.env.INVOICE_SERVICE_DB_SSL === 'true',
 };
 
 export const isProduction = config.nodeEnv === 'production';
 export const isDevelopment = config.nodeEnv === 'development';
-

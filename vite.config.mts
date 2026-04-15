@@ -1,4 +1,5 @@
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
+import { LanguageCode } from '@vendure/core';
 import { dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
@@ -96,6 +97,15 @@ export default defineConfig({
             // These types can be used in your dashboard extensions to provide
             // type safety when writing queries and mutations.
             gqlOutputPath: './src/gql',
+            // Configuración de idioma y región para el panel de administración.
+            // Controla el idioma y formato de fechas/monedas que ven los usuarios
+            // cuando acceden por primera vez. Configurable vía variables de entorno.
+            i18n: {
+                defaultLanguage: (process.env.DASHBOARD_DEFAULT_LANGUAGE as LanguageCode) ?? LanguageCode.es,
+                defaultLocale: process.env.DASHBOARD_DEFAULT_LOCALE ?? 'es-CO',
+                availableLanguages: [LanguageCode.es, LanguageCode.en],
+                availableLocales: ['es-CO', 'en-US'],
+            },
             // ─── Ecommer brand palette ───────────────────────────────────────
             // #12123F Deadly Depths     → hsl(240 56% 16%)
             // #9969F8 Candy Grape Fizz  → hsl(260 91% 69%)
