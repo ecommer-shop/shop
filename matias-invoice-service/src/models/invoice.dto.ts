@@ -331,6 +331,23 @@ export class CreateInvoiceDto {
   @Type(() => BillingReferenceDto)
   @IsOptional()
   billingReference?: BillingReferenceDto;
+
+  /** Snapshot de totales enviado por Vendure (solo persistencia / reportes en el micro). */
+  @IsString()
+  @IsOptional()
+  reportSubtotal?: string;
+
+  @IsString()
+  @IsOptional()
+  reportTaxTotal?: string;
+
+  @IsString()
+  @IsOptional()
+  reportTotal?: string;
+
+  @IsString()
+  @IsOptional()
+  currencyCode?: string;
 }
 
 export class InvoiceResponseDto {
