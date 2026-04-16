@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../../../../../../node_modules/@vendure/common/lib/normalize-string.js"],
+  "sourcesContent": ["\"use strict\";\n\nObject.defineProperty(exports, \"__esModule\", {\n  value: true\n});\nexports.normalizeString = normalizeString;\n/**\n * Normalizes a string to replace non-alphanumeric and diacritical marks with\n * plain equivalents.\n * Based on https://stackoverflow.com/a/37511463/772859\n */\nfunction normalizeString(input, spaceReplacer = ' ') {\n  const multipleSequentialReplacerRegex = new RegExp(`([${spaceReplacer}]){2,}`, 'g');\n  return (input || '').normalize('NFD').replace(/[\\u00df]/g, 'ss').replace(/[\\u1e9e]/g, 'SS').replace(/[\\u0308]/g, 'e').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[!\"£$%^&*()+[\\]{};:@#~?\\\\/,|><`¬'=‘’©®™]/g, '').replace(/\\s+/g, spaceReplacer).replace(multipleSequentialReplacerRegex, spaceReplacer);\n}\n"],
+  "mappings": ";;;;;AAAA;AAAA;AAAA;AAEA,WAAO,eAAe,SAAS,cAAc;AAAA,MAC3C,OAAO;AAAA,IACT,CAAC;AACD,YAAQ,kBAAkB;AAM1B,aAAS,gBAAgB,OAAO,gBAAgB,KAAK;AACnD,YAAM,kCAAkC,IAAI,OAAO,KAAK,aAAa,UAAU,GAAG;AAClF,cAAQ,SAAS,IAAI,UAAU,KAAK,EAAE,QAAQ,aAAa,IAAI,EAAE,QAAQ,aAAa,IAAI,EAAE,QAAQ,aAAa,GAAG,EAAE,QAAQ,oBAAoB,EAAE,EAAE,YAAY,EAAE,QAAQ,6CAA6C,EAAE,EAAE,QAAQ,QAAQ,aAAa,EAAE,QAAQ,iCAAiC,aAAa;AAAA,IACpT;AAAA;AAAA;",
+  "names": []
+}

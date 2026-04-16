@@ -66,6 +66,188 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/payment-methods_.$id.tsx')) {
+                if (!nextCode.includes("import { api } from '@/vdb/graphql/api.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { api } from '@/vdb/graphql/api.js';\nimport { graphql } from '@/vdb/graphql/graphql.js';",
+                    );
+                }
+                if (!nextCode.includes("import { useMutation } from '@tanstack/react-query';")) {
+                    nextCode = nextCode.replace(
+                        "import { createFileRoute, useNavigate } from '@tanstack/react-router';",
+                        "import { createFileRoute, useNavigate } from '@tanstack/react-router';\nimport { useMutation } from '@tanstack/react-query';",
+                    );
+                }
+                if (!nextCode.includes('const createAssetForPaymentMethodDocument = graphql(')) {
+                    nextCode = nextCode.replace(
+                        "const pageId = 'payment-method-detail';",
+                        `const pageId = 'payment-method-detail';
+
+const createAssetForPaymentMethodDocument = graphql(\`
+    mutation CreateAssetForPaymentMethod($input: [CreateAssetInput!]!) {
+        createAssets(input: $input) {
+            ... on Asset {
+                id
+                mimeType
+            }
+            ... on MimeTypeError {
+                message
+            }
+        }
+    }
+\`);`,
+                    );
+                }
+
+                nextCode = nextCode.replace(
+                    `        transformCreateInput: input => {
+            return {
+                ...input,
+                checker: input.checker?.code ? input.checker : undefined,
+                handler: input.handler,
+            };
+        },`,
+                    `        transformCreateInput: input => {
+            return {
+                ...input,
+                code:
+                    input.code?.trim() ||
+                    (input.name ?? '')
+                        .toLowerCase()
+                        .trim()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, ''),
+                description: input.description ?? '',
+                checker: input.checker?.code ? input.checker : undefined,
+                handler: input.handler,
+            };
+        },`,
+                );
+
+                nextCode = nextCode.replace(
+                    `                        <FormFieldWrapper
+                            control={form.control}
+                            name="code"
+                            label={<Trans>Code</Trans>}
+                            render={({ field }) => <Input {...field} />}
+                        />`,
+                    '',
+                );
+                nextCode = nextCode.replace(
+                    `                    <TranslatableFormFieldWrapper
+                        control={form.control}
+                        name="description"
+                        label={<Trans>Description</Trans>}
+                        render={({ field }) => <RichTextInput {...field} />}
+                    />`,
+                    '',
+                );
+                nextCode = nextCode.replace(
+                    `<CustomFieldsPageBlock column="main" entityType="PaymentMethod" control={form.control} />`,
+                    `<PageBlock column="main" blockId="payment-method-bank-fields">
+                    <DetailFormGrid>
+                        <FormFieldWrapper
+                            control={form.control}
+                            name="customFields.accountNumber"
+                            label="Account Number"
+                            render={({ field }) => <Input {...field} />}
+                        />
+                        <FormFieldWrapper
+                            control={form.control}
+                            name="customFields.bankName"
+                            label="Bank"
+                            render={({ field }) => <Input {...field} />}
+                        />
+                    </DetailFormGrid>
+                    <FormFieldWrapper
+                        control={form.control}
+                        name="customFields.bankCertificationPdf"
+                        label="Carga tu certificado bancario (PDF)"
+                        render={({ field }) => (
+                            <div className="space-y-2">
+                                <input
+                                    type="file"
+                                    accept=".pdf,application/pdf"
+                                    disabled={isUploadingPdf}
+                                    onChange={handlePdfSelected}
+                                />
+                                <div className="text-sm text-muted-foreground">
+                                    {field.value ? 'PDF cargado correctamente' : 'Solo se permiten archivos PDF'}
+                                </div>
+                                {field.value ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            form.setValue('customFields.bankCertificationPdf', undefined, {
+                                                shouldDirty: true,
+                                                shouldValidate: true,
+                                            });
+                                        }}
+                                    >
+                                        Quitar PDF
+                                    </Button>
+                                ) : null}
+                            </div>
+                        )}
+                    />
+                    <FormFieldWrapper
+                        control={form.control}
+                        name="customFields.bankCertificationVerified"
+                        label="Bank certification verified"
+                        render={({ field }) => (
+                            <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
+                        )}
+                    />
+                </PageBlock>`,
+                );
+                if (!nextCode.includes('const { mutateAsync: createAssetForPaymentMethod')) {
+                    nextCode = nextCode.replace(
+                        '    const [checkerArgsValid, setCheckerArgsValid] = useState(true);',
+                        `    const { mutateAsync: createAssetForPaymentMethod, isPending: isUploadingPdf } = useMutation({
+        mutationFn: api.mutate(createAssetForPaymentMethodDocument),
+    });
+
+    const handlePdfSelected = async (event: any) => {
+        const input = event.target as HTMLInputElement;
+        const file = input?.files?.[0];
+        if (!file) {
+            return;
+        }
+
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        if (!isPdf) {
+            toast.error('Solo se permiten archivos PDF');
+            input.value = '';
+            return;
+        }
+
+        try {
+            const result = await createAssetForPaymentMethod({ input: [{ file }] });
+            const created = result.createAssets?.[0];
+            if (!created || created.__typename !== 'Asset' || created.mimeType !== 'application/pdf') {
+                toast.error('No se pudo cargar el PDF');
+                return;
+            }
+            form.setValue('customFields.bankCertificationPdf', created.id, {
+                shouldDirty: true,
+                shouldValidate: true,
+            });
+            toast.success('PDF cargado correctamente');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Error al cargar el PDF');
+        } finally {
+            input.value = '';
+        }
+    };
+
+    const [checkerArgsValid, setCheckerArgsValid] = useState(true);`,
+                    );
+                }
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };
