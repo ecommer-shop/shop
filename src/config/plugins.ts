@@ -47,6 +47,7 @@ import { MetricsPlugin } from '@pinelab/vendure-plugin-metrics';
 import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
 import { LoginPlugin } from '../plugins/login/login.plugin';
 import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
+import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -141,6 +142,8 @@ export const plugins: VendureConfig['plugins'] = [
   SalesReportPlugin.init({}),
 
   ExcelLoaderPlugin.init({}),
+
+  FeedbackPlugin,
 
   InvoiceClientPlugin.init({
     invoiceServiceUrl: process.env.INVOICE_SERVICE_URL || 'http://localhost:3010/api',
