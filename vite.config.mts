@@ -67,6 +67,12 @@ function patchVendureDashboardChannelPermissions() {
             }
 
             if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/payment-methods_.$id.tsx')) {
+                if (!nextCode.includes('const pmIsEs =')) {
+                    nextCode = nextCode.replace(
+                        '    const { t } = useLingui();',
+                        `    const { t } = useLingui();`,
+                    );
+                }
                 if (!nextCode.includes("import { EntityAssets } from '@/vdb/components/shared/entity-assets.js';")) {
                     nextCode = nextCode.replace(
                         "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
@@ -109,7 +115,7 @@ function patchVendureDashboardChannelPermissions() {
                         err instanceof Error &&
                         (err.message.includes('ConfigurableOperationInput!') ||
                             err.message.includes('PaymentMethodHandler'))
-                            ? 'Debes seleccionar un Calculator antes de crear el método de pago.'
+                            ? 'Debes seleccionar un método de procesamiento de pago (Calculator) antes de crear el método de pago.'
                             : err instanceof Error
                               ? err.message
                               : 'Error desconocido',`,
@@ -137,6 +143,10 @@ function patchVendureDashboardChannelPermissions() {
                             label="Nombre"
                             render={({ field }) => <Input {...field} />}
                         />`,
+                );
+                nextCode = nextCode.replace(
+                    `                        label={<Trans>Enabled</Trans>}`,
+                    `                        label="Habilitado"`,
                 );
                 nextCode = nextCode.replace(
                     `                    <TranslatableFormFieldWrapper
@@ -191,6 +201,38 @@ function patchVendureDashboardChannelPermissions() {
                         )}
                     />
                 </PageBlock>`,
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Payment eligibility checker</Trans>}',
+                    "title={'Verificador de elegibilidad de pago'}",
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Calculator</Trans>}',
+                    "title={'Calculadora'}",
+                );
+            }
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/components/payment-eligibility-checker-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Payment Eligibility Checker"',
+                    `buttonText="Seleccionar verificador de elegibilidad de pago"`,
+                );
+                nextCode = nextCode.replace(
+                    'emptyText="No checkers found"',
+                    `emptyText="No se encontraron verificadores"`,
+                );
+            }
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/components/payment-handler-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Payment Handler"',
+                    `buttonText="Seleccionar método de pago (Calculadora)"`,
                 );
             }
 

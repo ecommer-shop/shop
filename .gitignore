@@ -36,3 +36,6 @@ Thumbs.db
 # Yarn
 .yarn/
 
+# Admin UI generado
+admin-ui/
+shop/src/admin-ui-custom/
