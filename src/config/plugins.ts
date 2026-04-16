@@ -90,31 +90,6 @@ const emailPlugin = EmailPlugin.init({
   },
 });
 
-<<<<<<< HEAD
-
-=======
-const adminUiApp = compileUiExtensions({
-  outputPath: path.join(__dirname, '../admin-ui-custom'),
-  extensions: [
-    {
-      id: 'payment-method-pdf-upload-v3',
-      extensionPath: path.join(
-        __dirname,
-        '../plugins/admin-ui-extensions/payment-method-pdf-upload',
-      ),
-      providers: ['providers.ts'],
-      ngModules: [
-        {
-          type: 'shared',
-          ngModuleFileName: 'payment-method-pdf-upload.module.ts',
-          ngModuleName: 'PaymentMethodPdfUploadModule',
-        },
-      ],
-    },
-  ],
-  devMode: IS_DEV,
-});
->>>>>>> d00f6cd (Metodos de pago)
 
 export const plugins: VendureConfig['plugins'] = [
   MultivendorPlugin.init({
