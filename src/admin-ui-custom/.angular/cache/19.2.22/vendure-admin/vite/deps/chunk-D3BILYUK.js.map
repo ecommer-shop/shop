@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../../../../../../../node_modules/@biesbjerg/ngx-translate-extract-marker/fesm5/biesbjerg-ngx-translate-extract-marker.js"],
-  "sourcesContent": ["/**\n * @fileoverview added by tsickle\n * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc\n */\n/**\n * @template T\n * @param {?} key\n * @return {?}\n */\nfunction marker(key) {\n  return key;\n}\nexport { marker };\n"],
-  "mappings": ";AASA,SAAS,OAAO,KAAK;AACnB,SAAO;AACT;",
-  "names": []
-}
