@@ -7,6 +7,7 @@ import {
     Injector,
     InternalServerError,
     isGraphQlErrorResult,
+    Logger,
     Order,
     OrderLine,
     OrderSellerStrategy,
@@ -23,6 +24,8 @@ import {
 
 import { CONNECTED_PAYMENT_METHOD_CODE, MULTIVENDOR_PLUGIN_OPTIONS } from '../constants';
 import { MultivendorPluginOptions } from '../types';
+
+const loggerCtx = 'MultivendorSellerStrategy';
 
 declare module '@vendure/core/dist/entity/custom-entity-fields' {
     interface CustomSellerFields {
@@ -53,22 +56,25 @@ export class MultivendorSellerStrategy implements OrderSellerStrategy {
         await this.entityHydrator.hydrate(ctx, orderLine.productVariant, { relations: ['channels'] });
         const defaultChannel = await this.channelService.getDefaultChannel();
 
-        // If a ProductVariant is assigned to exactly 2 Channels, then one is the default Channel
-        // and the other is the seller's Channel.
-        if (orderLine.productVariant.channels.length === 2) {
-            const sellerChannel = orderLine.productVariant.channels.find(
-                c => !idsAreEqual(c.id, defaultChannel.id),
-            );
-            if (sellerChannel) {
-                return sellerChannel;
-            }
+        // Find any non-default channel assigned to the variant — that is the seller's channel.
+        const sellerChannel = orderLine.productVariant.channels.find(
+            c => !idsAreEqual(c.id, defaultChannel.id),
+        );
+        Logger.debug(
+            `setOrderLineSellerChannel: variant ${orderLine.productVariant.id} channels=[${orderLine.productVariant.channels.map(c => c.code).join(', ')}] → sellerChannel=${sellerChannel?.code ?? 'NONE'}`,
+            loggerCtx,
+        );
+        if (sellerChannel) {
+            return sellerChannel;
         }
     }
 
     async splitOrder(ctx: RequestContext, order: Order): Promise<SplitOrderContents[]> {
         const partialOrders = new Map<ID, SplitOrderContents>();
+        Logger.debug(`splitOrder: processing order ${order.code} with ${order.lines.length} lines`, loggerCtx);
         for (const line of order.lines) {
             const sellerChannelId = line.sellerChannelId;
+            Logger.debug(`splitOrder: line ${line.id} sellerChannelId=${sellerChannelId ?? 'NULL'}`, loggerCtx);
             if (sellerChannelId) {
                 let partialOrder = partialOrders.get(sellerChannelId);
                 if (!partialOrder) {

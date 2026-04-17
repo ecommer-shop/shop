@@ -33,7 +33,11 @@ export const multivendorOrderProcess: CustomOrderProcess<any> = {
         const { ctx, order } = data;
         if (fromState === 'AddingItems' && toState === 'ArrangingPayment') {
             for (const line of data.order.lines) {
-                if (!line.shippingLineId) {
+                // Only require shippingLineId for seller lines (multivendor).
+                // Lines without a sellerChannelId belong to the default channel and
+                // are covered by the global shipping line on the aggregate order,
+                // so they may not have an individual shippingLineId assigned.
+                if (line.sellerChannelId && !line.shippingLineId) {
                     return 'not all lines have shipping';
                 }
             }
