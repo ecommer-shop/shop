@@ -222,9 +222,6 @@ export const customFields: VendureConfig['customFields'] = {
       name: 'bankCertificationPdf',
       type: 'string',
       nullable: true,
-      ui: {
-        component: 'payment-method-pdf-upload-input',
-      },
       label: [
         { languageCode: LanguageCode.en, value: 'Bank certification (PDF)' },
         { languageCode: LanguageCode.es, value: 'Certificacion bancaria (PDF)' },

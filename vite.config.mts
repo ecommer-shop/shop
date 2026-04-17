@@ -67,12 +67,6 @@ function patchVendureDashboardChannelPermissions() {
             }
 
             if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/payment-methods_.$id.tsx')) {
-                if (!nextCode.includes('const pmIsEs =')) {
-                    nextCode = nextCode.replace(
-                        '    const { t } = useLingui();',
-                        `    const { t } = useLingui();`,
-                    );
-                }
                 if (!nextCode.includes("import { EntityAssets } from '@/vdb/components/shared/entity-assets.js';")) {
                     nextCode = nextCode.replace(
                         "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
