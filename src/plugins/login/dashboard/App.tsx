@@ -11,14 +11,10 @@ function getAdminApiUrl(): string {
     return `${origin}/admin-api`;
 }
 
-type AuthView = 'login' | 'register';
-
-interface GoogleLoginOptions {
-    fromRegistration?: boolean;
-}
+type AuthView = 'home' | 'login' | 'register';
 
 export function App() {
-    const [view, setView] = useState<AuthView>('login');
+    const [view, setView] = useState<AuthView>('home');
     const [status, setStatus] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [registerNotice, setRegisterNotice] = useState<string | null>(null);
@@ -76,8 +72,7 @@ export function App() {
     }, [adminApiUrl, googleClientId]);
 
     const handleGoogleLogin = useCallback(
-        async (idToken: string, options?: GoogleLoginOptions) => {
-            const fromRegistration = options?.fromRegistration === true;
+        async (idToken: string, fromRegistration = false) => {
             setError(null);
             setRegisterNotice(null);
             setStatus(
@@ -188,14 +183,21 @@ export function App() {
         [adminApiUrl, redirectToRegisterFlow],
     );
 
-    const handleRegistered = useCallback(
-        async (_email: string, token: string) => {
-            setView('login');
-            setError(null);
-            await handleGoogleLogin(token, { fromRegistration: true });
-        },
-        [handleGoogleLogin],
-    );
+    const handleRegistered = useCallback((_email: string) => {
+        setTimeout(() => setView('login'), 3000);
+    }, []);
+
+    useEffect(() => {
+        if (view === 'login') {
+            document.body.classList.remove('hide-native-login');
+        } else {
+            document.body.classList.add('hide-native-login');
+        }
+
+        return () => {
+            document.body.classList.remove('hide-native-login');
+        };
+    }, [view]);
 
     if (!configLoaded) {
         return (
@@ -220,6 +222,39 @@ export function App() {
 
     return (
         <div className="w-full max-w-sm mx-auto px-4 flex flex-col gap-4">
+            {view === 'home' && (
+                <div className="flex flex-col items-center gap-4 py-4 pb-8">
+                    <h3 className="text-xl font-bold tracking-tight text-foreground text-center">
+                        Bienvenido a Ecommer
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center -mt-2">
+                        El futuro del comercio colaborativo
+                    </p>
+                    
+                    <button
+                        className="w-full bg-primary text-primary-foreground rounded-md px-5 py-3 text-sm font-medium hover:bg-primary/90 transition-colors cursor-pointer"
+                        onClick={() => {
+                            setView('login');
+                            setError(null);
+                            setStatus(null);
+                        }}
+                    >
+                        Iniciar sesión
+                    </button>
+
+                    <button
+                        className="w-full border border-border rounded-md px-5 py-3 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                        onClick={() => {
+                            setView('register');
+                            setError(null);
+                            setStatus(null);
+                        }}
+                    >
+                        Registrarse como Vendedor
+                    </button>
+                </div>
+            )}
+
             {view === 'login' && (
                 <div className="flex flex-col items-center gap-4">
                     <h3 className="text-base font-semibold tracking-tight text-foreground">
@@ -246,25 +281,16 @@ export function App() {
                         />
                     </div>
 
-                    <div className="relative w-full">
-                        <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-border" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-background px-2 text-muted-foreground">¿No tienes cuenta?</span>
-                        </div>
-                    </div>
-
                     <button
-                        className="w-full border border-border rounded-md px-5 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer self-start"
                         onClick={() => {
-                            setView('register');
+                            setView('home');
                             setError(null);
                             setStatus(null);
                             setRegisterNotice(null);
                         }}
                     >
-                        Registrarse como Vendedor
+                        ← Volver
                     </button>
                 </div>
             )}
@@ -279,9 +305,20 @@ export function App() {
 
                     <SellerRegistrationForm
                         clientId={googleClientId}
-                        onRegistered={handleRegistered}
+                        onRegistered={(email, token) => handleGoogleLogin(token, true)}
                         adminApiUrl={adminApiUrl}
                     />
+
+                    <button
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer self-start"
+                        onClick={() => {
+                            setView('home');
+                            setError(null);
+                            setStatus(null);
+                        }}
+                    >
+                        ← Volver
+                    </button>
 
                     <div className="relative w-full">
                         <div className="absolute inset-0 flex items-center">
