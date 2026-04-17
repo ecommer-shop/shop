@@ -12,6 +12,7 @@ import {
     TransactionalConnection,
     VendurePlugin,
 } from '@vendure/core';
+import gql from 'graphql-tag';
 
 import { shopApiExtensions } from './api/api-extensions';
 import { MultivendorOrderResolver } from './api/mv-order.resolver';
@@ -55,6 +56,14 @@ import { MultivendorPluginOptions } from './types';
         return config;
     },
     adminApiExtensions: {
+        schema: gql`
+            extend type Order {
+                aggregateOrderCode: String
+            }
+            extend type Query {
+                sellerOrderByAggregateCode(aggregateCode: String!): Order
+            }
+        `,
         resolvers: [MultivendorOrderResolver],
     },
     shopApiExtensions: {
