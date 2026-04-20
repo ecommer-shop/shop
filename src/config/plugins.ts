@@ -44,6 +44,7 @@ import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
 import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.plugin';
 import { MetricsPlugin } from '@pinelab/vendure-plugin-metrics';
+import { IngresosPorProducto, ValorPromedioDeOrden, UnidadesVendidas } from './metrics-es';
 import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
 import { LoginPlugin } from '../plugins/login/login.plugin';
 import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
@@ -153,6 +154,11 @@ export const plugins: VendureConfig['plugins'] = [
 
   MetricsPlugin.init({
     displayPastMonths: 13,
+    metrics: [
+        new IngresosPorProducto(),
+        new ValorPromedioDeOrden(),
+        new UnidadesVendidas(),
+    ],
   }),
 
   MetricsDashboardPlugin.init(),
@@ -161,3 +167,4 @@ export const plugins: VendureConfig['plugins'] = [
     googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
   }),
 ];
+
