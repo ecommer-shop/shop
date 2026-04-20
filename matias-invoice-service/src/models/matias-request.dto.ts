@@ -110,15 +110,40 @@ export function transformToMatiasRequest(dto: CreateInvoiceDto): MatiasInvoiceRe
     payable_amount: taxInclusiveAmount,
   };
 
-  // Totales de impuestos, solo agregar si hay impuestos
-  const taxTotals = totalTaxAmount > 0 ? [
-    {
-      tax_id: '1',
-      tax_amount: Number(totalTaxAmount.toFixed(2)), 
-      taxable_amount: Number(totalLineExtensionAmount.toFixed(2)),
-      percent: 19, // IVA
-    },
-  ] : [];
+  // Totales de impuestos agrupados por porcentaje para evitar inconsistencias
+  // entre líneas (ej. 20%) y total global (ej. 19%).
+  const taxGroups = new Map<number, { taxAmount: number; taxableAmount: number }>();
+  dto.items.forEach((item) => {
+    const quantity = item.quantity;
+    const priceAmount = item.unitPrice;
+    const baseAmount = quantity * priceAmount;
+
+    let totalDiscount = 0;
+    if (item.allowanceCharges?.length) {
+      item.allowanceCharges.forEach((discount) => {
+        totalDiscount += discount.chargeIndicator ? -discount.amount : discount.amount;
+      });
+    }
+
+    const finalLineAmount = baseAmount - totalDiscount;
+    const taxPercent = item.taxPercent ?? 19;
+    if (taxPercent <= 0) return;
+
+    const group = taxGroups.get(taxPercent) ?? { taxAmount: 0, taxableAmount: 0 };
+    group.taxableAmount += finalLineAmount;
+    group.taxAmount += (finalLineAmount * taxPercent) / 100;
+    taxGroups.set(taxPercent, group);
+  });
+
+  const taxTotals =
+    totalTaxAmount > 0
+      ? Array.from(taxGroups.entries()).map(([percent, group]) => ({
+          tax_id: '1',
+          tax_amount: Number(group.taxAmount.toFixed(2)),
+          taxable_amount: Number(group.taxableAmount.toFixed(2)),
+          percent,
+        }))
+      : [];
 
   // Transformar pagos
   const payments = dto.payments.map((payment) => ({

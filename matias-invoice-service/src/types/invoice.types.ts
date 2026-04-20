@@ -181,15 +181,3 @@ export interface MatiasInvoiceResponse {
   };
   success: boolean;
 }
-
-export interface InvoiceMetadata {
-  orderCode: string;
-  matiasInvoiceId?: string;
-  matiasInvoiceNumber?: string;
-  cufe?: string;
-  issuedAt?: Date;
-  status: InvoiceStatus;
-  error?: string;
-  pdfUrl?: string;
-  xmlUrl?: string;
-}

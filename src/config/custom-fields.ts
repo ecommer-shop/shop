@@ -179,4 +179,82 @@ export const customFields: VendureConfig['customFields'] = {
       ],
     },
   ],
+  PaymentMethod: [
+    {
+      name: 'accountNumber',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Account Number' },
+        { languageCode: LanguageCode.es, value: 'Numero de cuenta' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Bank account number where Ecommer transfers seller payouts',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Numero de cuenta bancaria donde Ecommer transfiere las ventas',
+        },
+      ],
+    },
+    {
+      name: 'bankName',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Bank' },
+        { languageCode: LanguageCode.es, value: 'Banco' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Bank where Ecommer sends seller payouts',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Banco al cual Ecommer transfiere las ventas',
+        },
+      ],
+    },
+    {
+      name: 'bankCertificationPdf',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Bank certification (PDF)' },
+        { languageCode: LanguageCode.es, value: 'Certificacion bancaria (PDF)' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'PDF document uploaded as bank certification',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Documento PDF cargado como certificacion bancaria',
+        },
+      ],
+    },
+    {
+      name: 'bankCertificationVerified',
+      type: 'boolean',
+      defaultValue: false,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Bank certification verified' },
+        { languageCode: LanguageCode.es, value: 'Certificacion bancaria verificada' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Whether the uploaded bank certification has been verified',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Indica si la certificacion bancaria cargada fue verificada',
+        },
+      ],
+    },
+  ],
 };

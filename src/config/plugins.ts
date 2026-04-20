@@ -47,6 +47,7 @@ import { MetricsPlugin } from '@pinelab/vendure-plugin-metrics';
 import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
 import { LoginPlugin } from '../plugins/login/login.plugin';
 import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
+import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -89,7 +90,6 @@ const emailPlugin = EmailPlugin.init({
     changeEmailAddressUrl: `${storeUrl}${ROUTE_STORE.account.changeEmailAddress}`,
   },
 });
-
 
 
 export const plugins: VendureConfig['plugins'] = [
@@ -142,8 +142,10 @@ export const plugins: VendureConfig['plugins'] = [
 
   ExcelLoaderPlugin.init({}),
 
+  FeedbackPlugin,
+
   InvoiceClientPlugin.init({
-    invoiceServiceUrl: process.env.INVOICE_SERVICE_URL || 'http://localhost:3001/api',
+    invoiceServiceUrl: process.env.INVOICE_SERVICE_URL || 'http://localhost:3010/api',
     apiKey: process.env.INVOICE_SERVICE_API_KEY || '',
     prefix: process.env.MATIAS_PREFIX,
     resolutionNumber: process.env.MATIAS_RESOLUTION_NUMBER,

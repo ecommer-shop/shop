@@ -12,8 +12,10 @@ import {
     TransactionalConnection,
     VendurePlugin,
 } from '@vendure/core';
+import gql from 'graphql-tag';
 
 import { shopApiExtensions } from './api/api-extensions';
+import { MultivendorOrderResolver } from './api/mv-order.resolver';
 import { MultivendorResolver } from './api/mv.resolver';
 import { multivendorOrderProcess } from './config/mv-order-process';
 import { MultivendorSellerStrategy } from './config/mv-order-seller-strategy';
@@ -21,6 +23,7 @@ import { multivendorPaymentMethodHandler } from './config/mv-payment-handler';
 import { multivendorShippingEligibilityChecker } from './config/mv-shipping-eligibility-checker';
 import { MultivendorShippingLineAssignmentStrategy } from './config/mv-shipping-line-assignment-strategy';
 import { CONNECTED_PAYMENT_METHOD_CODE, MULTIVENDOR_PLUGIN_OPTIONS } from './constants';
+import { AutoFulfillService } from './service/auto-fulfill.service';
 import { MultivendorService } from './service/mv.service';
 import { MultivendorPluginOptions } from './types';
 
@@ -52,12 +55,24 @@ import { MultivendorPluginOptions } from './types';
             new MultivendorShippingLineAssignmentStrategy();
         return config;
     },
+    adminApiExtensions: {
+        schema: gql`
+            extend type Order {
+                aggregateOrderCode: String
+            }
+            extend type Query {
+                sellerOrderByAggregateCode(aggregateCode: String!): Order
+            }
+        `,
+        resolvers: [MultivendorOrderResolver],
+    },
     shopApiExtensions: {
         schema: shopApiExtensions,
         resolvers: [MultivendorResolver],
     },
     providers: [
         MultivendorService,
+        AutoFulfillService,
         { provide: MULTIVENDOR_PLUGIN_OPTIONS, useFactory: () => MultivendorPlugin.options },
     ],
 })
