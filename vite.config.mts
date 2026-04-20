@@ -390,24 +390,39 @@ export default defineConfig({
       });
     </script>
     <script>
-      // Cerrar sidebar móvil al hacer click en item de navegación
-      document.addEventListener('click', function(e) {
-        const target = e.target;
-        const menuButton = target.closest('[data-sidebar="menu-button"]');
-        const menuSubButton = target.closest('[data-sidebar="menu-sub-button"]');
+        document.addEventListener('click', function(e) {
+            const target = e.target;
+            const menuButton = target.closest('[data-sidebar="menu-button"]');
+            const menuSubButton = target.closest('[data-sidebar="menu-sub-button"]');
+            
+            if (!menuButton && !menuSubButton) return;
+            
+            const activeEl = menuButton || menuSubButton;
+            const isCollapsibleTrigger = activeEl.getAttribute('data-slot') === 'collapsible-trigger';
+            const isDropdownTrigger = activeEl.getAttribute('data-slot') === 'dropdown-menu-trigger';
+            
+            if (!isCollapsibleTrigger && !isDropdownTrigger) {
+            setTimeout(function() {
+                const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+                if (closeBtn) closeBtn.click();
+            }, 50);
+            }
+        }, true);
         
-        if (!menuButton && !menuSubButton) return;
-        
-        const activeEl = menuButton || menuSubButton;
-        const isCollapsibleTrigger = activeEl.getAttribute('data-slot') === 'collapsible-trigger';
-        
-        if (!isCollapsibleTrigger) {
+        // Cerrar sidebar al tocar item dentro de un dropdown
+        document.addEventListener('click', function(e) {
+          const target = e.target;
+          const dropdownItem = target.closest(
+            '[data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-radio-item"]'
+          );
+          
+          if (!dropdownItem) return;
+          
           setTimeout(function() {
             const closeBtn = document.querySelector('button.absolute.top-4.right-4');
             if (closeBtn) closeBtn.click();
-          }, 50);
-        }
-      }, true);
+          }, 100);
+        }, true);
     </script>
     <style>
       /* Fix: ancho de app en móvil */
@@ -423,6 +438,19 @@ export default defineConfig({
           width: 100% !important;
           min-width: 0 !important;
         }
+      }
+
+      /* Ocultar formulario nativo de Vendure condicionalmente */
+      body.hide-native-login form > div:not([class*="max-w-sm"]),
+      body.hide-native-login form [data-slot="separator"],
+      body.hide-native-login form [data-slot="separator-root"],
+      body.hide-native-login form [name="username"],
+      body.hide-native-login form [name="password"],
+      body.hide-native-login form [type="submit"],
+      body.hide-native-login form h1,
+      body.hide-native-login form > div:not([class*="max-w-sm"]) p.text-muted-foreground,
+      body.hide-native-login form [data-slot="input-group"] {
+          display: none !important;
       }
     </style>`
                 );

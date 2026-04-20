@@ -18,6 +18,9 @@ build/
 
 # Env files
 .env
+.yarn
+/e2e/__data__admin-ui/
+admin-ui-compiled
 .env.*
 
 # Logs
