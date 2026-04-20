@@ -17,6 +17,7 @@ import './config/mercadopago.config';
 //import { PaymentMercadopagoPlugin } from './plugins/payment-mercadopago/payment-mercadopago.plugin';
 import { catalogOptions } from './config/catalog-options';
 import { ExcelLoaderPlugin } from './plugins/google-sheets-loader/excel-loader.plugin';
+import './config/promotion-translations';
 
 export const config: VendureConfig = {
   logger: new DefaultLogger({
