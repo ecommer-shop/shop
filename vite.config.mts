@@ -66,6 +66,170 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/payment-methods_.$id.tsx')) {
+                if (!nextCode.includes("import { EntityAssets } from '@/vdb/components/shared/entity-assets.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { EntityAssets } from '@/vdb/components/shared/entity-assets.js';",
+                    );
+                }
+                if (!nextCode.includes("import { Field } from '@/vdb/components/ui/field.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { Button } from '@/vdb/components/ui/button.js';",
+                        "import { Button } from '@/vdb/components/ui/button.js';\nimport { Field } from '@/vdb/components/ui/field.js';",
+                    );
+                }
+
+                nextCode = nextCode.replace(
+                    `        transformCreateInput: input => {
+            return {
+                ...input,
+                checker: input.checker?.code ? input.checker : undefined,
+                handler: input.handler,
+            };
+        },`,
+                    `        transformCreateInput: input => {
+            return {
+                ...input,
+                code:
+                    input.code?.trim() ||
+                    (input.name ?? '')
+                        .toLowerCase()
+                        .trim()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, ''),
+                checker: input.checker?.code ? input.checker : undefined,
+                handler: input.handler?.code ? input.handler : undefined,
+            };
+        },`,
+                );
+                nextCode = nextCode.replace(
+                    `                    description: err instanceof Error ? err.message : 'Unknown error',`,
+                    `                    description:
+                        err instanceof Error &&
+                        (err.message.includes('ConfigurableOperationInput!') ||
+                            err.message.includes('PaymentMethodHandler'))
+                            ? 'Debes seleccionar un método de procesamiento de pago (Calculator) antes de crear el método de pago.'
+                            : err instanceof Error
+                              ? err.message
+                              : 'Error desconocido',`,
+                );
+
+                nextCode = nextCode.replace(
+                    `                        <FormFieldWrapper
+                            control={form.control}
+                            name="code"
+                            label={<Trans>Code</Trans>}
+                            render={({ field }) => <Input {...field} />}
+                        />`,
+                    '',
+                );
+                nextCode = nextCode.replace(
+                    `                        <TranslatableFormFieldWrapper
+                            control={form.control}
+                            name="name"
+                            label={<Trans>Name</Trans>}
+                            render={({ field }) => <Input {...field} />}
+                        />`,
+                    `                        <TranslatableFormFieldWrapper
+                            control={form.control}
+                            name="name"
+                            label="Nombre"
+                            render={({ field }) => <Input {...field} />}
+                        />`,
+                );
+                nextCode = nextCode.replace(
+                    `                        label={<Trans>Enabled</Trans>}`,
+                    `                        label="Habilitado"`,
+                );
+                nextCode = nextCode.replace(
+                    `                    <TranslatableFormFieldWrapper
+                        control={form.control}
+                        name="description"
+                        label={<Trans>Description</Trans>}
+                        render={({ field }) => <RichTextInput {...field} />}
+                    />`,
+                    '',
+                );
+                nextCode = nextCode.replace(
+                    `<CustomFieldsPageBlock column="main" entityType="PaymentMethod" control={form.control} />`,
+                    `<PageBlock
+                    column="main"
+                    blockId="bank-certification-pdf"
+                    title="Carga tu certificado bancario"
+                >
+                    <Field>
+                        <EntityAssets
+                            compact={true}
+                            multiSelect={false}
+                            onChange={value => {
+                                form.setValue('customFields.bankCertificationPdf', value.featuredAssetId ?? undefined, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                });
+                            }}
+                        />
+                    </Field>
+                </PageBlock>
+                <PageBlock column="main" blockId="payment-method-bank-fields" title="Datos bancarios">
+                    <DetailFormGrid>
+                        <FormFieldWrapper
+                            control={form.control}
+                            name="customFields.accountNumber"
+                            label="Número de cuenta"
+                            render={({ field }) => <Input {...field} />}
+                        />
+                        <FormFieldWrapper
+                            control={form.control}
+                            name="customFields.bankName"
+                            label="Banco"
+                            render={({ field }) => <Input {...field} />}
+                        />
+                    </DetailFormGrid>
+                    <FormFieldWrapper
+                        control={form.control}
+                        name="customFields.bankCertificationVerified"
+                        label="Certificación bancaria verificada"
+                        render={({ field }) => (
+                            <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
+                        )}
+                    />
+                </PageBlock>`,
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Payment eligibility checker</Trans>}',
+                    "title={'Verificador de elegibilidad de pago'}",
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Calculator</Trans>}',
+                    "title={'Calculadora'}",
+                );
+            }
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/components/payment-eligibility-checker-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Payment Eligibility Checker"',
+                    `buttonText="Seleccionar verificador de elegibilidad de pago"`,
+                );
+                nextCode = nextCode.replace(
+                    'emptyText="No checkers found"',
+                    `emptyText="No se encontraron verificadores"`,
+                );
+            }
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/components/payment-handler-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Payment Handler"',
+                    `buttonText="Seleccionar método de pago (Calculadora)"`,
+                );
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };
@@ -75,7 +239,7 @@ export default defineConfig({
     base: '/dashboard',
     build: {
         outDir: `${__dirname}/dist/dashboard`,
-        emptyOutDir: false,  // Evita borrar el backend compilado, ponerlo en true si falla
+        emptyOutDir: true,
     },
     plugins: [
         patchVendureDashboardChannelPermissions(),

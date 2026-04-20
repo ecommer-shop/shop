@@ -92,7 +92,6 @@ const emailPlugin = EmailPlugin.init({
 });
 
 
-
 export const plugins: VendureConfig['plugins'] = [
   MultivendorPlugin.init({
     platformFeePercent: 10,
