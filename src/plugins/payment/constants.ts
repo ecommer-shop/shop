@@ -3,3 +3,5 @@ export const loggerCtx = 'PaymentPlugin';
 
 export const CURRENCY = 'COP';
 export const PAYMENT_METHOD = { code: 'wompi', id: 1 } as const;
+
+export const METRICS_DISPLAY_PAST_MONTHS = 13;

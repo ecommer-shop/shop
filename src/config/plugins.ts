@@ -25,7 +25,7 @@ import { ROUTE, ROUTE_STORE } from '../consts';
 import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
 import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
-import { CURRENCY } from '../plugins/payment/constants';
+import { CURRENCY, METRICS_DISPLAY_PAST_MONTHS } from '../plugins/payment/constants';
 import { ClerkPlugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
 //import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
@@ -153,7 +153,7 @@ export const plugins: VendureConfig['plugins'] = [
   }),
 
   MetricsPlugin.init({
-    displayPastMonths: 13,
+    displayPastMonths: METRICS_DISPLAY_PAST_MONTHS,
     metrics: [
         new IngresosPorProducto(),
         new ValorPromedioDeOrden(),
