@@ -21,7 +21,7 @@ import {
   configureS3AssetStorage,
 } from '@vendure/asset-server-plugin';
 
-import { ROUTE, ROUTE_STORE } from '../consts';
+import { ROUTE, ROUTE_STORE } from '../constants';
 import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
 import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
