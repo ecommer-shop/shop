@@ -16,6 +16,14 @@ function patchVendureDashboardChannelPermissions() {
             const normalizedId = id.replace(/\\/g, '/');
             let nextCode = code;
 
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/shared/boolean-badge.tsx')) {
+                nextCode = nextCode
+                    .replace(/id:\s*['"]CM5TXb['"]/g, 'id: "RxzN1M"')
+                    .replace(/id:\s*['"]77Ufuv['"]/g, 'id: "E/QGRL"')
+                    .replace(/id="CM5TXb"/g, 'id="RxzN1M"')
+                    .replace(/id="77Ufuv"/g, 'id="E/QGRL"');
+            }
+
             if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/channel-switcher.tsx')) {
                 if (!nextCode.includes("import { usePermissions } from '@/vdb/hooks/use-permissions.js';")) {
                     nextCode = nextCode.replace(
