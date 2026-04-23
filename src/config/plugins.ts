@@ -26,9 +26,9 @@ import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
 import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
 import { CURRENCY } from '../plugins/payment/constants';
-import { ClerkPlugin } from '../plugins/auth0/auth0.plugin';
+import { ClerkPlugin } from '../plugins/clerk/clerk.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
-//import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
+
 import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
 import { InvoiceClientPlugin } from '../plugins/invoice-client/invoice-client.plugin';
 import { ResendEmailSender } from './mail/resend-email-sender';
