@@ -6,10 +6,8 @@ import {
   DefaultJobQueuePlugin,
   DefaultSchedulerPlugin,
   DefaultSearchPlugin,
-  LanguageCode,
-  Role,
 } from '@vendure/core';
-import { AdminUiPlugin } from '@vendure/admin-ui-plugin';
+
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import {
   defaultEmailHandlers,
@@ -34,7 +32,6 @@ import { InvoiceClientPlugin } from '../plugins/invoice-client/invoice-client.pl
 import { ResendEmailSender } from './mail/resend-email-sender';
 import {
   IS_DEV,
-  serverPort,
   staticDir,
   storeUrl,
   assetUploadDir,
@@ -109,16 +106,6 @@ export const plugins: VendureConfig['plugins'] = [
   DefaultSearchPlugin.init({ bufferUpdates: false, indexStockStatus: true }),
 
   emailPlugin,
-
-  AdminUiPlugin.init({
-    route: ROUTE.Admin,
-    port: serverPort + 2,
-    adminUiConfig: {
-      defaultLanguage: LanguageCode.es,
-      defaultLocale: 'es-CO',
-    },
-  }),
-
 
   DashboardPlugin.init({
     route: ROUTE.Dashboard,
