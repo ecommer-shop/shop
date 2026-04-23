@@ -1,4 +1,5 @@
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
+import { LanguageCode } from '@vendure/core';
 import { dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
@@ -268,6 +269,10 @@ export default defineConfig({
             // These types can be used in your dashboard extensions to provide
             // type safety when writing queries and mutations.
             gqlOutputPath: './src/gql',
+            i18n: {
+                defaultLanguage: (process.env.DASHBOARD_DEFAULT_LANGUAGE as LanguageCode) ?? LanguageCode.es,
+                defaultLocale: process.env.DASHBOARD_DEFAULT_LOCALE ?? 'es-CO',
+            },
             // ─── Ecommer brand palette ───────────────────────────────────────
             // #12123F Deadly Depths     → hsl(240 56% 16%)
             // #9969F8 Candy Grape Fizz  → hsl(260 91% 69%)

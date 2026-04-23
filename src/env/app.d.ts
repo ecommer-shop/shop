@@ -15,6 +15,8 @@ declare global {
          STATIC_DIR: string;
          ASSET_URL_PREFIX: string;
          GOOGLE_OAUTH_CLIENT_ID: string;
+         DASHBOARD_DEFAULT_LANGUAGE?: string;
+         DASHBOARD_DEFAULT_LOCALE?: string;
       }
    }
 }
