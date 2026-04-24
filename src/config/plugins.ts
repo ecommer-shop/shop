@@ -49,6 +49,7 @@ import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
 import { LoginPlugin } from '../plugins/login/login.plugin';
 import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
 import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
+import { StorePagePlugin } from '../plugins/store-page/store-page.plugin';
 import { AutoSkuPlugin } from '../plugins/auto-sku/auto-sku.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
@@ -131,6 +132,7 @@ export const plugins: VendureConfig['plugins'] = [
 
   CoinbasePlugin,
   ReviewsPlugin,
+  StorePagePlugin,
   AiChatPlugin,
 
   PaymentPlugin.init({
