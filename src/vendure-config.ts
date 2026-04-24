@@ -16,6 +16,7 @@ import { plugins } from './config/plugins';
 
 import { catalogOptions } from './config/catalog-options';
 import { ExcelLoaderPlugin } from './plugins/google-sheets-loader/excel-loader.plugin';
+import './config/promotion-translations';
 
 export const config: VendureConfig = {
   logger: new DefaultLogger({

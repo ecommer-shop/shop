@@ -32,15 +32,18 @@ yarn install
 cp .env.example .env
 ```
 
-Editar `.env` con tus credenciales:
+Editar `.env` con tus credenciales (ver `.env.example`):
 ```env
-PORT=3001
+PORT=3010
 NODE_ENV=development
 MATIAS_API_URL=https://api-v2.matias-api.com/api/ubl2.1
 MATIAS_EMAIL=tu-email@ejemplo.com
 MATIAS_PASSWORD=tu-contraseña
 VENDURE_SERVICE_API_KEY=tu-api-key-secreta
 LOG_LEVEL=info
+# Base de datos PROPIA del microservicio (no la misma que Vendure/shop):
+INVOICE_SERVICE_DATABASE_URL=postgresql://...
+# INVOICE_SERVICE_DB_SSL=true
 ```
 
 **Nota importante**: Las credenciales `MATIAS_EMAIL` y `MATIAS_PASSWORD` son las que recibiste al registrarte en la API de Matias. Si aún no te has registrado, debes hacerlo primero en `{{URL}}/register` o a través del formulario web.
@@ -50,13 +53,31 @@ LOG_LEVEL=info
 npm run dev
 ```
 
-El servicio estará disponible en `http://localhost:3001`
+El servicio estará disponible en `http://localhost:3010` (o el `PORT` que definas). En Vendure, `INVOICE_SERVICE_URL` debe apuntar a la misma base, p. ej. `http://localhost:3010/api`.
 
 ## 📚 API Endpoints
 
 ### Health Check
 ```
 GET /api/health
+```
+
+### Siguiente número de documento (secuencia en la BD del micro)
+Vendure llama esto antes de `POST /invoices`; no se guarda secuencia en la BD del shop.
+```
+GET /api/sequence/next?prefix=LZT
+Headers:
+  X-API-Key: your-api-key
+```
+Respuesta: `{ "success": true, "data": { "prefix": "LZT", "documentNumber": "2840" } }`
+
+### Listado y totales (requieren `INVOICE_SERVICE_DATABASE_URL`)
+```
+GET /api/invoices/list?dateFrom=&dateTo=&customerDni=&status=&orderCode=&take=&skip=
+GET /api/invoices/totals/day?dateFrom=&dateTo=
+GET /api/invoices/totals/month?dateFrom=&dateTo=
+Headers:
+  X-API-Key: your-api-key
 ```
 
 ### Crear Factura
@@ -129,7 +150,7 @@ En Vendure, crea un servicio cliente que llame a este microservicio:
 import axios from 'axios';
 
 const invoiceService = axios.create({
-  baseURL: 'http://localhost:3001/api',
+  baseURL: 'http://localhost:3010/api',
   headers: {
     'X-API-Key': process.env.VENDURE_SERVICE_API_KEY,
     'Content-Type': 'application/json',
@@ -150,14 +171,16 @@ Para ejecutar con Docker:
 
 ```bash
 docker build -t matias-invoice-service .
-docker run -p 3001:3001 --env-file .env matias-invoice-service
+docker run -p 3010:3010 --env-file .env matias-invoice-service
 ```
 
 ## 📝 Notas Importantes
 
 1. **Token de Matias**: El servicio maneja automáticamente la autenticación y renovación del token de Matias. El token se obtiene mediante login con email/password y tiene validez de 1 año.
 
-2. **Persistencia**: Actualmente las facturas se almacenan en memoria. Para producción, se recomienda implementar una base de datos (PostgreSQL, MongoDB, etc.).
+2. **Persistencia y base de datos**:
+   - **Producción**: define `INVOICE_SERVICE_DATABASE_URL` con un **PostgreSQL dedicado al microservicio** (no reutilices el `DATABASE_URL` de Vendure/shop). El servicio crea la tabla `matias_invoice_record` al arrancar.
+   - **Desarrollo**: si no defines esa variable, se usa almacenamiento en memoria (con advertencia en logs).
 
 3. **Endpoints de Matias**: Los endpoints de la API de Matias en el código tienen marcadores `TODO`. Debes ajustarlos según la documentación real de Matias.
 

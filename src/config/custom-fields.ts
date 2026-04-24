@@ -104,6 +104,69 @@ export const customFields: VendureConfig['customFields'] = {
         },
       ],
     },
+    {
+      name: 'storeDescription',
+      type: 'text',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Store description' },
+        { languageCode: LanguageCode.es, value: 'Descripcion de la tienda' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Public description shown on the seller store page',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Descripcion publica mostrada en la pagina de la tienda',
+        },
+      ],
+    },
+    {
+      name: 'storeBannerUrl',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Store banner URL' },
+        { languageCode: LanguageCode.es, value: 'URL del banner de la tienda' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Public banner image URL shown on the seller store page',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'URL publica de la imagen de banner mostrada en la pagina de la tienda',
+        },
+      ],
+    },
+  ],
+  Product: [
+    {
+      name: 'storeFeatured',
+      type: 'boolean',
+      defaultValue: false,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.es, value: 'Destacado en mi tienda' },
+        { languageCode: LanguageCode.en, value: 'Featured in my store' },
+      ],
+      description: [
+        {
+            languageCode: LanguageCode.es,
+            value: 'Máximo 3 productos destacados por tienda. Actívalo con la estrella en el panel de producto.',
+        },
+        {
+            languageCode: LanguageCode.en,
+            value: 'Up to 3 featured products per store. Toggle with the star on the product screen.',
+        },
+      ],
+      ui: { component: 'ecommer-store-featured-star' },
+    },
   ],
   ProductVariant: [
     {
@@ -175,6 +238,84 @@ export const customFields: VendureConfig['customFields'] = {
         {
           languageCode: LanguageCode.es,
           value: 'Ancho del producto en centímetros',
+        },
+      ],
+    },
+  ],
+  PaymentMethod: [
+    {
+      name: 'accountNumber',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Account Number' },
+        { languageCode: LanguageCode.es, value: 'Numero de cuenta' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Bank account number where Ecommer transfers seller payouts',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Numero de cuenta bancaria donde Ecommer transfiere las ventas',
+        },
+      ],
+    },
+    {
+      name: 'bankName',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Bank' },
+        { languageCode: LanguageCode.es, value: 'Banco' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Bank where Ecommer sends seller payouts',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Banco al cual Ecommer transfiere las ventas',
+        },
+      ],
+    },
+    {
+      name: 'bankCertificationPdf',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Bank certification (PDF)' },
+        { languageCode: LanguageCode.es, value: 'Certificacion bancaria (PDF)' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'PDF document uploaded as bank certification',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Documento PDF cargado como certificacion bancaria',
+        },
+      ],
+    },
+    {
+      name: 'bankCertificationVerified',
+      type: 'boolean',
+      defaultValue: false,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Bank certification verified' },
+        { languageCode: LanguageCode.es, value: 'Certificacion bancaria verificada' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Whether the uploaded bank certification has been verified',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Indica si la certificacion bancaria cargada fue verificada',
         },
       ],
     },

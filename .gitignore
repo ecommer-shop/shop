@@ -1,8 +1,44 @@
-node_modules
-dist
-admin-ui
-static/assets
-static/email/test-emails
+# Dependencies
+node_modules/
+
+# Build
+dist/
+build/
+
+# Angular
+.angular/
+**/.angular/
+
+# Vite / caches
+.cache/
+.vite/
+
+# Vendure
+.vendure/
+
+# Env files
 .env
 .yarn
+/e2e/__data__admin-ui/
+admin-ui-compiled
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
 /e2e/__data__
+
+# Yarn
+.yarn/
+
+# Admin UI generado
+admin-ui/
+shop/src/admin-ui-custom/

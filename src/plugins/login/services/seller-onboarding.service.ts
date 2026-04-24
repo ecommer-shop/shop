@@ -6,8 +6,12 @@ import {
     AdministratorService,
     Channel,
     ChannelService,
+    Collection,
+    CollectionService,
     ConfigService,
     defaultShippingCalculator,
+    Facet,
+    FacetService,
     InternalServerError,
     isGraphQlErrorResult,
     Logger,
@@ -41,6 +45,8 @@ export class SellerOnboardingService {
         private shippingMethodService: ShippingMethodService,
         private configService: ConfigService,
         private stockLocationService: StockLocationService,
+        private facetService: FacetService,
+        private collectionService: CollectionService,
         private requestContextService: RequestContextService,
         private connection: TransactionalConnection,
     ) { }
@@ -81,6 +87,8 @@ export class SellerOnboardingService {
 
         await this.createSellerShippingMethod(superAdminCtx, input.shopName, channel);
         await this.createSellerStockLocation(superAdminCtx, input.shopName, channel);
+        await this.assignFacetsToSellerChannel(superAdminCtx, channel);
+        await this.assignCollectionsToSellerChannel(superAdminCtx, channel);
 
         Logger.info(
             `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
@@ -152,6 +160,10 @@ export class SellerOnboardingService {
                 Permission.ReadPromotion,
                 Permission.ReadCountry,
                 Permission.ReadZone,
+                Permission.ReadChannel,
+                Permission.CreateAsset,
+                Permission.ReadAsset,
+                Permission.UpdateAsset,
                 Permission.CreateCustomer,
                 Permission.UpdateCustomer,
                 Permission.DeleteCustomer,
@@ -159,9 +171,17 @@ export class SellerOnboardingService {
                 Permission.ReadTag,
                 Permission.UpdateTag,
                 Permission.DeleteTag,
+                Permission.ReadAdministrator,
+                Permission.UpdateAdministrator,
                 Permission.ReadCollection,
                 Permission.ReadFacet,
+                Permission.CreateStockLocation,
                 Permission.ReadStockLocation,
+                Permission.UpdateStockLocation,
+                Permission.CreatePromotion,
+                Permission.ReadPromotion,
+                Permission.UpdatePromotion,
+                Permission.DeletePromotion,
             ],
         });
 
@@ -309,6 +329,26 @@ export class SellerOnboardingService {
         await this.channelService.assignToChannels(ctx, StockLocation, stockLocation.id, [
             sellerChannel.id,
         ]);
+    }
+
+    private async assignFacetsToSellerChannel(
+        ctx: RequestContext,
+        sellerChannel: Channel,
+    ) {
+        const { items: facets } = await this.facetService.findAll(ctx, { take: 1000 });
+        for (const facet of facets) {
+            await this.channelService.assignToChannels(ctx, Facet, facet.id, [sellerChannel.id]);
+        }
+    }
+
+    private async assignCollectionsToSellerChannel(
+        ctx: RequestContext,
+        sellerChannel: Channel,
+    ) {
+        const { items: collections } = await this.collectionService.findAll(ctx, { take: 1000 });
+        for (const collection of collections) {
+            await this.channelService.assignToChannels(ctx, Collection, collection.id, [sellerChannel.id]);
+        }
     }
 
     private async getSuperAdminContext(ctx: RequestContext): Promise<RequestContext> {

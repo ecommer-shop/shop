@@ -33,15 +33,6 @@ import { SummaryRegenerationPolicy } from './services/summary-regeneration-polic
         resolvers: [ProductEntityResolver, ProductReviewShopResolver, ProductReviewEntityResolver],
     },
     configuration: config => {
-        config.customFields.Product.push({
-            name: 'reviews',
-            type: 'relation',
-            list: true,
-            entity: ProductReview,
-            inverseSide: (review: ProductReview) => review.product,
-            ui: { component: 'review-multi-select-with-create' },
-        });
-
         return config;
     },
     dashboard: './dashboard/index.tsx',

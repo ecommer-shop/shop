@@ -3,29 +3,101 @@ import { CreateInvoiceDto, InvoiceResponseDto, InvoiceStatusDto } from '@/models
 import { transformToMatiasRequest } from '@/models/matias-request.dto';
 import { InvoiceStatus } from '@/types/invoice.types';
 import logger from '@/utils/logger';
+import { getInvoiceDbPool } from '@/db/pool';
+import { InvoiceRepository, type InvoiceMetadata } from '@/db/invoice-repository';
 
-// En memoria por ahora - en producción deberías usar una base de datos
-const invoiceStore = new Map<string, InvoiceMetadata>();
-
-interface InvoiceMetadata {
-  id: string;
-  orderCode: string;
-  prefix: string;
-  documentNumber: string;
-  status: InvoiceStatus;
-  cufe?: string;
-  pdfUrl?: string;
-  xmlUrl?: string;
-  issuedAt?: Date;
-  error?: string;
-  createdAt: Date;
-}
+/** Fallback en memoria solo si no hay `INVOICE_SERVICE_DATABASE_URL`. */
+const memoryStore = new Map<string, InvoiceMetadata>();
 
 export class InvoiceService {
   private matiasApi: MatiasApiService;
+  private repo: InvoiceRepository | null;
 
   constructor() {
     this.matiasApi = new MatiasApiService();
+    const pool = getInvoiceDbPool();
+    this.repo = pool ? new InvoiceRepository(pool) : null;
+    if (!this.repo) {
+      logger.warn(
+        'INVOICE_SERVICE_DATABASE_URL no está definida: usando almacenamiento en memoria (solo desarrollo; en producción define una BD propia del microservicio).',
+      );
+    }
+  }
+
+  private async ready(): Promise<void> {
+    if (this.repo) {
+      await this.repo.ensureSchema();
+    }
+  }
+
+  private async findIssuedByOrderCode(orderCode: string): Promise<InvoiceMetadata | null> {
+    await this.ready();
+    if (this.repo) {
+      return this.repo.findIssuedByOrderCode(orderCode);
+    }
+    return (
+      Array.from(memoryStore.values()).find(
+        (inv) => inv.orderCode === orderCode && inv.status === InvoiceStatus.ISSUED,
+      ) ?? null
+    );
+  }
+
+  private async findBestByOrderCode(orderCode: string): Promise<InvoiceMetadata | null> {
+    await this.ready();
+    if (this.repo) {
+      return this.repo.findBestByOrderCode(orderCode);
+    }
+    const issued = Array.from(memoryStore.values()).find(
+      (inv) => inv.orderCode === orderCode && inv.status === InvoiceStatus.ISSUED,
+    );
+    if (issued) return issued;
+    const all = Array.from(memoryStore.values()).filter((inv) => inv.orderCode === orderCode);
+    if (all.length === 0) return null;
+    return all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  }
+
+  private async getById(invoiceId: string): Promise<InvoiceMetadata | null> {
+    await this.ready();
+    if (this.repo) {
+      return this.repo.findById(invoiceId);
+    }
+    return memoryStore.get(invoiceId) ?? null;
+  }
+
+  private async persist(meta: InvoiceMetadata): Promise<void> {
+    await this.ready();
+    if (this.repo) {
+      await this.repo.insert(meta);
+    } else {
+      memoryStore.set(meta.id, meta);
+    }
+  }
+
+  private async persistUpdate(meta: InvoiceMetadata): Promise<void> {
+    await this.ready();
+    if (this.repo) {
+      await this.repo.update(meta);
+    } else {
+      memoryStore.set(meta.id, meta);
+    }
+  }
+
+  private toResponseDto(invoice: InvoiceMetadata, message?: string): InvoiceResponseDto {
+    return {
+      id: invoice.id,
+      orderCode: invoice.orderCode,
+      status: invoice.status,
+      matiasInvoiceId:
+        invoice.matiasInvoiceId ?? `${invoice.prefix}-${invoice.documentNumber}`,
+      matiasInvoiceNumber:
+        invoice.matiasInvoiceNumber ?? `${invoice.prefix}${invoice.documentNumber}`,
+      cufe: invoice.cufe,
+      pdfUrl: invoice.pdfUrl,
+      xmlUrl: invoice.xmlUrl,
+      issuedAt: invoice.issuedAt,
+      error: invoice.error,
+      ...(message !== undefined ? { message } : {}),
+    };
   }
 
   /**
@@ -35,34 +107,26 @@ export class InvoiceService {
     try {
       logger.info('Creating invoice', { orderCode: dto.orderCode });
 
-      // Validar que no exista ya una factura para esta orden
-      const existingInvoice = Array.from(invoiceStore.values()).find(
-        (inv) => inv.orderCode === dto.orderCode
-      );
+      const existingInvoice = await this.findIssuedByOrderCode(dto.orderCode);
 
       if (existingInvoice && existingInvoice.status === InvoiceStatus.ISSUED) {
         throw new Error(`Invoice already exists for order ${dto.orderCode}`);
       }
 
-      // Transformar DTO interno a formato Matias
       const matiasRequest = transformToMatiasRequest(dto);
 
-      // Crear factura en Matias
       const matiasResponse = await this.matiasApi.createInvoice(matiasRequest);
 
-      // Validar respuesta
-      // Nota: Matias puede devolver success=true pero IsValid='false' si la DIAN rechaza el documento
       if (!matiasResponse.success) {
         const errorMsg = matiasResponse.message || 'Invoice creation failed';
         throw new Error(errorMsg);
       }
 
-      // Si la DIAN rechazó el documento, incluir detalles en el error
       if (matiasResponse.response?.IsValid !== 'true') {
         const statusCode = matiasResponse.response?.StatusCode;
         const statusMessage = matiasResponse.response?.StatusMessage || 'Document validation failed';
         const errorDetails = matiasResponse.response?.ErrorMessage;
-        
+
         logger.warn('Invoice created in Matias but rejected by DIAN', {
           xmlDocumentKey: matiasResponse.XmlDocumentKey,
           statusCode,
@@ -70,12 +134,10 @@ export class InvoiceService {
           errorDetails: errorDetails ? JSON.stringify(errorDetails) : undefined,
         });
 
-        // Lanzar error con información detallada
         const errorMsg = `${statusMessage}${errorDetails ? ` - Details: ${JSON.stringify(errorDetails)}` : ''}`;
         throw new Error(errorMsg);
       }
 
-      // Guardar metadata
       const invoiceId = `inv_${Date.now()}_${dto.orderCode}`;
       const metadata: InvoiceMetadata = {
         id: invoiceId,
@@ -88,9 +150,21 @@ export class InvoiceService {
         xmlUrl: matiasResponse.AttachedDocument?.url,
         issuedAt: new Date(),
         createdAt: new Date(),
+        typeDocumentId: dto.typeDocumentId,
+        operationTypeId: dto.operationTypeId,
+        statusMessage: matiasResponse.response?.StatusMessage ?? null,
+        customerName: dto.customer?.companyName ?? null,
+        customerDni: dto.customer?.dni ?? null,
+        customerEmail: dto.customer?.email ?? null,
+        subtotal: dto.reportSubtotal ?? null,
+        taxTotal: dto.reportTaxTotal ?? null,
+        total: dto.reportTotal ?? null,
+        currencyCode: dto.currencyCode ?? 'COP',
+        matiasInvoiceId: `${dto.prefix}-${dto.documentNumber}`,
+        matiasInvoiceNumber: `${dto.prefix}${dto.documentNumber}`,
       };
 
-      invoiceStore.set(invoiceId, metadata);
+      await this.persist(metadata);
 
       logger.info('Invoice created successfully', {
         invoiceId,
@@ -99,25 +173,13 @@ export class InvoiceService {
         statusCode: matiasResponse.response?.StatusCode,
       });
 
-      return {
-        id: invoiceId,
-        orderCode: dto.orderCode,
-        status: metadata.status,
-        matiasInvoiceId: `${dto.prefix}-${dto.documentNumber}`,
-        matiasInvoiceNumber: `${dto.prefix}${dto.documentNumber}`,
-        cufe: metadata.cufe,
-        pdfUrl: metadata.pdfUrl,
-        xmlUrl: metadata.xmlUrl,
-        issuedAt: metadata.issuedAt,
-        message: matiasResponse.response?.StatusMessage || 'Invoice created successfully',
-      };
+      return this.toResponseDto(
+        metadata,
+        matiasResponse.response?.StatusMessage || 'Invoice created successfully',
+      );
     } catch (error: any) {
-      logger.error('Error creating invoice:', {
-        message: error?.message,
-        stack: error?.stack,
-      });
+      logger.error('Error creating invoice:', error);
 
-      // Guardar error en metadata si es posible
       const invoiceId = `inv_${Date.now()}_${dto.orderCode}`;
       const errorMetadata: InvoiceMetadata = {
         id: invoiceId,
@@ -127,8 +189,17 @@ export class InvoiceService {
         status: InvoiceStatus.REJECTED,
         error: error.message,
         createdAt: new Date(),
+        typeDocumentId: dto.typeDocumentId,
+        operationTypeId: dto.operationTypeId,
+        customerName: dto.customer?.companyName ?? null,
+        customerDni: dto.customer?.dni ?? null,
+        customerEmail: dto.customer?.email ?? null,
+        subtotal: dto.reportSubtotal ?? null,
+        taxTotal: dto.reportTaxTotal ?? null,
+        total: dto.reportTotal ?? null,
+        currencyCode: dto.currencyCode ?? null,
       };
-      invoiceStore.set(invoiceId, errorMetadata);
+      await this.persist(errorMetadata);
 
       throw error;
     }
@@ -140,26 +211,13 @@ export class InvoiceService {
   async getInvoiceByOrderCode(orderCode: string): Promise<InvoiceResponseDto | null> {
     logger.info('Getting invoice by order code', { orderCode });
 
-    const invoice = Array.from(invoiceStore.values()).find(
-      (inv) => inv.orderCode === orderCode
-    );
+    const invoice = await this.findBestByOrderCode(orderCode);
 
     if (!invoice) {
       return null;
     }
 
-    return {
-      id: invoice.id,
-      orderCode: invoice.orderCode,
-      status: invoice.status,
-      matiasInvoiceId: `${invoice.prefix}-${invoice.documentNumber}`,
-      matiasInvoiceNumber: `${invoice.prefix}${invoice.documentNumber}`,
-      cufe: invoice.cufe,
-      pdfUrl: invoice.pdfUrl,
-      xmlUrl: invoice.xmlUrl,
-      issuedAt: invoice.issuedAt,
-      error: invoice.error,
-    };
+    return this.toResponseDto(invoice);
   }
 
   /**
@@ -168,32 +226,26 @@ export class InvoiceService {
   async getInvoiceStatus(invoiceId: string): Promise<InvoiceStatusDto> {
     logger.info('Getting invoice status', { invoiceId });
 
-    const invoice = invoiceStore.get(invoiceId);
+    const invoice = await this.getById(invoiceId);
 
     if (!invoice) {
       throw new Error(`Invoice not found: ${invoiceId}`);
     }
 
-    // Si hay prefijo y número, obtener estado actualizado de Matias
     if (invoice.prefix && invoice.documentNumber) {
       try {
         const matiasResponse = await this.matiasApi.getInvoice(invoice.prefix, invoice.documentNumber);
-        
-        // Actualizar metadata local
+
         if (matiasResponse.response?.IsValid === 'true') {
           invoice.status = InvoiceStatus.ISSUED;
         }
         invoice.cufe = matiasResponse.XmlDocumentKey || invoice.cufe;
         invoice.pdfUrl = matiasResponse.pdf?.url || invoice.pdfUrl;
         invoice.xmlUrl = matiasResponse.AttachedDocument?.url || invoice.xmlUrl;
-        
-        invoiceStore.set(invoiceId, invoice);
+
+        await this.persistUpdate(invoice);
       } catch (error: any) {
-        logger.warn('Could not fetch updated status from Matias:', {
-          message: error?.message,
-          stack: error?.stack,
-        });
-        // Continuar con el estado local
+        logger.warn('Could not fetch updated status from Matias:', error);
       }
     }
 
@@ -214,7 +266,7 @@ export class InvoiceService {
   async resendInvoice(invoiceId: string, email?: string): Promise<InvoiceResponseDto> {
     logger.info('Resending invoice', { invoiceId, email });
 
-    const invoice = invoiceStore.get(invoiceId);
+    const invoice = await this.getById(invoiceId);
 
     if (!invoice) {
       throw new Error(`Invoice not found: ${invoiceId}`);
@@ -231,23 +283,9 @@ export class InvoiceService {
 
       logger.info('Invoice resent successfully', { invoiceId });
 
-      return {
-        id: invoice.id,
-        orderCode: invoice.orderCode,
-        status: invoice.status,
-        matiasInvoiceId: `${invoice.prefix}-${invoice.documentNumber}`,
-        matiasInvoiceNumber: `${invoice.prefix}${invoice.documentNumber}`,
-        cufe: invoice.cufe,
-        pdfUrl: invoice.pdfUrl,
-        xmlUrl: invoice.xmlUrl,
-        issuedAt: invoice.issuedAt,
-        message: 'Invoice resent successfully',
-      };
+      return this.toResponseDto(invoice, 'Invoice resent successfully');
     } catch (error: any) {
-      logger.error('Error resending invoice:', {
-        message: error?.message,
-        stack: error?.stack,
-      });
+      logger.error('Error resending invoice:', error);
       throw error;
     }
   }

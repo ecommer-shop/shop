@@ -1,4 +1,5 @@
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
+import { LanguageCode } from '@vendure/core';
 import { dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
@@ -14,6 +15,14 @@ function patchVendureDashboardChannelPermissions() {
         transform(code: string, id: string) {
             const normalizedId = id.replace(/\\/g, '/');
             let nextCode = code;
+
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/shared/boolean-badge.tsx')) {
+                nextCode = nextCode
+                    .replace(/id:\s*['"]CM5TXb['"]/g, 'id: "RxzN1M"')
+                    .replace(/id:\s*['"]77Ufuv['"]/g, 'id: "E/QGRL"')
+                    .replace(/id="CM5TXb"/g, 'id="RxzN1M"')
+                    .replace(/id="77Ufuv"/g, 'id="E/QGRL"');
+            }
 
             if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/channel-switcher.tsx')) {
                 if (!nextCode.includes("import { usePermissions } from '@/vdb/hooks/use-permissions.js';")) {
@@ -65,6 +74,212 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/payment-methods_.$id.tsx')) {
+                if (!nextCode.includes("import { EntityAssets } from '@/vdb/components/shared/entity-assets.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { EntityAssets } from '@/vdb/components/shared/entity-assets.js';",
+                    );
+                }
+                if (!nextCode.includes("import { Field } from '@/vdb/components/ui/field.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { Button } from '@/vdb/components/ui/button.js';",
+                        "import { Button } from '@/vdb/components/ui/button.js';\nimport { Field } from '@/vdb/components/ui/field.js';",
+                    );
+                }
+
+                nextCode = nextCode.replace(
+                    `        transformCreateInput: input => {
+            return {
+                ...input,
+                checker: input.checker?.code ? input.checker : undefined,
+                handler: input.handler,
+            };
+        },`,
+                    `        transformCreateInput: input => {
+            return {
+                ...input,
+                code:
+                    input.code?.trim() ||
+                    (input.name ?? '')
+                        .toLowerCase()
+                        .trim()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, ''),
+                checker: input.checker?.code ? input.checker : undefined,
+                handler: input.handler?.code ? input.handler : undefined,
+            };
+        },`,
+                );
+                nextCode = nextCode.replace(
+                    `                    description: err instanceof Error ? err.message : 'Unknown error',`,
+                    `                    description:
+                        err instanceof Error &&
+                        (err.message.includes('ConfigurableOperationInput!') ||
+                            err.message.includes('PaymentMethodHandler'))
+                            ? 'Debes seleccionar un método de procesamiento de pago (Calculator) antes de crear el método de pago.'
+                            : err instanceof Error
+                              ? err.message
+                              : 'Error desconocido',`,
+                );
+
+                nextCode = nextCode.replace(
+                    `                        <FormFieldWrapper
+                            control={form.control}
+                            name="code"
+                            label={<Trans>Code</Trans>}
+                            render={({ field }) => <Input {...field} />}
+                        />`,
+                    '',
+                );
+                nextCode = nextCode.replace(
+                    `                        <TranslatableFormFieldWrapper
+                            control={form.control}
+                            name="name"
+                            label={<Trans>Name</Trans>}
+                            render={({ field }) => <Input {...field} />}
+                        />`,
+                    `                        <TranslatableFormFieldWrapper
+                            control={form.control}
+                            name="name"
+                            label="Nombre"
+                            render={({ field }) => <Input {...field} />}
+                        />`,
+                );
+                nextCode = nextCode.replace(
+                    `                        label={<Trans>Enabled</Trans>}`,
+                    `                        label="Habilitado"`,
+                );
+                nextCode = nextCode.replace(
+                    `                    <TranslatableFormFieldWrapper
+                        control={form.control}
+                        name="description"
+                        label={<Trans>Description</Trans>}
+                        render={({ field }) => <RichTextInput {...field} />}
+                    />`,
+                    '',
+                );
+                nextCode = nextCode.replace(
+                    `<CustomFieldsPageBlock column="main" entityType="PaymentMethod" control={form.control} />`,
+                    `<PageBlock
+                    column="main"
+                    blockId="bank-certification-pdf"
+                    title="Carga tu certificado bancario"
+                >
+                    <Field>
+                        <EntityAssets
+                            compact={true}
+                            multiSelect={false}
+                            onChange={value => {
+                                form.setValue('customFields.bankCertificationPdf', value.featuredAssetId ?? undefined, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                });
+                            }}
+                        />
+                    </Field>
+                </PageBlock>
+                <PageBlock column="main" blockId="payment-method-bank-fields" title="Datos bancarios">
+                    <DetailFormGrid>
+                        <FormFieldWrapper
+                            control={form.control}
+                            name="customFields.accountNumber"
+                            label="Número de cuenta"
+                            render={({ field }) => <Input {...field} />}
+                        />
+                        <FormFieldWrapper
+                            control={form.control}
+                            name="customFields.bankName"
+                            label="Banco"
+                            render={({ field }) => <Input {...field} />}
+                        />
+                    </DetailFormGrid>
+                    <FormFieldWrapper
+                        control={form.control}
+                        name="customFields.bankCertificationVerified"
+                        label="Certificación bancaria verificada"
+                        render={({ field }) => (
+                            <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
+                        )}
+                    />
+                </PageBlock>`,
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Payment eligibility checker</Trans>}',
+                    "title={'Verificador de elegibilidad de pago'}",
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Calculator</Trans>}',
+                    "title={'Calculadora'}",
+                );
+            }
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/components/payment-eligibility-checker-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Payment Eligibility Checker"',
+                    `buttonText="Seleccionar verificador de elegibilidad de pago"`,
+                );
+                nextCode = nextCode.replace(
+                    'emptyText="No checkers found"',
+                    `emptyText="No se encontraron verificadores"`,
+                );
+            }
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/components/payment-handler-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Payment Handler"',
+                    `buttonText="Seleccionar método de pago (Calculadora)"`,
+                );
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_products/components/add-product-variant-dialog.tsx',
+                )
+            ) {
+                if (!nextCode.includes('const generateVariantSku = () =>')) {
+                    nextCode = nextCode.replace(
+                        'type FormValues = z.infer<typeof formSchema>;\n',
+                        `type FormValues = z.infer<typeof formSchema>;\n\nconst generateVariantSku = () => {\n    const bytes = new Uint8Array(6);\n    globalThis.crypto.getRandomValues(bytes);\n    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');\n};\n`,
+                    );
+                }
+
+                nextCode = nextCode.replace(
+                    `    useEffect(() => {\n        if (open && productData?.product) {\n            checkForDuplicateVariant(form.getValues());\n        }\n    }, [open, productData?.product, checkForDuplicateVariant, form]);`,
+                    `    useEffect(() => {\n        if (open && productData?.product) {\n            checkForDuplicateVariant(form.getValues());\n            form.setValue('sku', generateVariantSku(), {\n                shouldDirty: true,\n                shouldValidate: true,\n            });\n        }\n    }, [open, productData?.product, checkForDuplicateVariant, form]);`,
+                );
+
+                nextCode = nextCode.replace(
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className="cursor-not-allowed bg-muted" />\n                            )}\n                        />`,
+                );
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_product-variants/product-variants_.$id.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className=\"cursor-not-allowed bg-muted\" />\n                            )}\n                        />`,
+                )
+            }
+
+            // Cambiar la moneda por defecto del preview en el diálogo de idioma de USD a COP
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/language-dialog')) {
+                nextCode = nextCode.replace(
+                    `useState<string>('USD')`,
+                    `useState<string>('COP')`,
+                );
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };
@@ -74,7 +289,7 @@ export default defineConfig({
     base: '/dashboard',
     build: {
         outDir: `${__dirname}/dist/dashboard`,
-        emptyOutDir: false,  // Evita borrar el backend compilado, ponerlo en true si falla
+        emptyOutDir: true,
     },
     plugins: [
         patchVendureDashboardChannelPermissions(),
@@ -96,6 +311,10 @@ export default defineConfig({
             // These types can be used in your dashboard extensions to provide
             // type safety when writing queries and mutations.
             gqlOutputPath: './src/gql',
+            i18n: {
+                defaultLanguage: (process.env.DASHBOARD_DEFAULT_LANGUAGE as LanguageCode) ?? LanguageCode.es,
+                defaultLocale: process.env.DASHBOARD_DEFAULT_LOCALE ?? 'CO',
+            },
             // ─── Ecommer brand palette ───────────────────────────────────────
             // #12123F Deadly Depths     → hsl(240 56% 16%)
             // #9969F8 Candy Grape Fizz  → hsl(260 91% 69%)
@@ -204,6 +423,28 @@ export default defineConfig({
                     `<meta charset="UTF-8" />
     <title>Ecommer | Admin</title>
     <script>
+      // Establecer idioma/locale por defecto para nuevos usuarios (sin settings guardados)
+      (function() {
+        try {
+          var key = 'vendure-user-settings';
+          if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify({
+              displayLanguage: 'es',
+              displayLocale: 'CO',
+              contentLanguage: 'es',
+              theme: 'system',
+              displayUiExtensionPoints: false,
+              mainNavExpanded: true,
+              activeChannelId: '',
+              devMode: false,
+              hasSeenOnboarding: false,
+              tableSettings: {}
+            }));
+          }
+        } catch(e) {}
+      })();
+    </script>
+    <script>
       // Mantener título personalizado aunque el JS de Vendure lo sobreescriba
       Object.defineProperty(document, 'title', {
         set: function(val) {
@@ -216,24 +457,39 @@ export default defineConfig({
       });
     </script>
     <script>
-      // Cerrar sidebar móvil al hacer click en item de navegación
-      document.addEventListener('click', function(e) {
-        const target = e.target;
-        const menuButton = target.closest('[data-sidebar="menu-button"]');
-        const menuSubButton = target.closest('[data-sidebar="menu-sub-button"]');
+        document.addEventListener('click', function(e) {
+            const target = e.target;
+            const menuButton = target.closest('[data-sidebar="menu-button"]');
+            const menuSubButton = target.closest('[data-sidebar="menu-sub-button"]');
+            
+            if (!menuButton && !menuSubButton) return;
+            
+            const activeEl = menuButton || menuSubButton;
+            const isCollapsibleTrigger = activeEl.getAttribute('data-slot') === 'collapsible-trigger';
+            const isDropdownTrigger = activeEl.getAttribute('data-slot') === 'dropdown-menu-trigger';
+            
+            if (!isCollapsibleTrigger && !isDropdownTrigger) {
+            setTimeout(function() {
+                const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+                if (closeBtn) closeBtn.click();
+            }, 50);
+            }
+        }, true);
         
-        if (!menuButton && !menuSubButton) return;
-        
-        const activeEl = menuButton || menuSubButton;
-        const isCollapsibleTrigger = activeEl.getAttribute('data-slot') === 'collapsible-trigger';
-        
-        if (!isCollapsibleTrigger) {
+        // Cerrar sidebar al tocar item dentro de un dropdown
+        document.addEventListener('click', function(e) {
+          const target = e.target;
+          const dropdownItem = target.closest(
+            '[data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-radio-item"]'
+          );
+          
+          if (!dropdownItem) return;
+          
           setTimeout(function() {
             const closeBtn = document.querySelector('button.absolute.top-4.right-4');
             if (closeBtn) closeBtn.click();
-          }, 50);
-        }
-      }, true);
+          }, 100);
+        }, true);
     </script>
     <style>
       /* Fix: ancho de app en móvil */
@@ -249,6 +505,19 @@ export default defineConfig({
           width: 100% !important;
           min-width: 0 !important;
         }
+      }
+
+      /* Ocultar formulario nativo de Vendure condicionalmente */
+      body.hide-native-login form > div:not([class*="max-w-sm"]),
+      body.hide-native-login form [data-slot="separator"],
+      body.hide-native-login form [data-slot="separator-root"],
+      body.hide-native-login form [name="username"],
+      body.hide-native-login form [name="password"],
+      body.hide-native-login form [type="submit"],
+      body.hide-native-login form h1,
+      body.hide-native-login form > div:not([class*="max-w-sm"]) p.text-muted-foreground,
+      body.hide-native-login form [data-slot="input-group"] {
+          display: none !important;
       }
     </style>`
                 );

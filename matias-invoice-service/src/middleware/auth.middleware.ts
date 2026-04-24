@@ -8,8 +8,8 @@ import logger from '@/utils/logger';
 export function authenticateRequest(request: NextRequest): { authenticated: boolean; error?: string } {
   const apiKey = request.headers.get('X-API-Key');
 
-  if (!apiKey || !apiKey.trim()) {
-    logger.warn('Request missing or empty API key', {
+  if (!apiKey) {
+    logger.warn('Request missing API key', {
       path: request.nextUrl.pathname,
       method: request.method,
     });
