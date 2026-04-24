@@ -271,7 +271,7 @@ export default defineConfig({
             gqlOutputPath: './src/gql',
             i18n: {
                 defaultLanguage: (process.env.DASHBOARD_DEFAULT_LANGUAGE as LanguageCode) ?? LanguageCode.es,
-                defaultLocale: process.env.DASHBOARD_DEFAULT_LOCALE ?? 'es-CO',
+                defaultLocale: process.env.DASHBOARD_DEFAULT_LOCALE ?? 'CO',
             },
             // ─── Ecommer brand palette ───────────────────────────────────────
             // #12123F Deadly Depths     → hsl(240 56% 16%)
@@ -380,6 +380,28 @@ export default defineConfig({
                     '<meta charset="UTF-8" />',
                     `<meta charset="UTF-8" />
     <title>Ecommer | Admin</title>
+    <script>
+      // Establecer idioma/locale por defecto para nuevos usuarios (sin settings guardados)
+      (function() {
+        try {
+          var key = 'vendure-user-settings';
+          if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify({
+              displayLanguage: 'es',
+              displayLocale: 'CO',
+              contentLanguage: 'es',
+              theme: 'system',
+              displayUiExtensionPoints: false,
+              mainNavExpanded: true,
+              activeChannelId: '',
+              devMode: false,
+              hasSeenOnboarding: false,
+              tableSettings: {}
+            }));
+          }
+        } catch(e) {}
+      })();
+    </script>
     <script>
       // Mantener título personalizado aunque el JS de Vendure lo sobreescriba
       Object.defineProperty(document, 'title', {
