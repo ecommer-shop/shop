@@ -238,6 +238,40 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_products/components/add-product-variant-dialog.tsx',
+                )
+            ) {
+                if (!nextCode.includes('const generateVariantSku = () =>')) {
+                    nextCode = nextCode.replace(
+                        'type FormValues = z.infer<typeof formSchema>;\n',
+                        `type FormValues = z.infer<typeof formSchema>;\n\nconst generateVariantSku = () => {\n    const bytes = new Uint8Array(6);\n    globalThis.crypto.getRandomValues(bytes);\n    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');\n};\n`,
+                    );
+                }
+
+                nextCode = nextCode.replace(
+                    `    useEffect(() => {\n        if (open && productData?.product) {\n            checkForDuplicateVariant(form.getValues());\n        }\n    }, [open, productData?.product, checkForDuplicateVariant, form]);`,
+                    `    useEffect(() => {\n        if (open && productData?.product) {\n            checkForDuplicateVariant(form.getValues());\n            form.setValue('sku', generateVariantSku(), {\n                shouldDirty: true,\n                shouldValidate: true,\n            });\n        }\n    }, [open, productData?.product, checkForDuplicateVariant, form]);`,
+                );
+
+                nextCode = nextCode.replace(
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className="cursor-not-allowed bg-muted" />\n                            )}\n                        />`,
+                );
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_product-variants/product-variants_.$id.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className=\"cursor-not-allowed bg-muted\" />\n                            )}\n                        />`,
+                )
+            }
+
             // Cambiar la moneda por defecto del preview en el diálogo de idioma de USD a COP
             if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/language-dialog')) {
                 nextCode = nextCode.replace(
