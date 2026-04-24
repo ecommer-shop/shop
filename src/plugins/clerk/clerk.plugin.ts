@@ -1,5 +1,5 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
-import { ClerkAuthenticationStrategy } from './auth0.strategy';
+import { ClerkAuthenticationStrategy } from './clerk.strategy';
 import { AuthorizationService } from './services/auth.service';
 import { ExternalAuthService } from './services/external-auth.service';
 import { DeleteCustomerService } from './services/delete-customer.service';

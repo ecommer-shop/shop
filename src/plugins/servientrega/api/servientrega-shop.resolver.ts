@@ -3,7 +3,6 @@ import { Allow, Ctx, RequestContext, User, TransactionalConnection, AuthService 
 import { Permission } from '@vendure/common/lib/generated-types';
 import { forwardRef, Inject, Injectable, UseGuards } from '@nestjs/common';
 import { Servientrega } from '../services/servientrega';
-import { AuthorizationService } from '../../auth0/services/auth.service';
 
 @Injectable()
 @Resolver()
