@@ -1,6 +1,6 @@
 import type { VendureConfig } from '@vendure/core';
 import type { Request, Response, NextFunction } from 'express';
-import { ROUTE } from '../consts';
+import { ROUTE } from '../constants';
 import { IS_DEV, serverPort } from './environment';
 
 export const apiOptions: VendureConfig['apiOptions'] = {

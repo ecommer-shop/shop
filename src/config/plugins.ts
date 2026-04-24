@@ -21,11 +21,11 @@ import {
   configureS3AssetStorage,
 } from '@vendure/asset-server-plugin';
 
-import { ROUTE, ROUTE_STORE } from '../consts';
+import { ROUTE, ROUTE_STORE } from '../constants';
 import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
 import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
-import { CURRENCY } from '../plugins/payment/constants';
+import { CURRENCY, METRICS_DISPLAY_PAST_MONTHS } from '../plugins/payment/constants';
 import { ClerkPlugin } from '../plugins/auth0/auth0.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
 //import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
@@ -44,11 +44,13 @@ import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
 import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.plugin';
 import { MetricsPlugin } from '@pinelab/vendure-plugin-metrics';
+import { IngresosPorProducto, ValorPromedioDeOrden, UnidadesVendidas } from './metrics-es';
 import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
 import { LoginPlugin } from '../plugins/login/login.plugin';
 import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
 import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
 import { StorePagePlugin } from '../plugins/store-page/store-page.plugin';
+import { AutoSkuPlugin } from '../plugins/auto-sku/auto-sku.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -94,6 +96,8 @@ const emailPlugin = EmailPlugin.init({
 
 
 export const plugins: VendureConfig['plugins'] = [
+  AutoSkuPlugin,
+
   MultivendorPlugin.init({
     platformFeePercent: 10,
     platformFeeSKU: "FEE"
@@ -154,7 +158,12 @@ export const plugins: VendureConfig['plugins'] = [
   }),
 
   MetricsPlugin.init({
-    displayPastMonths: 13,
+    displayPastMonths: METRICS_DISPLAY_PAST_MONTHS,
+    metrics: [
+      new IngresosPorProducto(),
+      new ValorPromedioDeOrden(),
+      new UnidadesVendidas(),
+    ],
   }),
 
   MetricsDashboardPlugin.init(),
@@ -163,3 +172,4 @@ export const plugins: VendureConfig['plugins'] = [
     googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
   }),
 ];
+
