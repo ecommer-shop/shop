@@ -238,6 +238,14 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            // Cambiar la moneda por defecto del preview en el diálogo de idioma de USD a COP
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/language-dialog')) {
+                nextCode = nextCode.replace(
+                    `useState<string>('USD')`,
+                    `useState<string>('COP')`,
+                );
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };
