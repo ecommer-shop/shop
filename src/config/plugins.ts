@@ -6,10 +6,8 @@ import {
   DefaultJobQueuePlugin,
   DefaultSchedulerPlugin,
   DefaultSearchPlugin,
-  LanguageCode,
-  Role,
 } from '@vendure/core';
-import { AdminUiPlugin } from '@vendure/admin-ui-plugin';
+
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import {
   defaultEmailHandlers,
@@ -26,15 +24,14 @@ import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
 import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
 import { CURRENCY, METRICS_DISPLAY_PAST_MONTHS } from '../plugins/payment/constants';
-import { ClerkPlugin } from '../plugins/auth0/auth0.plugin';
+import { ClerkPlugin } from '../plugins/clerk/clerk.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
-//import { PaymentMercadopagoPlugin } from '../plugins/payment-mercadopago/payment-mercadopago.plugin';
+
 import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
 import { InvoiceClientPlugin } from '../plugins/invoice-client/invoice-client.plugin';
 import { ResendEmailSender } from './mail/resend-email-sender';
 import {
   IS_DEV,
-  serverPort,
   staticDir,
   storeUrl,
   assetUploadDir,
@@ -49,6 +46,8 @@ import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
 import { LoginPlugin } from '../plugins/login/login.plugin';
 import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
 import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
+import { StorePagePlugin } from '../plugins/store-page/store-page.plugin';
+import { AutoSkuPlugin } from '../plugins/auto-sku/auto-sku.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -94,6 +93,8 @@ const emailPlugin = EmailPlugin.init({
 
 
 export const plugins: VendureConfig['plugins'] = [
+  AutoSkuPlugin,
+
   MultivendorPlugin.init({
     platformFeePercent: 10,
     platformFeeSKU: "FEE"
@@ -111,16 +112,6 @@ export const plugins: VendureConfig['plugins'] = [
 
   emailPlugin,
 
-  AdminUiPlugin.init({
-    route: ROUTE.Admin,
-    port: serverPort + 2,
-    adminUiConfig: {
-      defaultLanguage: LanguageCode.es,
-      defaultLocale: 'es-CO',
-    },
-  }),
-
-
   DashboardPlugin.init({
     route: ROUTE.Dashboard,
     appDir: './dist/dashboard',
@@ -128,6 +119,7 @@ export const plugins: VendureConfig['plugins'] = [
 
   CoinbasePlugin,
   ReviewsPlugin,
+  StorePagePlugin,
   AiChatPlugin,
 
   PaymentPlugin.init({
@@ -155,9 +147,9 @@ export const plugins: VendureConfig['plugins'] = [
   MetricsPlugin.init({
     displayPastMonths: METRICS_DISPLAY_PAST_MONTHS,
     metrics: [
-        new IngresosPorProducto(),
-        new ValorPromedioDeOrden(),
-        new UnidadesVendidas(),
+      new IngresosPorProducto(),
+      new ValorPromedioDeOrden(),
+      new UnidadesVendidas(),
     ],
   }),
 

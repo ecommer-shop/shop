@@ -238,6 +238,48 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_products/components/add-product-variant-dialog.tsx',
+                )
+            ) {
+                if (!nextCode.includes('const generateVariantSku = () =>')) {
+                    nextCode = nextCode.replace(
+                        'type FormValues = z.infer<typeof formSchema>;\n',
+                        `type FormValues = z.infer<typeof formSchema>;\n\nconst generateVariantSku = () => {\n    const bytes = new Uint8Array(6);\n    globalThis.crypto.getRandomValues(bytes);\n    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');\n};\n`,
+                    );
+                }
+
+                nextCode = nextCode.replace(
+                    `    useEffect(() => {\n        if (open && productData?.product) {\n            checkForDuplicateVariant(form.getValues());\n        }\n    }, [open, productData?.product, checkForDuplicateVariant, form]);`,
+                    `    useEffect(() => {\n        if (open && productData?.product) {\n            checkForDuplicateVariant(form.getValues());\n            form.setValue('sku', generateVariantSku(), {\n                shouldDirty: true,\n                shouldValidate: true,\n            });\n        }\n    }, [open, productData?.product, checkForDuplicateVariant, form]);`,
+                );
+
+                nextCode = nextCode.replace(
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className="cursor-not-allowed bg-muted" />\n                            )}\n                        />`,
+                );
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_product-variants/product-variants_.$id.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className=\"cursor-not-allowed bg-muted\" />\n                            )}\n                        />`,
+                )
+            }
+
+            // Cambiar la moneda por defecto del preview en el diálogo de idioma de USD a COP
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/language-dialog')) {
+                nextCode = nextCode.replace(
+                    `useState<string>('USD')`,
+                    `useState<string>('COP')`,
+                );
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };
@@ -269,14 +311,9 @@ export default defineConfig({
             // These types can be used in your dashboard extensions to provide
             // type safety when writing queries and mutations.
             gqlOutputPath: './src/gql',
-            // Configuración de idioma y región para el panel de administración.
-            // Controla el idioma y formato de fechas/monedas que ven los usuarios
-            // cuando acceden por primera vez. Configurable vía variables de entorno.
             i18n: {
                 defaultLanguage: (process.env.DASHBOARD_DEFAULT_LANGUAGE as LanguageCode) ?? LanguageCode.es,
-                defaultLocale: process.env.DASHBOARD_DEFAULT_LOCALE ?? 'es-CO',
-                availableLanguages: [LanguageCode.es, LanguageCode.en],
-                availableLocales: ['es-CO', 'en-US'],
+                defaultLocale: process.env.DASHBOARD_DEFAULT_LOCALE ?? 'CO',
             },
             // ─── Ecommer brand palette ───────────────────────────────────────
             // #12123F Deadly Depths     → hsl(240 56% 16%)
@@ -385,6 +422,28 @@ export default defineConfig({
                     '<meta charset="UTF-8" />',
                     `<meta charset="UTF-8" />
     <title>Ecommer | Admin</title>
+    <script>
+      // Establecer idioma/locale por defecto para nuevos usuarios (sin settings guardados)
+      (function() {
+        try {
+          var key = 'vendure-user-settings';
+          if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify({
+              displayLanguage: 'es',
+              displayLocale: 'CO',
+              contentLanguage: 'es',
+              theme: 'system',
+              displayUiExtensionPoints: false,
+              mainNavExpanded: true,
+              activeChannelId: '',
+              devMode: false,
+              hasSeenOnboarding: false,
+              tableSettings: {}
+            }));
+          }
+        } catch(e) {}
+      })();
+    </script>
     <script>
       // Mantener título personalizado aunque el JS de Vendure lo sobreescriba
       Object.defineProperty(document, 'title', {

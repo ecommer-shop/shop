@@ -1,5 +1,5 @@
 import { DashboardRouteDefinition, defineDashboardExtension } from '@vendure/dashboard';
-import MetricsWrapper from './MetricsWrapper';
+import { AdvancedMetricsWidget } from './advanced-metrics-widget';
 import { MetricsDetailPage } from './metrics-detail';
 
 const metricsDetailRoute: DashboardRouteDefinition = {
@@ -20,7 +20,7 @@ export default defineDashboardExtension({
         {
             id: 'advanced-metrics',
             name: 'Métricas avanzadas',
-            component: MetricsWrapper,
+            component: AdvancedMetricsWidget,
             defaultSize: { w: 6, h: 3 },
             minSize: { w: 3, h: 3 },
             maxSize: { w: 6, h: 6 },
