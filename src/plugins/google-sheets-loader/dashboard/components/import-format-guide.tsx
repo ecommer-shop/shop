@@ -47,9 +47,9 @@ const FIELD_SPECS: FieldSpec[] = [
 const TEMPLATE_HEADERS = ['sku', 'name', 'description', 'price', 'stock'];
 const MACRO_TEMPLATE_URL = 'https://ecommer-assets.s3.us-east-2.amazonaws.com/plantilla-carga-de-productos-ecommer.xlsm';
 const EXAMPLE_IMAGE_DRIVE_URL =
-    'https://drive.google.com/file/d/1ggCQgy8SlepWhM9WQiSnLn12QFiOHgi2/view?usp=sharing';
+    'https://ecommer-assets.s3.us-east-2.amazonaws.com/ejemplo-carga-products.png';
 const EXAMPLE_IMAGE_URL =
-    'https://drive.google.com/thumbnail?id=1ggCQgy8SlepWhM9WQiSnLn12QFiOHgi2&sz=w2000';
+    'https://ecommer-assets.s3.us-east-2.amazonaws.com/ejemplo-carga-products.png';
 
 const TEMPLATE_ROWS = [
     {
@@ -82,7 +82,9 @@ export function ImportFormatGuide() {
         link.rel = 'noopener noreferrer';
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        if (link.parentNode === document.body) {
+            document.body.removeChild(link);
+        }
     };
 
     const handleTemplateDownload = async () => {
