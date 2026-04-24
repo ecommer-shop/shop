@@ -1,4 +1,5 @@
 import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
+import { LanguageCode } from '@vendure/core';
 import { dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
@@ -237,6 +238,14 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            // Cambiar la moneda por defecto del preview en el diálogo de idioma de USD a COP
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/language-dialog')) {
+                nextCode = nextCode.replace(
+                    `useState<string>('USD')`,
+                    `useState<string>('COP')`,
+                );
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };
@@ -268,6 +277,10 @@ export default defineConfig({
             // These types can be used in your dashboard extensions to provide
             // type safety when writing queries and mutations.
             gqlOutputPath: './src/gql',
+            i18n: {
+                defaultLanguage: (process.env.DASHBOARD_DEFAULT_LANGUAGE as LanguageCode) ?? LanguageCode.es,
+                defaultLocale: process.env.DASHBOARD_DEFAULT_LOCALE ?? 'CO',
+            },
             // ─── Ecommer brand palette ───────────────────────────────────────
             // #12123F Deadly Depths     → hsl(240 56% 16%)
             // #9969F8 Candy Grape Fizz  → hsl(260 91% 69%)
@@ -375,6 +388,28 @@ export default defineConfig({
                     '<meta charset="UTF-8" />',
                     `<meta charset="UTF-8" />
     <title>Ecommer | Admin</title>
+    <script>
+      // Establecer idioma/locale por defecto para nuevos usuarios (sin settings guardados)
+      (function() {
+        try {
+          var key = 'vendure-user-settings';
+          if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify({
+              displayLanguage: 'es',
+              displayLocale: 'CO',
+              contentLanguage: 'es',
+              theme: 'system',
+              displayUiExtensionPoints: false,
+              mainNavExpanded: true,
+              activeChannelId: '',
+              devMode: false,
+              hasSeenOnboarding: false,
+              tableSettings: {}
+            }));
+          }
+        } catch(e) {}
+      })();
+    </script>
     <script>
       // Mantener título personalizado aunque el JS de Vendure lo sobreescriba
       Object.defineProperty(document, 'title', {
