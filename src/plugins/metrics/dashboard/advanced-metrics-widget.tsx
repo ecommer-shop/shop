@@ -133,7 +133,8 @@ export function AdvancedMetricsWidget() {
                             />
                             <XAxis
                                 dataKey="name"
-                                tick={{ fontSize: 12 }}
+                                tick={{ fontSize: 12, angle: -45, dy: 12 }}
+                                interval={0}
                                 className="fill-muted-foreground"
                             />
                             <YAxis

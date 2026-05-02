@@ -499,13 +499,34 @@ export default defineConfig({
         width: 100%;
       }
 
-      /* Fix: sidebar-inset no desborde en móvil */
-      @media (max-width: 768px) {
-        [data-slot="sidebar-inset"] {
-          width: 100% !important;
-          min-width: 0 !important;
-        }
-      }
+            /* Fix: sidebar-inset no desborde en móvil */
+            @media (max-width: 768px) {
+                [data-slot="sidebar-inset"] {
+                    width: 100% !important;
+                    min-width: 0 !important;
+                }
+            }
+
+            /* Sticky header */
+            [data-slot="sidebar-inset"] > header,
+            main > header {
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                background: var(--background, #fff);
+            }
+
+            /* --- Vendure Dashboard: Fix superposición de labels en gráficos métricas home --- */
+            /* Recharts XAxis tick labels: rotar y ajustar en displays pequeños */
+            @media (max-width: 768px) {
+                .recharts-xAxis .recharts-cartesian-axis-tick-value {
+                    transform-box: fill-box;
+                    transform-origin: right center;
+                    transform: rotate(-45deg);
+                    text-anchor: end !important;
+                    font-size: 10px;
+                }
+            }
 
       /* Ocultar formulario nativo de Vendure condicionalmente */
       body.hide-native-login form > div:not([class*="max-w-sm"]),
