@@ -507,13 +507,24 @@ export default defineConfig({
                 }
             }
 
-            /* Sticky header */
-            [data-slot="sidebar-inset"] > header,
-            main > header {
-                position: sticky;
-                top: 0;
-                z-index: 100;
-                background: var(--background, #fff);
+            /* Sticky header - solo en displays pequeños */
+            @media (max-width: 768px) {
+                [data-slot="sidebar-inset"] {
+                    display: flex;
+                    flex-direction: column;
+                    overflow-y: auto;
+                    max-height: 100vh;
+                }
+
+                [data-slot="sidebar-inset"] header,
+                main header {
+                    position: sticky;
+                    top: 0;
+                    z-index: 100;
+                    background: var(--background, #fff);
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                    flex-shrink: 0;
+                }
             }
 
             /* --- Vendure Dashboard: Fix superposición de labels en gráficos métricas home --- */
