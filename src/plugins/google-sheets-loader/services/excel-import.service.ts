@@ -76,14 +76,11 @@ export class ExcelImportService {
         let primaryStockLocation = null;
 
         if (channel.stockLocations && channel.stockLocations.length > 0) {
+            // Usa el stock location que tenga asignado el channel, si tiene varios, usa el primero
             primaryStockLocation = channel.stockLocations[0];
-            this.logger.log(`Using channel-assigned stock location: ${primaryStockLocation.name} (ID: ${primaryStockLocation.id})`);
         } else {
             // Si el channel no tiene stock locations asignadas, usar el primero disponible
             primaryStockLocation = stockLocations.items[0];
-            this.logger.warn(
-                `Channel ${channel.code} has no assigned stock locations. Using the first available: ${primaryStockLocation.name} (ID: ${primaryStockLocation.id})`
-            );
         }
 
         const primaryStockLocationId = primaryStockLocation.id;
