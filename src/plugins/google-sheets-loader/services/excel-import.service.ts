@@ -54,6 +54,8 @@ export class ExcelImportService {
 
         // Obtener el channel actual y sus stock locations
         const channel = adminCtx.channel;
+        const currencyCode = channel.defaultCurrencyCode;
+        this.logger.log(`Using currency: ${currencyCode}`);
 
         // Buscar todos los stock locations disponibles
         const stockLocations = await this.stockLocationService.findAll(adminCtx, {
@@ -148,9 +150,10 @@ export class ExcelImportService {
                                 .getRawOne();
 
                             const currentStock = Number(raw.stock);
+                            const priceInCents = Math.round(product.price * 100);
 
                             // Comparar precio y stock
-                            const priceChanged = existingVariant.price !== product.price;
+                            const priceChanged = existingVariant.price !== priceInCents;
                             const stockChanged = currentStock !== product.stock;
 
                             if (!priceChanged && !stockChanged) {
@@ -167,11 +170,11 @@ export class ExcelImportService {
                                 await this.productVariantService.update(adminCtx, [
                                     {
                                         id: existingVariant.id,
-                                        price: product.price,
+                                        price: priceInCents,
                                     },
                                 ]);
                                 this.logger.log(
-                                    `Updated price for SKU ${product.sku}: ${product.price}`,
+                                    `Updated price for SKU ${product.sku}: ${product.price} ${currencyCode}`,
                                 );
                             }
 
@@ -214,6 +217,7 @@ export class ExcelImportService {
 
                         // No existe, crear
                         const slug = slugify(product.name);
+                        const priceInCents = Math.round(product.price * 100);
 
                         const newProduct =
                             await this.productService.create(
@@ -239,7 +243,7 @@ export class ExcelImportService {
                                 {
                                     productId: newProduct.id,
                                     sku: product.sku,
-                                    price: product.price,
+                                    price: priceInCents,
                                     stockLevels: [
                                         {
                                             stockLocationId: primaryStockLocationId,
@@ -254,7 +258,7 @@ export class ExcelImportService {
 
                         created++;
                         this.logger.log(
-                            `Created new variant SKU ${product.sku} with stock ${product.stock} at location ${primaryStockLocationId}`,
+                            `Created new variant SKU ${product.sku} with price ${product.price} ${currencyCode} and stock ${product.stock} at location ${primaryStockLocationId}`,
                         );
                     } catch (e: any) {
                         failed++;
