@@ -13,8 +13,7 @@ import { dbConnectionOptions } from './config/database';
 import { paymentOptions } from './config/payment-options';
 import { customFields } from './config/custom-fields';
 import { plugins } from './config/plugins';
-import './config/mercadopago.config';
-//import { PaymentMercadopagoPlugin } from './plugins/payment-mercadopago/payment-mercadopago.plugin';
+
 import { catalogOptions } from './config/catalog-options';
 import { ExcelLoaderPlugin } from './plugins/google-sheets-loader/excel-loader.plugin';
 import './config/promotion-translations';

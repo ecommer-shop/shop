@@ -7,7 +7,7 @@ import { IS_DEV } from './environment';
  */
 export const dbConnectionOptions: VendureConfig['dbConnectionOptions'] = {
   type: 'postgres',
-  synchronize: IS_DEV,
+  synchronize: IS_DEV && process.env.NODE_ENV !== 'production',
   logging: false,
   migrations: [path.join(__dirname, '../migrations/*.+(js|ts)')],
 
