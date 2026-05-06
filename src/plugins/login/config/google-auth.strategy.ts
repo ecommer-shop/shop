@@ -12,7 +12,7 @@ import gql from 'graphql-tag';
 import { OAuth2Client } from 'google-auth-library';
 
 import { loggerCtx } from '../constants';
-
+import { SellerOnboardingService } from '../services/seller-onboarding.service';
 export interface GoogleAuthData {
     token: string;
 }
@@ -31,7 +31,7 @@ export class GoogleAdminAuthenticationStrategy
     readonly name = 'google';
     private client: OAuth2Client;
     private connection!: TransactionalConnection;
-
+    private sellerOnboardingService!: SellerOnboardingService;
     constructor(private clientId: string) {
         this.client = new OAuth2Client(clientId);
     }
@@ -46,6 +46,7 @@ export class GoogleAdminAuthenticationStrategy
 
     init(injector: Injector) {
         this.connection = injector.get(TransactionalConnection);
+        this.sellerOnboardingService = injector.get(SellerOnboardingService);
     }
 
     // Extrae el email del token de Google, Primero intenta como ID token
@@ -140,7 +141,12 @@ export class GoogleAdminAuthenticationStrategy
                 );
                 return false;
             }
-
+            await this.sellerOnboardingService.syncAllSellerAdminPermissions(ctx).catch(err => {
+                Logger.error(
+                    `Failed to sync seller admin permissions: ${err instanceof Error ? err.message : err}`,
+                    loggerCtx,
+                );
+            });
             Logger.info(`Google auth successful for: ${email}`, loggerCtx);
             return user;
         } catch (error) {

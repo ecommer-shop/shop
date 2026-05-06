@@ -257,7 +257,7 @@ function patchVendureDashboardChannelPermissions() {
 
                 nextCode = nextCode.replace(
                     `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
-                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className="cursor-not-allowed bg-muted" />\n                            )}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className="cursor-not-allowed bg-muted" value={field.value?.toUpperCase?.() ?? ''} />\n                            )}\n                        />`,
                 );
             }
 
@@ -268,7 +268,7 @@ function patchVendureDashboardChannelPermissions() {
             ) {
                 nextCode = nextCode.replace(
                     `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
-                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className=\"cursor-not-allowed bg-muted\" />\n                            )}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className="cursor-not-allowed bg-muted" value={field.value?.toUpperCase?.() ?? ''} />\n                            )}\n                        />`,
                 )
             }
 
@@ -331,7 +331,7 @@ export default defineConfig({
                     primary: 'hsl(260 91% 69%)',       // Candy Grape Fizz
                     'primary-foreground': 'hsl(0 0% 100%)',
                     secondary: 'hsl(209 100% 71%)',      // Blue Mana
-                    'secondary-foreground': 'hsl(240 56% 16%)',
+                    'secondary-foreground': 'hsl(240 56% 10%)',
                     muted: 'hsl(260 40% 93%)',
                     'muted-foreground': 'hsl(240 20% 45%)',
                     accent: 'hsl(209 100% 71%)',
@@ -499,13 +499,45 @@ export default defineConfig({
         width: 100%;
       }
 
-      /* Fix: sidebar-inset no desborde en móvil */
-      @media (max-width: 768px) {
-        [data-slot="sidebar-inset"] {
-          width: 100% !important;
-          min-width: 0 !important;
-        }
-      }
+            /* Fix: sidebar-inset no desborde en móvil */
+            @media (max-width: 768px) {
+                [data-slot="sidebar-inset"] {
+                    width: 100% !important;
+                    min-width: 0 !important;
+                }
+            }
+
+            /* Sticky header - solo en displays pequeños */
+            @media (max-width: 768px) {
+                [data-slot="sidebar-inset"] {
+                    display: flex;
+                    flex-direction: column;
+                    overflow-y: auto;
+                    max-height: 100vh;
+                }
+
+                [data-slot="sidebar-inset"] header,
+                main header {
+                    position: sticky;
+                    top: 0;
+                    z-index: 100;
+                    background: var(--background, #fff);
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                    flex-shrink: 0;
+                }
+            }
+
+            /* --- Vendure Dashboard: Fix superposición de labels en gráficos métricas home --- */
+            /* Recharts XAxis tick labels: rotar y ajustar en displays pequeños */
+            @media (max-width: 768px) {
+                .recharts-xAxis .recharts-cartesian-axis-tick-value {
+                    transform-box: fill-box;
+                    transform-origin: right center;
+                    transform: rotate(-45deg);
+                    text-anchor: end !important;
+                    font-size: 10px;
+                }
+            }
 
       /* Ocultar formulario nativo de Vendure condicionalmente */
       body.hide-native-login form > div:not([class*="max-w-sm"]),
