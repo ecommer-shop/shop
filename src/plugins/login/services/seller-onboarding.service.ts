@@ -32,7 +32,7 @@ import {
 import crypto from 'crypto';
 
 import { multivendorShippingEligibilityChecker } from '../../multivendor-plugin/config/mv-shipping-eligibility-checker';
-import { loggerCtx } from '../constants';
+import { loggerCtx, SELLER_ADMIN_PERMISSIONS } from '../constants';
 import { GoogleSellerRegistrationResult, SellerOnboardingInput } from '../types';
 
 @Injectable()
@@ -145,44 +145,7 @@ export class SellerOnboardingService {
             code: `${shopCode}-admin`,
             channelIds: [channel.id],
             description: `Administrator of ${input.shopName}`,
-            permissions: [
-                Permission.CreateCatalog,
-                Permission.UpdateCatalog,
-                Permission.ReadCatalog,
-                Permission.DeleteCatalog,
-                Permission.CreateOrder,
-                Permission.ReadOrder,
-                Permission.UpdateOrder,
-                Permission.DeleteOrder,
-                Permission.ReadCustomer,
-                Permission.ReadPaymentMethod,
-                Permission.ReadShippingMethod,
-                Permission.ReadPromotion,
-                Permission.ReadCountry,
-                Permission.ReadZone,
-                Permission.ReadChannel,
-                Permission.CreateAsset,
-                Permission.ReadAsset,
-                Permission.UpdateAsset,
-                Permission.CreateCustomer,
-                Permission.UpdateCustomer,
-                Permission.DeleteCustomer,
-                Permission.CreateTag,
-                Permission.ReadTag,
-                Permission.UpdateTag,
-                Permission.DeleteTag,
-                Permission.ReadAdministrator,
-                Permission.UpdateAdministrator,
-                Permission.ReadCollection,
-                Permission.ReadFacet,
-                Permission.CreateStockLocation,
-                Permission.ReadStockLocation,
-                Permission.UpdateStockLocation,
-                Permission.CreatePromotion,
-                Permission.ReadPromotion,
-                Permission.UpdatePromotion,
-                Permission.DeletePromotion,
-            ],
+            permissions: SELLER_ADMIN_PERMISSIONS,
         });
 
         if (existingUser) {
@@ -361,6 +324,90 @@ export class SellerOnboardingService {
             apiType: 'admin',
             user: superAdminUser!,
         });
+    }
+
+    /**
+     * Sincroniza los permisos de un rol de vendedor con los permisos definidos en SELLER_ADMIN_PERMISSIONS
+     * Útil cuando necesitas actualizar los permisos de un rol existente
+     */
+    public async syncSellerAdminPermissions(
+        ctx: RequestContext,
+        roleId: number | string,
+    ): Promise<void> {
+        const role = await this.roleService.findOne(ctx, roleId);
+        if (!role) {
+            throw new InternalServerError(`Role with ID ${roleId} not found`);
+        }
+
+        // Verificar que es un rol de vendedor
+        if (!role.code.includes('-admin')) {
+            throw new InternalServerError(
+                `Role ${role.code} does not appear to be a seller admin role`,
+            );
+        }
+
+        await this.roleService.update(ctx, {
+            id: role.id,
+            permissions: SELLER_ADMIN_PERMISSIONS,
+        });
+
+        Logger.info(
+            `Synced permissions for seller admin role: ${role.code}`,
+            loggerCtx,
+        );
+    }
+
+    /**
+     * Sincroniza los permisos de todos los roles de administrador de vendedor
+     * para el canal actual solamente
+     * Llama a este método después de actualizar SELLER_ADMIN_PERMISSIONS para aplicar
+     * los cambios a todos los vendedores existentes del canal
+     */
+    public async syncAllSellerAdminPermissions(ctx: RequestContext): Promise<void> {
+        const superAdminCtx = await this.getSuperAdminContext(ctx);
+        const currentChannelToken = ctx.channel.token;
+
+        // Obtener todos los roles que son de vendedor (contienen '-admin')
+        const roles = await this.roleService.findAll(superAdminCtx);
+
+        // Filtrar solo los roles de vendedor que pertenecen al canal actual
+        const sellerRoles = roles.items.filter(
+            role =>
+                role.channels.some(channel => channel.token === currentChannelToken) &&
+                role.code.includes('-admin'),
+        );
+
+        if (sellerRoles.length === 0) {
+            Logger.info(
+                `No seller admin roles found to sync for channel: ${currentChannelToken}`,
+                loggerCtx,
+            );
+            return;
+        }
+
+        for (const role of sellerRoles) {
+            try {
+                await this.roleService.update(superAdminCtx, {
+                    id: role.id,
+                    permissions: SELLER_ADMIN_PERMISSIONS,
+                });
+
+                Logger.info(
+                    `Updated permissions for seller admin role: ${role.code} on channel: ${currentChannelToken}`,
+                    loggerCtx,
+                );
+            } catch (error) {
+                Logger.error(
+                    `Failed to update permissions for role ${role.code}: ${error}`,
+                    loggerCtx,
+                );
+            }
+        }
+
+        Logger.info(
+            `Synced permissions for ${sellerRoles.length} seller admin roles on channel: ${currentChannelToken}`,
+            loggerCtx,
+        );
     }
 
     private generateSecurePassword(): string {

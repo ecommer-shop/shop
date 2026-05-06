@@ -175,7 +175,7 @@ export function ImportFormatGuide() {
                 <li>Completa una fila por producto, sin dejar vacios sku, name, price ni stock.</li>
                 <li>Usa valores numericos en price y stock (sin simbolos ni texto extra).</li>
                 <li>Usa valores de texto en los demás campos.</li>
-                <li>Guarda el archivo y cargalo desde el boton de esta pantalla.</li>
+                <li>Guarda el archivo y cargalo desde el boton "importar X productos" de esta pantalla.</li>
             </ol>
 
             <div className="mt-4 rounded-md border border-amber-300/40 bg-amber-50/40 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-200">

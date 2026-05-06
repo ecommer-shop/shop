@@ -38,7 +38,7 @@ export class MultivendorService {
         private stockLocationService: StockLocationService,
         private requestContextService: RequestContextService,
         private connection: TransactionalConnection,
-    ) {}
+    ) { }
 
     async registerNewSeller(ctx: RequestContext, input: { shopName: string; seller: CreateSellerInput }) {
         const superAdminCtx = await this.getSuperAdminContext(ctx);
@@ -140,10 +140,6 @@ export class MultivendorService {
             channelIds: [channel.id],
             description: `Administrator of ${input.shopName}`,
             permissions: [
-                Permission.CreateCatalog,
-                Permission.UpdateCatalog,
-                Permission.ReadCatalog,
-                Permission.DeleteCatalog,
                 Permission.CreateOrder,
                 Permission.ReadOrder,
                 Permission.UpdateOrder,
@@ -161,6 +157,14 @@ export class MultivendorService {
                 Permission.ReadTag,
                 Permission.UpdateTag,
                 Permission.DeleteTag,
+                Permission.CreateProduct,
+                Permission.ReadProduct,
+                Permission.UpdateProduct,
+                Permission.DeleteProduct,
+                Permission.CreateAsset,
+                Permission.ReadAsset,
+                Permission.UpdateAsset,
+                Permission.DeleteAsset,
             ],
         });
         const administrator = await this.administratorService.create(ctx, {

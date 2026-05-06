@@ -24,7 +24,7 @@ export class AutoSkuPlugin {
                     let sku: string;
                     let exists = true;
                     do {
-                        sku = randomBytes(6).toString('hex'); // 12 dígitos hex
+                        sku = randomBytes(6).toString('hex').toUpperCase(); // 12 dígitos hex
                         const count = await connection.getRepository(ctx, 'ProductVariant').count({
                             where: {
                                 sku,
