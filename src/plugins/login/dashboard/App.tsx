@@ -157,7 +157,9 @@ export function App() {
                 if (authResult?.id) {
                     setStatus('¡Sesión iniciada! Redirigiendo...');
                     sessionStorage.setItem(POST_LOGIN_RELOAD_KEY, '1');
-                    window.location.href = '/dashboard';
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1500);
                 } else {
                     if (!fromRegistration) {
                         redirectToRegisterFlow();
