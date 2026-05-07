@@ -48,6 +48,7 @@ import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
 import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
 import { StorePagePlugin } from '../plugins/store-page/store-page.plugin';
 import { AutoSkuPlugin } from '../plugins/auto-sku/auto-sku.plugin';
+import { ProductVariantEnforcementPlugin } from '../plugins/product-variant-enforcement/product-variant-enforcement.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -158,5 +159,8 @@ export const plugins: VendureConfig['plugins'] = [
   LoginPlugin.init({
     googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
   }),
+
+  ProductVariantEnforcementPlugin,
+
 ];
 
