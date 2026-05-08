@@ -12,6 +12,7 @@ import {
     defaultShippingCalculator,
     Facet,
     FacetService,
+    FacetValue,
     InternalServerError,
     isGraphQlErrorResult,
     Logger,
@@ -301,6 +302,11 @@ export class SellerOnboardingService {
         const { items: facets } = await this.facetService.findAll(ctx, { take: 1000 });
         for (const facet of facets) {
             await this.channelService.assignToChannels(ctx, Facet, facet.id, [sellerChannel.id]);
+
+            for (const facetValue of facet.values) {
+                await this.channelService.assignToChannels(ctx, FacetValue, facetValue.id, [sellerChannel.id]);
+                console.log(`Assigned facet value ${facetValue.id} to channel ${sellerChannel.id}`);
+            }
         }
     }
 
