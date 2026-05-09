@@ -280,6 +280,24 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            // Profile query must select Administrator customFields subfields
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    `            customFields`,
+                    `            customFields {
+                storeDescription
+                storeBannerUrl {
+                    id
+                    preview
+                }
+            }`,
+                );
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };

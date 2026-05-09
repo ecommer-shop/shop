@@ -1,11 +1,56 @@
 import type { VendureConfig } from '@vendure/core';
-import { LanguageCode } from '@vendure/core';
+import { Asset, LanguageCode } from '@vendure/core';
 
 /**
  * Custom fields para ProductVariant (peso y dimensiones).
  * Si cambias esto recuerda generar migración de DB.
  */
 export const customFields: VendureConfig['customFields'] = {
+  Administrator: [
+    {
+      name: 'storeDescription',
+      type: 'text',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Store description' },
+        { languageCode: LanguageCode.es, value: 'Descripcion de la tienda' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Public description shown on the seller store page',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Descripcion publica mostrada en la pagina de la tienda',
+        },
+      ],
+    },
+    {
+      name: 'storeBannerUrl',
+      type: 'relation',
+      entity: Asset,
+      nullable: true,
+      public: true,
+      eager: true,
+      ui: { component: 'ecommer-store-banner-asset-picker', fullWidth: true },
+      label: [
+        { languageCode: LanguageCode.en, value: 'Store banner' },
+        { languageCode: LanguageCode.es, value: 'Banner de la tienda' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Banner image for the public store page (Admin profile)',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Imagen de banner para la tienda pública (perfil de administrador)',
+        },
+      ],
+    },
+  ],
   Customer: [
     {
       name: 'acceptedTermsAndPrivacy',
@@ -101,46 +146,6 @@ export const customFields: VendureConfig['customFields'] = {
         {
           languageCode: LanguageCode.es,
           value: 'Si el vendedor confirmó ser mayor de edad al registrarse',
-        },
-      ],
-    },
-    {
-      name: 'storeDescription',
-      type: 'text',
-      nullable: true,
-      public: true,
-      label: [
-        { languageCode: LanguageCode.en, value: 'Store description' },
-        { languageCode: LanguageCode.es, value: 'Descripcion de la tienda' },
-      ],
-      description: [
-        {
-          languageCode: LanguageCode.en,
-          value: 'Public description shown on the seller store page',
-        },
-        {
-          languageCode: LanguageCode.es,
-          value: 'Descripcion publica mostrada en la pagina de la tienda',
-        },
-      ],
-    },
-    {
-      name: 'storeBannerUrl',
-      type: 'string',
-      nullable: true,
-      public: true,
-      label: [
-        { languageCode: LanguageCode.en, value: 'Store banner URL' },
-        { languageCode: LanguageCode.es, value: 'URL del banner de la tienda' },
-      ],
-      description: [
-        {
-          languageCode: LanguageCode.en,
-          value: 'Public banner image URL shown on the seller store page',
-        },
-        {
-          languageCode: LanguageCode.es,
-          value: 'URL publica de la imagen de banner mostrada en la pagina de la tienda',
         },
       ],
     },
