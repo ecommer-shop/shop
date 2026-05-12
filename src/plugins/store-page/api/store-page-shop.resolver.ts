@@ -11,9 +11,58 @@ import {
     TransactionalConnection,
 } from '@vendure/core';
 
+type AdminStoreFields = {
+    storeDescription?: string | null;
+    storeBannerUrl?: string | { preview?: string | null; source?: string | null } | null;
+};
+
+/** AssetServerPlugin no añade el prefijo a campos String custom; lo hacemos a mano. */
+function absolutizeAssetUrl(value: string | null | undefined): string | null {
+    if (!value) return null;
+    if (/^(https?:|data:|\/)/i.test(value)) return value;
+    const prefix = process.env.ASSET_URL_PREFIX || '';
+    if (!prefix) return value;
+    return `${prefix.replace(/\/+$/, '')}/${value.replace(/^\/+/, '')}`;
+}
+
+function resolveBannerUrl(field: AdminStoreFields['storeBannerUrl']): string | null {
+    if (!field) return null;
+    const raw = typeof field === 'string' ? field : field.preview || field.source || null;
+    return absolutizeAssetUrl(raw);
+}
+
 @Resolver()
 export class StorePageShopResolver {
     constructor(private connection: TransactionalConnection) {}
+
+    /** Carga Administrator con custom fields (incluyendo el Asset de `storeBannerUrl`).
+     *  Se hace en dos pasos porque TypeORM `createQueryBuilder` no respeta `eager` ni los joins
+     *  embebidos sobre `customFields.<relation>` de forma fiable. */
+    private async loadAdminWithStoreFields(
+        ctx: RequestContext,
+        channelId: string | number,
+    ): Promise<Administrator | null> {
+        const adminId = (
+            await this.connection
+                .getRepository(ctx, Administrator)
+                .createQueryBuilder('administrator')
+                .innerJoin('administrator.user', 'user')
+                .innerJoin('user.roles', 'role')
+                .innerJoin('role.channels', 'roleChannel')
+                .where('roleChannel.id = :channelId', { channelId })
+                .andWhere('administrator.deletedAt IS NULL')
+                .orderBy('administrator.updatedAt', 'DESC')
+                .select(['administrator.id'])
+                .getOne()
+        )?.id;
+
+        if (!adminId) return null;
+
+        return this.connection.getRepository(ctx, Administrator).findOne({
+            where: { id: adminId },
+            relations: ['customFields.storeBannerUrl'],
+        });
+    }
 
     /**
      * Si `collectionSlug` no se envía: destacados solo por canal Shop (cabecera vendure-token).
@@ -108,39 +157,16 @@ export class StorePageShopResolver {
         const sellerChannel = firstProduct?.channels?.find(ch => !!ch.seller) ?? firstProduct?.channels?.[0];
         const seller = sellerChannel?.seller;
 
-        if (seller) {
+        if (seller && sellerChannel?.id != null) {
             sellerName = seller.name || sellerName;
 
-            const administrator = await this.connection
-                .getRepository(ctx, Administrator)
-                .createQueryBuilder('administrator')
-                .leftJoinAndSelect('administrator.user', 'user')
-                .leftJoinAndSelect('user.roles', 'role')
-                .leftJoinAndSelect('role.channels', 'roleChannel')
-                .where('roleChannel.id = :channelId', { channelId: sellerChannel?.id })
-                .andWhere('administrator.deletedAt IS NULL')
-                .orderBy('administrator.updatedAt', 'DESC')
-                .getOne();
-
-            const adminFields = administrator?.customFields as
-                | {
-                      storeDescription?: string | null;
-                      storeBannerUrl?:
-                          | string
-                          | { preview?: string | null; source?: string | null }
-                          | null;
-                  }
-                | undefined;
+            const administrator = await this.loadAdminWithStoreFields(ctx, sellerChannel.id);
+            const adminFields = administrator?.customFields as AdminStoreFields | undefined;
 
             if (adminFields?.storeDescription) {
                 storeDescription = adminFields.storeDescription || storeDescription;
             }
-            const bannerField = adminFields?.storeBannerUrl;
-            const resolvedBannerUrl =
-                typeof bannerField === 'string'
-                    ? bannerField
-                    : bannerField?.preview || bannerField?.source || null;
-            storeBannerUrl = resolvedBannerUrl || storeBannerUrl;
+            storeBannerUrl = resolveBannerUrl(adminFields?.storeBannerUrl) || storeBannerUrl;
         }
 
         return {
@@ -167,30 +193,11 @@ export class StorePageShopResolver {
 
         const storeName = channel.seller.name || 'Tienda';
 
-        const administrator = await this.connection
-            .getRepository(ctx, Administrator)
-            .createQueryBuilder('administrator')
-            .leftJoinAndSelect('administrator.user', 'user')
-            .leftJoinAndSelect('user.roles', 'role')
-            .leftJoinAndSelect('role.channels', 'roleChannel')
-            .where('roleChannel.id = :channelId', { channelId: ctx.channelId })
-            .andWhere('administrator.deletedAt IS NULL')
-            .orderBy('administrator.updatedAt', 'DESC')
-            .getOne();
-
-        const adminFields = administrator?.customFields as
-            | {
-                  storeDescription?: string | null;
-                  storeBannerUrl?: string | { preview?: string | null; source?: string | null } | null;
-              }
-            | undefined;
+        const administrator = await this.loadAdminWithStoreFields(ctx, ctx.channelId);
+        const adminFields = administrator?.customFields as AdminStoreFields | undefined;
 
         storeDescription = adminFields?.storeDescription ?? null;
-        const bannerField = adminFields?.storeBannerUrl;
-        storeBannerUrl =
-            typeof bannerField === 'string'
-                ? bannerField
-                : bannerField?.preview || bannerField?.source || null;
+        storeBannerUrl = resolveBannerUrl(adminFields?.storeBannerUrl);
 
         return {
             storeName,
