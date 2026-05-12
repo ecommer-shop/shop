@@ -280,6 +280,14 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
+                nextCode = nextCode.replace(
+                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
+                    '',
+                );
+            }
+
             // Profile query must select Administrator customFields subfields
             if (
                 normalizedId.includes(
