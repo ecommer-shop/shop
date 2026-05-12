@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
-// import { UrlFormatter } from './url-formatter';
+ import { UrlFormatter } from './url-formatter';
 
 @Injectable()
 export class AiChat {
-    // private readonly urlFormatter = new UrlFormatter();
+     private readonly urlFormatter = new UrlFormatter();
     /**
      * Envía un mensaje al servicio de IA y recibe una respuesta
      */
@@ -35,12 +35,8 @@ export class AiChat {
             // TEMPORALMENTE DESACTIVADO: El formateo de URLs está desactivado hasta que
             // el equipo de IA estandarice las respuestas con URLs de productos.
             // Cuando esté listo, descomentar las siguientes 2 líneas y comentar la línea de 'return' actual:
-            // const formattedResponse = this.urlFormatter.formatUrls(rawResponse);
-            // return { response: formattedResponse };
-            
-            return {
-                response: rawResponse
-            };
+            const formattedResponse = this.urlFormatter.formatUrls(rawResponse);
+            return { response: formattedResponse };
         } catch (error) {
             throw new Error(`Failed to call AI service: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }

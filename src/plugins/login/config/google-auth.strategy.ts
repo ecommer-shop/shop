@@ -1,5 +1,9 @@
 import {
     AuthenticationStrategy,
+    ChannelService,
+    Facet,
+    FacetService,
+    FacetValue,
     Injector,
     RequestContext,
     User,
@@ -12,7 +16,7 @@ import gql from 'graphql-tag';
 import { OAuth2Client } from 'google-auth-library';
 
 import { loggerCtx } from '../constants';
-
+import { SellerOnboardingService } from '../services/seller-onboarding.service';
 export interface GoogleAuthData {
     token: string;
 }
@@ -31,7 +35,9 @@ export class GoogleAdminAuthenticationStrategy
     readonly name = 'google';
     private client: OAuth2Client;
     private connection!: TransactionalConnection;
-
+    private sellerOnboardingService!: SellerOnboardingService;
+    private facetService!: FacetService;
+    private channelService!: ChannelService;
     constructor(private clientId: string) {
         this.client = new OAuth2Client(clientId);
     }
@@ -46,6 +52,9 @@ export class GoogleAdminAuthenticationStrategy
 
     init(injector: Injector) {
         this.connection = injector.get(TransactionalConnection);
+        this.sellerOnboardingService = injector.get(SellerOnboardingService);
+        this.facetService = injector.get(FacetService);
+        this.channelService = injector.get(ChannelService);
     }
 
     // Extrae el email del token de Google, Primero intenta como ID token
@@ -140,7 +149,18 @@ export class GoogleAdminAuthenticationStrategy
                 );
                 return false;
             }
-
+            await this.sellerOnboardingService.syncAllSellerAdminPermissions(ctx).catch(err => {
+                Logger.error(
+                    `Failed to sync seller admin permissions: ${err instanceof Error ? err.message : err}`,
+                    loggerCtx,
+                );
+            });
+            await this.assignFacetsIfSeller(ctx, user).catch(err => {
+                Logger.error(
+                    `Failed to assign facets to seller channel: ${err instanceof Error ? err.message : err}`,
+                    loggerCtx,
+                );
+            });
             Logger.info(`Google auth successful for: ${email}`, loggerCtx);
             return user;
         } catch (error) {
@@ -150,5 +170,42 @@ export class GoogleAdminAuthenticationStrategy
             );
             return false;
         }
+    }
+
+    private async assignFacetsIfSeller(
+        ctx: RequestContext,
+        user: User,
+    ): Promise<void> {
+        // Verificar si el usuario tiene un rol de vendedor (contiene '-admin')
+        const sellerRole = user.roles?.find(role => role.code.includes('-admin'));
+        if (!sellerRole) {
+            return; // No es vendedor
+        }
+
+        // Obtener el canal del vendedor
+        const sellerChannel = sellerRole.channels?.[0];
+        if (!sellerChannel) {
+            return;
+        }
+
+        // Asignar facetas y sus valores al canal del vendedor
+        const { items: facets } = await this.facetService.findAll(ctx, { take: 1000 });
+        for (const facet of facets) {
+            await this.channelService.assignToChannels(ctx, Facet, facet.id, [
+                sellerChannel.id,
+            ]);
+
+            // Asignar también los valores de la faceta
+            for (const facetValue of facet.values) {
+                await this.channelService.assignToChannels(ctx, FacetValue, facetValue.id, [
+                    sellerChannel.id,
+                ]);
+            }
+        }
+
+        Logger.info(
+            `Facetas asignadas al canal del vendedor en login: ${user.identifier}`,
+            loggerCtx,
+        );
     }
 }
