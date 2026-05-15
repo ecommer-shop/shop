@@ -4,6 +4,7 @@ import { dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
 import { IS_DEV } from './src/config/environment';
+import { patchBaseUiMouseUp } from './src/vite-plugins/patch-base-ui-mouseup';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -293,6 +294,7 @@ export default defineConfig({
     },
     plugins: [
         patchVendureDashboardChannelPermissions(),
+        patchBaseUiMouseUp(),
         vendureDashboardPlugin({
             // The vendureDashboardPlugin will scan your configuration in order
             // to find any plugins which have dashboard extensions, as well as
