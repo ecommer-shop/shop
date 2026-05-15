@@ -16,12 +16,37 @@ function patchVendureDashboardChannelPermissions() {
             const normalizedId = id.replace(/\\/g, '/');
             let nextCode = code;
 
-            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/shared/boolean-badge.tsx')) {
+            if (normalizedId.includes('/data-display/boolean.tsx')) {
                 nextCode = nextCode
-                    .replace(/id:\s*['"]CM5TXb['"]/g, 'id: "RxzN1M"')
-                    .replace(/id:\s*['"]77Ufuv['"]/g, 'id: "E/QGRL"')
-                    .replace(/id="CM5TXb"/g, 'id="RxzN1M"')
-                    .replace(/id="77Ufuv"/g, 'id="E/QGRL"');
+                    .replace(/labelTrue \?\? 'Enabled'/g, "labelTrue ?? 'Habilitado'")
+                    .replace(/labelFalse \?\? 'Disabled'/g, "labelFalse ?? 'Deshabilitado'")
+                    .replace(/labelTrue \?\? "Enabled"/g, 'labelTrue ?? "Habilitado"')
+                    .replace(/labelFalse \?\? "Disabled"/g, 'labelFalse ?? "Deshabilitado"');
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/hooks/use-dynamic-translations.ts')) {
+                nextCode = nextCode.replace(
+                    `    const getTranslatedFieldName = (fieldId: string) => {
+        const fieldNameTranslationId = \`fieldName.\${fieldId}\`;
+        const translatedDisplay = i18n.t(fieldNameTranslationId);
+        return translatedDisplay !== fieldNameTranslationId
+            ? translatedDisplay
+            : camelCaseToTitleCase(fieldId);
+    };`,
+                    `    const fieldNameOverrides: Record<string, string> = {
+        enabled: 'Habilitado',
+    };
+    const getTranslatedFieldName = (fieldId: string) => {
+        if (fieldNameOverrides[fieldId]) {
+            return fieldNameOverrides[fieldId];
+        }
+        const fieldNameTranslationId = \`fieldName.\${fieldId}\`;
+        const translatedDisplay = i18n.t(fieldNameTranslationId);
+        return translatedDisplay !== fieldNameTranslationId
+            ? translatedDisplay
+            : camelCaseToTitleCase(fieldId);
+    };`,
+                );
             }
 
             if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/channel-switcher.tsx')) {
