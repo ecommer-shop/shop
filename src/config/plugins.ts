@@ -49,6 +49,10 @@ import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
 import { StorePagePlugin } from '../plugins/store-page/store-page.plugin';
 import { AutoSkuPlugin } from '../plugins/auto-sku/auto-sku.plugin';
 import { ProductVariantEnforcementPlugin } from '../plugins/product-variant-enforcement/product-variant-enforcement.plugin';
+import {
+  DeliveryCostPlugin,
+  MessengerDomisDeliveryCostStrategy,
+} from '../plugins/delivery-cost';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -122,6 +126,13 @@ export const plugins: VendureConfig['plugins'] = [
   ReviewsPlugin,
   StorePagePlugin,
   AiChatPlugin,
+
+  DeliveryCostPlugin.init({
+    strategy: new MessengerDomisDeliveryCostStrategy({
+      apiKey: process.env.DELIVERY_COST_API_KEY,
+      url: process.env.DELIVERY_COST_API_URL,
+    }),
+  }),
 
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
