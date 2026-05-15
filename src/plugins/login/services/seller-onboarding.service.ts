@@ -139,8 +139,8 @@ export class SellerOnboardingService {
             throw new InternalServerError(channel.message);
         }
 
-        const superAdminRole = await this.roleService.getSuperAdminRole(ctx);
-        await this.roleService.assignRoleToChannel(ctx, superAdminRole.id, channel.id);
+        //const superAdminRole = await this.roleService.getSuperAdminRole(ctx);
+        //await this.roleService.assignRoleToChannel(ctx, superAdminRole.id, channel.id);
 
         const role = await this.roleService.create(ctx, {
             code: `${shopCode}-admin`,
@@ -369,23 +369,25 @@ export class SellerOnboardingService {
      * Llama a este método después de actualizar SELLER_ADMIN_PERMISSIONS para aplicar
      * los cambios a todos los vendedores existentes del canal
      */
-    public async syncAllSellerAdminPermissions(ctx: RequestContext): Promise<void> {
+    public async syncAllSellerAdminPermissionsForChannel(
+        ctx: RequestContext,
+        channelToken: string,
+    ): Promise<void> {
         const superAdminCtx = await this.getSuperAdminContext(ctx);
-        const currentChannelToken = ctx.channel.token;
 
         // Obtener todos los roles que son de vendedor (contienen '-admin')
         const roles = await this.roleService.findAll(superAdminCtx);
 
-        // Filtrar solo los roles de vendedor que pertenecen al canal actual
+        // Filtrar solo los roles de vendedor que pertenecen al canal indicado
         const sellerRoles = roles.items.filter(
             role =>
-                role.channels.some(channel => channel.token === currentChannelToken) &&
+                role.channels.some(channel => channel.token === channelToken) &&
                 role.code.includes('-admin'),
         );
 
         if (sellerRoles.length === 0) {
             Logger.info(
-                `No seller admin roles found to sync for channel: ${currentChannelToken}`,
+                `No seller admin roles found to sync for channel: ${channelToken}`,
                 loggerCtx,
             );
             return;
@@ -399,7 +401,7 @@ export class SellerOnboardingService {
                 });
 
                 Logger.info(
-                    `Updated permissions for seller admin role: ${role.code} on channel: ${currentChannelToken}`,
+                    `Updated permissions for seller admin role: ${role.code} on channel: ${channelToken}`,
                     loggerCtx,
                 );
             } catch (error) {
@@ -411,7 +413,7 @@ export class SellerOnboardingService {
         }
 
         Logger.info(
-            `Synced permissions for ${sellerRoles.length} seller admin roles on channel: ${currentChannelToken}`,
+            `Synced permissions for ${sellerRoles.length} seller admin roles on channel: ${channelToken}`,
             loggerCtx,
         );
     }

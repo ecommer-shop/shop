@@ -8,8 +8,11 @@ import { GoogleTokenVerificationService } from './services/google-token-verifica
 import { SellerOnboardingService } from './services/seller-onboarding.service';
 import { LoginResolver } from './api/login.resolver';
 import { adminApiExtensions } from './api/api-extensions';
+import { PostLoginSyncResolver } from './api/post-login-sync.resolver';
+import { postLoginSyncGraphql } from './api/post-login-sync.resolver';
 
 @VendurePlugin({
+
     imports: [PluginCommonModule],
     providers: [
         { provide: LOGIN_PLUGIN_OPTIONS, useFactory: () => LoginPlugin.options },
@@ -19,8 +22,9 @@ import { adminApiExtensions } from './api/api-extensions';
     ],
     adminApiExtensions: {
         schema: adminApiExtensions,
-        resolvers: [LoginResolver],
+        resolvers: [LoginResolver, PostLoginSyncResolver],
     },
+
     configuration: config => {
         const clientId =
             LoginPlugin.options?.googleOAuthClientId ||
