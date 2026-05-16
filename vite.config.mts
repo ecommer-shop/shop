@@ -281,6 +281,13 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/framework/dashboard-widget/base-widget')) {
+                nextCode = nextCode.replace(
+                    `'h-full w-full flex flex-col rounded-md'`,
+                    `'h-full w-full flex flex-col rounded-md overflow-hidden'`
+                );
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };
