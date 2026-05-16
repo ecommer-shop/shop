@@ -2,6 +2,7 @@ import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 
 import { storePageAdminApiExtensions, storePageShopApiExtensions } from './api/api-extensions';
 import { StorePageAdminResolver } from './api/store-page-admin.resolver';
+import { ProductSellerShopResolver } from './api/product-seller-shop.resolver';
 import { StorePageShopResolver } from './api/store-page-shop.resolver';
 import { StoreFeaturedService } from './services/store-featured.service';
 
@@ -10,7 +11,7 @@ import { StoreFeaturedService } from './services/store-featured.service';
     providers: [StoreFeaturedService],
     shopApiExtensions: {
         schema: storePageShopApiExtensions,
-        resolvers: [StorePageShopResolver],
+        resolvers: [StorePageShopResolver, ProductSellerShopResolver],
     },
     adminApiExtensions: {
         schema: storePageAdminApiExtensions,
