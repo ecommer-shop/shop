@@ -6,24 +6,18 @@ import {
     Channel,
     ChannelService,
     ConfigService,
-    defaultShippingCalculator,
     InternalServerError,
     isGraphQlErrorResult,
-    manualFulfillmentHandler,
     RequestContext,
     RequestContextService,
     RoleService,
     SellerService,
-    ShippingMethod,
-    ShippingMethodService,
     StockLocation,
     StockLocationService,
-    TaxSetting,
     TransactionalConnection,
     User,
 } from '@vendure/core';
 
-import { multivendorShippingEligibilityChecker } from '../config/mv-shipping-eligibility-checker';
 import { CreateSellerInput } from '../types';
 
 @Injectable()
@@ -33,7 +27,6 @@ export class MultivendorService {
         private sellerService: SellerService,
         private roleService: RoleService,
         private channelService: ChannelService,
-        private shippingMethodService: ShippingMethodService,
         private configService: ConfigService,
         private stockLocationService: StockLocationService,
         private requestContextService: RequestContextService,
@@ -43,58 +36,8 @@ export class MultivendorService {
     async registerNewSeller(ctx: RequestContext, input: { shopName: string; seller: CreateSellerInput }) {
         const superAdminCtx = await this.getSuperAdminContext(ctx);
         const channel = await this.createSellerChannelRoleAdmin(superAdminCtx, input);
-        await this.createSellerShippingMethod(superAdminCtx, input.shopName, channel);
         await this.createSellerStockLocation(superAdminCtx, input.shopName, channel);
         return channel;
-    }
-
-    private async createSellerShippingMethod(ctx: RequestContext, shopName: string, sellerChannel: Channel) {
-        const defaultChannel = await this.channelService.getDefaultChannel(ctx);
-        const { shippingEligibilityCheckers, shippingCalculators, fulfillmentHandlers } =
-            this.configService.shippingOptions;
-        const shopCode = normalizeString(shopName, '-');
-        const checker = shippingEligibilityCheckers.find(
-            c => c.code === multivendorShippingEligibilityChecker.code,
-        );
-        const calculator = shippingCalculators.find(c => c.code === defaultShippingCalculator.code);
-        const fulfillmentHandler = fulfillmentHandlers.find(h => h.code === manualFulfillmentHandler.code);
-        if (!checker) {
-            throw new InternalServerError(
-                'Could not find a suitable ShippingEligibilityChecker for the seller',
-            );
-        }
-        if (!calculator) {
-            throw new InternalServerError('Could not find a suitable ShippingCalculator for the seller');
-        }
-        if (!fulfillmentHandler) {
-            throw new InternalServerError('Could not find a suitable FulfillmentHandler for the seller');
-        }
-        const shippingMethod = await this.shippingMethodService.create(ctx, {
-            code: `${shopCode}-shipping`,
-            checker: {
-                code: checker.code,
-                arguments: [],
-            },
-            calculator: {
-                code: calculator.code,
-                arguments: [
-                    { name: 'rate', value: '500' },
-                    { name: 'includesTax', value: TaxSetting.auto },
-                    { name: 'taxRate', value: '20' },
-                ],
-            },
-            fulfillmentHandler: fulfillmentHandler.code,
-            translations: [
-                {
-                    languageCode: defaultChannel.defaultLanguageCode,
-                    name: `Standard Shipping for ${shopName}`,
-                },
-            ],
-        });
-
-        await this.channelService.assignToChannels(ctx, ShippingMethod, shippingMethod.id, [
-            sellerChannel.id,
-        ]);
     }
 
     private async createSellerStockLocation(ctx: RequestContext, shopName: string, sellerChannel: Channel) {
@@ -146,7 +89,12 @@ export class MultivendorService {
                 Permission.DeleteOrder,
                 Permission.ReadCustomer,
                 Permission.ReadPaymentMethod,
+                Permission.CreatePaymentMethod,
+                Permission.UpdatePaymentMethod,
                 Permission.ReadShippingMethod,
+                Permission.CreateShippingMethod,
+                Permission.UpdateShippingMethod,
+                Permission.DeleteShippingMethod,
                 Permission.ReadPromotion,
                 Permission.ReadCountry,
                 Permission.ReadZone,

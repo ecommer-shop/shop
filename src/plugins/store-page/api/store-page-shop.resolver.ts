@@ -2,6 +2,7 @@ import { Args, Query, Resolver } from '@nestjs/graphql';
 import {
     Administrator,
     Allow,
+    Asset,
     Collection,
     Channel,
     Ctx,
@@ -31,6 +32,26 @@ function resolveBannerUrl(field: AdminStoreFields['storeBannerUrl']): string | n
     return absolutizeAssetUrl(raw);
 }
 
+/** ID del asset de banner cuando la relación no viene hidratada en `customFields`. */
+function resolveBannerAssetId(
+    administrator: Administrator,
+    customFields: AdminStoreFields | undefined,
+): string | null {
+    const bannerField = customFields?.storeBannerUrl;
+    if (typeof bannerField === 'string' || typeof bannerField === 'number') {
+        return String(bannerField);
+    }
+    const cf = customFields as { storeBannerUrlId?: string | number | null } | undefined;
+    if (cf?.storeBannerUrlId != null) {
+        return String(cf.storeBannerUrlId);
+    }
+    const row = administrator as unknown as { customFieldsStorebannerurlid?: number | null };
+    if (row.customFieldsStorebannerurlid != null) {
+        return String(row.customFieldsStorebannerurlid);
+    }
+    return null;
+}
+
 @Resolver()
 export class StorePageShopResolver {
     constructor(private connection: TransactionalConnection) {}
@@ -58,10 +79,39 @@ export class StorePageShopResolver {
 
         if (!adminId) return null;
 
-        return this.connection.getRepository(ctx, Administrator).findOne({
+        const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
             where: { id: adminId },
-            relations: ['customFields.storeBannerUrl'],
         });
+
+        if (!administrator) {
+            return null;
+        }
+
+        const customFields = administrator.customFields as AdminStoreFields | undefined;
+        const bannerField = customFields?.storeBannerUrl;
+
+        if (bannerField && typeof bannerField === 'object') {
+            return administrator;
+        }
+
+        const bannerAssetId = resolveBannerAssetId(administrator, customFields);
+
+        if (!bannerAssetId) {
+            return administrator;
+        }
+
+        const asset = await this.connection.getRepository(ctx, Asset).findOne({
+            where: { id: bannerAssetId },
+        });
+
+        if (asset) {
+            (administrator.customFields as AdminStoreFields) = {
+                ...customFields,
+                storeBannerUrl: asset,
+            };
+        }
+
+        return administrator;
     }
 
     /**
@@ -133,7 +183,7 @@ export class StorePageShopResolver {
         let sellerName = collTrans?.name ?? 'Tienda';
 
         if (collectionEntity?.featuredAsset?.preview) {
-            storeBannerUrl = collectionEntity.featuredAsset.preview ?? null;
+            storeBannerUrl = absolutizeAssetUrl(collectionEntity.featuredAsset.preview);
         }
         storeDescription = collTrans?.description || null;
 
