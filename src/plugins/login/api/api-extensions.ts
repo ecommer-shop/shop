@@ -9,6 +9,11 @@ export const adminApiExtensions = gql`
         Google OAuth Client ID usado por el dashboard de login.
         """
         googleOAuthClientId: String!
+        """
+        Código del canal por defecto. El superadmin debe usar este canal
+        para evitar problemas de filtrado de productos.
+        """
+        defaultChannelToken: String!
     }
 
     """

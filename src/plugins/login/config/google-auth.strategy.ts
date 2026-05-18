@@ -9,6 +9,7 @@ import {
     User,
     TransactionalConnection,
     Logger,
+    RoleService,
 } from '@vendure/core';
 import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
 import { DocumentNode } from 'graphql';
@@ -38,6 +39,7 @@ export class GoogleAdminAuthenticationStrategy
     private sellerOnboardingService!: SellerOnboardingService;
     private facetService!: FacetService;
     private channelService!: ChannelService;
+    private roleService!: RoleService;
     constructor(private clientId: string) {
         this.client = new OAuth2Client(clientId);
     }
@@ -55,6 +57,7 @@ export class GoogleAdminAuthenticationStrategy
         this.sellerOnboardingService = injector.get(SellerOnboardingService);
         this.facetService = injector.get(FacetService);
         this.channelService = injector.get(ChannelService);
+        this.roleService = injector.get(RoleService);
     }
 
     // Extrae el email del token de Google, Primero intenta como ID token
