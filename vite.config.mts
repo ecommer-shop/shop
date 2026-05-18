@@ -107,10 +107,31 @@ function patchVendureDashboardChannelPermissions() {
                         "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { EntityAssets } from '@/vdb/components/shared/entity-assets.js';",
                     );
                 }
+                if (!nextCode.includes("import { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';",
+                    );
+                }
+                if (!nextCode.includes("import { usePermissions } from '@/vdb/hooks/use-permissions.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { toast } from 'sonner';",
+                        "import { toast } from 'sonner';\nimport { usePermissions } from '@/vdb/hooks/use-permissions.js';",
+                    );
+                }
                 if (!nextCode.includes("import { Field } from '@/vdb/components/ui/field.js';")) {
                     nextCode = nextCode.replace(
                         "import { Button } from '@/vdb/components/ui/button.js';",
                         "import { Button } from '@/vdb/components/ui/button.js';\nimport { Field } from '@/vdb/components/ui/field.js';",
+                    );
+                }
+
+                if (!nextCode.includes('const canConfigurePaymentProcessor')) {
+                    nextCode = nextCode.replace(
+                        '    const { t } = useLingui();',
+                        `    const { t } = useLingui();
+    const { hasPermissions } = usePermissions();
+    const canConfigurePaymentProcessor = hasPermissions(['CreateSettings']);`,
                     );
                 }
 
@@ -133,7 +154,12 @@ function patchVendureDashboardChannelPermissions() {
                         .replace(/[^a-z0-9]+/g, '-')
                         .replace(/^-+|-+$/g, ''),
                 checker: input.checker?.code ? input.checker : undefined,
-                handler: input.handler?.code ? input.handler : undefined,
+                handler: input.handler?.code
+                    ? input.handler
+                    : {
+                          code: 'dummy-payment-handler',
+                          arguments: [{ name: 'automaticSettle', value: 'false' }],
+                      },
             };
         },`,
                 );
@@ -220,14 +246,16 @@ function patchVendureDashboardChannelPermissions() {
                             render={({ field }) => <Input {...field} />}
                         />
                     </DetailFormGrid>
-                    <FormFieldWrapper
-                        control={form.control}
-                        name="customFields.bankCertificationVerified"
-                        label="Certificación bancaria verificada"
-                        render={({ field }) => (
-                            <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
-                        )}
-                    />
+                    <PermissionGuard requires={['SuperAdmin']}>
+                        <FormFieldWrapper
+                            control={form.control}
+                            name="customFields.bankCertificationVerified"
+                            label="Certificación bancaria verificada"
+                            render={({ field }) => (
+                                <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
+                            )}
+                        />
+                    </PermissionGuard>
                 </PageBlock>`,
                 );
                 nextCode = nextCode.replace(
@@ -238,6 +266,56 @@ function patchVendureDashboardChannelPermissions() {
                     'title={<Trans>Calculator</Trans>}',
                     "title={'Calculadora'}",
                 );
+
+                if (!nextCode.includes('canConfigurePaymentProcessor && (!checkerArgsValid')) {
+                    nextCode = nextCode.replace(
+                        `                        disabled={
+                            !form.formState.isDirty ||
+                            !form.formState.isValid ||
+                            isPending ||
+                            !checkerArgsValid ||
+                            !handlerArgsValid
+                        }`,
+                        `                        disabled={
+                            !form.formState.isDirty ||
+                            !form.formState.isValid ||
+                            isPending ||
+                            (canConfigurePaymentProcessor &&
+                                (!checkerArgsValid || !handlerArgsValid))
+                        }`,
+                    );
+                }
+
+                if (!nextCode.includes('<PermissionGuard requires={[\'CreateSettings\']}')) {
+                    nextCode = nextCode.replace(
+                        `                <PageBlock
+                    column="main"
+                    blockId="payment-eligibility-checker"
+                    title={'Verificador de elegibilidad de pago'}
+                >`,
+                        `                <PermissionGuard requires={['CreateSettings']}>
+                <PageBlock
+                    column="main"
+                    blockId="payment-eligibility-checker"
+                    title={'Verificador de elegibilidad de pago'}
+                >`,
+                    );
+                    nextCode = nextCode.replace(
+                        `                </PageBlock>
+                <PageBlock column="main" blockId="payment-handler" title={'Calculadora'}>`,
+                        `                </PageBlock>
+                </PermissionGuard>
+                <PermissionGuard requires={['CreateSettings']}>
+                <PageBlock column="main" blockId="payment-handler" title={'Calculadora'}>`,
+                    );
+                    nextCode = nextCode.replace(
+                        `                </PageBlock>
+            </PageLayout>`,
+                        `                </PageBlock>
+                </PermissionGuard>
+            </PageLayout>`,
+                    );
+                }
             }
             if (
                 normalizedId.includes(
@@ -261,6 +339,228 @@ function patchVendureDashboardChannelPermissions() {
                 nextCode = nextCode.replace(
                     'buttonText="Select Payment Handler"',
                     `buttonText="Seleccionar método de pago (Calculadora)"`,
+                );
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/payment-methods.tsx')) {
+                nextCode = nextCode.replace(
+                    'title={<Trans>Payment Methods</Trans>}',
+                    "title={'Métodos de pago'}",
+                );
+                nextCode = nextCode.replace(
+                    'breadcrumb: () => <Trans>Payment Methods</Trans>',
+                    "breadcrumb: () => 'Métodos de pago'",
+                );
+                nextCode = nextCode.replace(
+                    '<Trans>New payment method</Trans>',
+                    "'Nuevo método de pago'",
+                );
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/shipping-methods_.$id.tsx')) {
+                if (!nextCode.includes("import { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';",
+                    );
+                }
+                if (!nextCode.includes("import { useEffect } from 'react';")) {
+                    nextCode = nextCode.replace(
+                        "import { useState } from 'react';",
+                        "import { useEffect, useState } from 'react';",
+                    );
+                }
+
+                if (!nextCode.includes('transformCreateInput: input =>')) {
+                    nextCode = nextCode.replace(
+                        `        params: { id: params.id },`,
+                        `        transformCreateInput: input => {
+            const name =
+                input.translations?.[0]?.name ??
+                input.name ??
+                '';
+            return {
+                ...input,
+                code:
+                    input.code?.trim() ||
+                    name
+                        .toLowerCase()
+                        .trim()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, ''),
+                fulfillmentHandler: input.fulfillmentHandler || 'manual-fulfillment',
+                checker: input.checker?.code
+                    ? input.checker
+                    : {
+                          code: 'multivendor-shipping-eligibility-checker',
+                          arguments: [],
+                      },
+                calculator: input.calculator?.code
+                    ? input.calculator
+                    : {
+                          code: 'default-shipping-calculator',
+                          arguments: [
+                              { name: 'rate', value: '500' },
+                              { name: 'includesTax', value: 'auto' },
+                              { name: 'taxRate', value: '20' },
+                          ],
+                      },
+            };
+        },
+        params: { id: params.id },`,
+                    );
+                }
+
+                if (!nextCode.includes('multivendor-shipping-eligibility-checker')) {
+                    nextCode = nextCode.replace(
+                        `    const [checkerArgsValid, setCheckerArgsValid] = useState(true);
+    const [calculatorArgsValid, setCalculatorArgsValid] = useState(true);`,
+                        `    const [checkerArgsValid, setCheckerArgsValid] = useState(true);
+    const [calculatorArgsValid, setCalculatorArgsValid] = useState(true);
+
+    useEffect(() => {
+        if (!creatingNewEntity) {
+            return;
+        }
+        if (!form.getValues('fulfillmentHandler')) {
+            form.setValue('fulfillmentHandler', 'manual-fulfillment', {
+                shouldDirty: true,
+                shouldValidate: true,
+            });
+        }
+        if (!form.getValues('checker')?.code) {
+            form.setValue(
+                'checker',
+                { code: 'multivendor-shipping-eligibility-checker', arguments: [] },
+                { shouldDirty: true, shouldValidate: true },
+            );
+        }
+        if (!form.getValues('calculator')?.code) {
+            form.setValue(
+                'calculator',
+                {
+                    code: 'default-shipping-calculator',
+                    arguments: [
+                        { name: 'rate', value: '500' },
+                        { name: 'includesTax', value: 'auto' },
+                        { name: 'taxRate', value: '20' },
+                    ],
+                },
+                { shouldDirty: true, shouldValidate: true },
+            );
+        }
+    }, [creatingNewEntity, form]);`,
+                    );
+                }
+
+                nextCode = nextCode.replace(
+                    '{creatingNewEntity ? <Trans>New shipping method</Trans> : (entity?.name ?? \'\')}',
+                    "{creatingNewEntity ? 'Nuevo método de envío' : (entity?.name ?? '')}",
+                );
+                nextCode = nextCode.replace(
+                    `                            label={<Trans>Name</Trans>}`,
+                    `                            label="Nombre"`,
+                );
+                nextCode = nextCode.replace(
+                    `                            label={<Trans>Code</Trans>}`,
+                    `                            label="Código"`,
+                );
+                nextCode = nextCode.replace(
+                    `                            label={<Trans>Description</Trans>}`,
+                    `                            label="Descripción"`,
+                );
+                nextCode = nextCode.replace(
+                    `                            label={<Trans>Fulfillment handler</Trans>}`,
+                    `                            label="Manejador de cumplimiento"`,
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Conditions</Trans>}',
+                    "title={'Condiciones'}",
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Calculator</Trans>}',
+                    "title={'Calculadora'}",
+                );
+                nextCode = nextCode.replace(
+                    '{creatingNewEntity ? <Trans>Create</Trans> : <Trans>Update</Trans>}',
+                    "{creatingNewEntity ? 'Crear' : 'Actualizar'}",
+                );
+
+                if (!nextCode.includes('<PermissionGuard requires={[\'CreateSettings\']}')) {
+                    nextCode = nextCode.replace(
+                        `                {!creatingNewEntity && entity && (
+                    <ActionBarItem itemId="test-shipping-button">
+                        <TestSingleShippingMethodSheet checker={checker} calculator={calculator} />
+                    </ActionBarItem>
+                )}`,
+                        `                {!creatingNewEntity && entity && (
+                    <PermissionGuard requires={['CreateSettings']}>
+                        <ActionBarItem itemId="test-shipping-button">
+                            <TestSingleShippingMethodSheet checker={checker} calculator={calculator} />
+                        </ActionBarItem>
+                    </PermissionGuard>
+                )}`,
+                    );
+                }
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/shipping-methods.tsx')) {
+                nextCode = nextCode.replace(
+                    'title={<Trans>Shipping Methods</Trans>}',
+                    "title={'Métodos de envío'}",
+                );
+                nextCode = nextCode.replace(
+                    'breadcrumb: () => <Trans>Shipping Methods</Trans>',
+                    "breadcrumb: () => 'Métodos de envío'",
+                );
+                nextCode = nextCode.replace(
+                    '<Trans>New Shipping Method</Trans>',
+                    "'Nuevo método de envío'",
+                );
+                if (!nextCode.includes('<PermissionGuard requires={[\'CreateSettings\']}')) {
+                    nextCode = nextCode.replace(
+                        `            <ActionBarItem itemId="test-shipping-button">
+                <TestShippingMethodsSheet />
+            </ActionBarItem>`,
+                        `            <PermissionGuard requires={['CreateSettings']}>
+                <ActionBarItem itemId="test-shipping-button">
+                    <TestShippingMethodsSheet />
+                </ActionBarItem>
+            </PermissionGuard>`,
+                    );
+                }
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/components/shipping-eligibility-checker-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Shipping Eligibility Checker"',
+                    `buttonText="Seleccionar verificador de elegibilidad de envío"`,
+                );
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/components/shipping-calculator-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Shipping Calculator"',
+                    `buttonText="Seleccionar calculadora de envío"`,
+                );
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/components/fulfillment-handler-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'placeholder="Select a fulfillment handler"',
+                    `placeholder="Seleccionar manejador de cumplimiento"`,
                 );
             }
 
