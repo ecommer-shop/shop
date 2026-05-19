@@ -53,6 +53,10 @@ import {
   DeliveryCostPlugin,
   MessengerDomisDeliveryCostStrategy,
 } from '../plugins/delivery-cost';
+import {
+  DeliveryOrderPlugin,
+  MessengerDomisDeliveryOrderStrategy,
+} from '../plugins/delivery-order';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -131,6 +135,13 @@ export const plugins: VendureConfig['plugins'] = [
     strategy: new MessengerDomisDeliveryCostStrategy({
       apiKey: process.env.DELIVERY_COST_API_KEY,
       url: process.env.DELIVERY_COST_API_URL,
+    }),
+  }),
+
+  DeliveryOrderPlugin.init({
+    strategy: new MessengerDomisDeliveryOrderStrategy({
+      apiKey: process.env.DELIVERY_ORDER_API_KEY,
+      url: process.env.DELIVERY_ORDER_API_URL,
     }),
   }),
 
