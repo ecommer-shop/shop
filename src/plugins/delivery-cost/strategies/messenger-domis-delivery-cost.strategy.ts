@@ -10,7 +10,7 @@ import type {
 } from '../types';
 
 const DEFAULT_URL =
-    'https://us-central1-messengerdomis-19924.cloudfunctions.net/calcularCostoDelivery';
+    'https://creardomicilio-shjecnxqxq-uc.a.run.app';
 const DEFAULT_TIMEOUT_MS = 10000;
 
 interface MessengerDomisResponse {
