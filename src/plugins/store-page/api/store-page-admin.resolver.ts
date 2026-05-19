@@ -9,7 +9,8 @@ export class StorePageAdminResolver {
 
     @Mutation()
     @Transaction()
-    @Allow(Permission.UpdateCatalog)
+    /** Vendedores usan permisos granulares (`UpdateProduct`), no el paraguas `UpdateCatalog`. */
+    @Allow(Permission.UpdateCatalog, Permission.UpdateProduct)
     async setProductStoreFeatured(
         @Ctx() ctx: RequestContext,
         @Args() args: { productId: string; featured: boolean },
