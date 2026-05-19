@@ -4,6 +4,7 @@ import { dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
 import { IS_DEV } from './src/config/environment';
+import { patchBaseUiMouseUp } from './src/vite-plugins/patch-base-ui-mouseup';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -632,6 +633,67 @@ function patchVendureDashboardChannelPermissions() {
             }
 
             return nextCode === code ? null : nextCode;
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/framework/dashboard-widget/base-widget')) {
+                nextCode = nextCode.replace(
+                    `'h-full w-full flex flex-col rounded-md'`,
+                    `'h-full w-full flex flex-col rounded-md overflow-hidden'`
+                );
+            }
+
+            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
+                nextCode = nextCode.replace(
+                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
+                    '',
+                );
+            }
+
+            // Profile query must select Administrator customFields subfields
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    `            customFields`,
+                    `            customFields {
+                storeDescription
+                storeBannerUrl {
+                    id
+                    preview
+                }
+            }`,
+                );
+            }
+
+            return nextCode === code ? null : nextCode;
+            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
+                nextCode = nextCode.replace(
+                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
+                    '',
+                );
+            }
+
+            // Profile query must select Administrator customFields subfields
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    `            customFields`,
+                    `            customFields {
+                storeDescription
+                storeBannerUrl {
+                    id
+                    preview
+                }
+            }`,
+                );
+            }
+
+            return nextCode === code ? null : nextCode;
         },
     };
 }
@@ -644,6 +706,7 @@ export default defineConfig({
     },
     plugins: [
         patchVendureDashboardChannelPermissions(),
+        patchBaseUiMouseUp(),
         vendureDashboardPlugin({
             // The vendureDashboardPlugin will scan your configuration in order
             // to find any plugins which have dashboard extensions, as well as
