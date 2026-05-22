@@ -9,30 +9,25 @@ import {
     Collection,
     CollectionService,
     ConfigService,
-    defaultShippingCalculator,
     Facet,
     FacetService,
+    FacetValue,
     InternalServerError,
     isGraphQlErrorResult,
     Logger,
-    manualFulfillmentHandler,
     Permission,
     RequestContext,
     RequestContextService,
     RoleService,
     SellerService,
-    ShippingMethod,
-    ShippingMethodService,
     StockLocation,
     StockLocationService,
-    TaxSetting,
     TransactionalConnection,
     User,
 } from '@vendure/core';
 import crypto from 'crypto';
 
-import { multivendorShippingEligibilityChecker } from '../../multivendor-plugin/config/mv-shipping-eligibility-checker';
-import { loggerCtx } from '../constants';
+import { loggerCtx, SELLER_ADMIN_PERMISSIONS } from '../constants';
 import { GoogleSellerRegistrationResult, SellerOnboardingInput } from '../types';
 
 @Injectable()
@@ -42,7 +37,6 @@ export class SellerOnboardingService {
         private sellerService: SellerService,
         private roleService: RoleService,
         private channelService: ChannelService,
-        private shippingMethodService: ShippingMethodService,
         private configService: ConfigService,
         private stockLocationService: StockLocationService,
         private facetService: FacetService,
@@ -85,7 +79,6 @@ export class SellerOnboardingService {
             },
         }, existingUser ?? undefined);
 
-        await this.createSellerShippingMethod(superAdminCtx, input.shopName, channel);
         await this.createSellerStockLocation(superAdminCtx, input.shopName, channel);
         await this.assignFacetsToSellerChannel(superAdminCtx, channel);
         await this.assignCollectionsToSellerChannel(superAdminCtx, channel);
@@ -145,44 +138,7 @@ export class SellerOnboardingService {
             code: `${shopCode}-admin`,
             channelIds: [channel.id],
             description: `Administrator of ${input.shopName}`,
-            permissions: [
-                Permission.CreateCatalog,
-                Permission.UpdateCatalog,
-                Permission.ReadCatalog,
-                Permission.DeleteCatalog,
-                Permission.CreateOrder,
-                Permission.ReadOrder,
-                Permission.UpdateOrder,
-                Permission.DeleteOrder,
-                Permission.ReadCustomer,
-                Permission.ReadPaymentMethod,
-                Permission.ReadShippingMethod,
-                Permission.ReadPromotion,
-                Permission.ReadCountry,
-                Permission.ReadZone,
-                Permission.ReadChannel,
-                Permission.CreateAsset,
-                Permission.ReadAsset,
-                Permission.UpdateAsset,
-                Permission.CreateCustomer,
-                Permission.UpdateCustomer,
-                Permission.DeleteCustomer,
-                Permission.CreateTag,
-                Permission.ReadTag,
-                Permission.UpdateTag,
-                Permission.DeleteTag,
-                Permission.ReadAdministrator,
-                Permission.UpdateAdministrator,
-                Permission.ReadCollection,
-                Permission.ReadFacet,
-                Permission.CreateStockLocation,
-                Permission.ReadStockLocation,
-                Permission.UpdateStockLocation,
-                Permission.CreatePromotion,
-                Permission.ReadPromotion,
-                Permission.UpdatePromotion,
-                Permission.DeletePromotion,
-            ],
+            permissions: SELLER_ADMIN_PERMISSIONS,
         });
 
         if (existingUser) {
@@ -255,68 +211,6 @@ export class SellerOnboardingService {
         await administratorRepository.save(administrator);
     }
 
-    private async createSellerShippingMethod(
-        ctx: RequestContext,
-        shopName: string,
-        sellerChannel: Channel,
-    ) {
-        const defaultChannel = await this.channelService.getDefaultChannel(ctx);
-        const { shippingEligibilityCheckers, shippingCalculators, fulfillmentHandlers } =
-            this.configService.shippingOptions;
-
-        const shopCode = normalizeString(shopName, '-');
-
-        const checker = shippingEligibilityCheckers.find(
-            c => c.code === multivendorShippingEligibilityChecker.code,
-        );
-        const calculator = shippingCalculators.find(
-            c => c.code === defaultShippingCalculator.code,
-        );
-        const fulfillmentHandler = fulfillmentHandlers.find(
-            h => h.code === manualFulfillmentHandler.code,
-        );
-
-        if (!checker) {
-            throw new InternalServerError(
-                'Could not find a suitable ShippingEligibilityChecker for the seller',
-            );
-        }
-        if (!calculator) {
-            throw new InternalServerError(
-                'Could not find a suitable ShippingCalculator for the seller',
-            );
-        }
-        if (!fulfillmentHandler) {
-            throw new InternalServerError(
-                'Could not find a suitable FulfillmentHandler for the seller',
-            );
-        }
-
-        const shippingMethod = await this.shippingMethodService.create(ctx, {
-            code: `${shopCode}-shipping`,
-            checker: { code: checker.code, arguments: [] },
-            calculator: {
-                code: calculator.code,
-                arguments: [
-                    { name: 'rate', value: '500' },
-                    { name: 'includesTax', value: TaxSetting.auto },
-                    { name: 'taxRate', value: '20' },
-                ],
-            },
-            fulfillmentHandler: fulfillmentHandler.code,
-            translations: [
-                {
-                    languageCode: defaultChannel.defaultLanguageCode,
-                    name: `Standard Shipping for ${shopName}`,
-                },
-            ],
-        });
-
-        await this.channelService.assignToChannels(ctx, ShippingMethod, shippingMethod.id, [
-            sellerChannel.id,
-        ]);
-    }
-
     private async createSellerStockLocation(
         ctx: RequestContext,
         shopName: string,
@@ -338,6 +232,11 @@ export class SellerOnboardingService {
         const { items: facets } = await this.facetService.findAll(ctx, { take: 1000 });
         for (const facet of facets) {
             await this.channelService.assignToChannels(ctx, Facet, facet.id, [sellerChannel.id]);
+
+            for (const facetValue of facet.values) {
+                await this.channelService.assignToChannels(ctx, FacetValue, facetValue.id, [sellerChannel.id]);
+                console.log(`Assigned facet value ${facetValue.id} to channel ${sellerChannel.id}`);
+            }
         }
     }
 
@@ -361,6 +260,90 @@ export class SellerOnboardingService {
             apiType: 'admin',
             user: superAdminUser!,
         });
+    }
+
+    /**
+     * Sincroniza los permisos de un rol de vendedor con los permisos definidos en SELLER_ADMIN_PERMISSIONS
+     * Útil cuando necesitas actualizar los permisos de un rol existente
+     */
+    public async syncSellerAdminPermissions(
+        ctx: RequestContext,
+        roleId: number | string,
+    ): Promise<void> {
+        const role = await this.roleService.findOne(ctx, roleId);
+        if (!role) {
+            throw new InternalServerError(`Role with ID ${roleId} not found`);
+        }
+
+        // Verificar que es un rol de vendedor
+        if (!role.code.includes('-admin')) {
+            throw new InternalServerError(
+                `Role ${role.code} does not appear to be a seller admin role`,
+            );
+        }
+
+        await this.roleService.update(ctx, {
+            id: role.id,
+            permissions: SELLER_ADMIN_PERMISSIONS,
+        });
+
+        Logger.info(
+            `Synced permissions for seller admin role: ${role.code}`,
+            loggerCtx,
+        );
+    }
+
+    /**
+     * Sincroniza los permisos de todos los roles de administrador de vendedor
+     * para el canal actual solamente
+     * Llama a este método después de actualizar SELLER_ADMIN_PERMISSIONS para aplicar
+     * los cambios a todos los vendedores existentes del canal
+     */
+    public async syncAllSellerAdminPermissions(ctx: RequestContext): Promise<void> {
+        const superAdminCtx = await this.getSuperAdminContext(ctx);
+        const currentChannelToken = ctx.channel.token;
+
+        // Obtener todos los roles que son de vendedor (contienen '-admin')
+        const roles = await this.roleService.findAll(superAdminCtx);
+
+        // Filtrar solo los roles de vendedor que pertenecen al canal actual
+        const sellerRoles = roles.items.filter(
+            role =>
+                role.channels.some(channel => channel.token === currentChannelToken) &&
+                role.code.includes('-admin'),
+        );
+
+        if (sellerRoles.length === 0) {
+            Logger.info(
+                `No seller admin roles found to sync for channel: ${currentChannelToken}`,
+                loggerCtx,
+            );
+            return;
+        }
+
+        for (const role of sellerRoles) {
+            try {
+                await this.roleService.update(superAdminCtx, {
+                    id: role.id,
+                    permissions: SELLER_ADMIN_PERMISSIONS,
+                });
+
+                Logger.info(
+                    `Updated permissions for seller admin role: ${role.code} on channel: ${currentChannelToken}`,
+                    loggerCtx,
+                );
+            } catch (error) {
+                Logger.error(
+                    `Failed to update permissions for role ${role.code}: ${error}`,
+                    loggerCtx,
+                );
+            }
+        }
+
+        Logger.info(
+            `Synced permissions for ${sellerRoles.length} seller admin roles on channel: ${currentChannelToken}`,
+            loggerCtx,
+        );
     }
 
     private generateSecurePassword(): string {

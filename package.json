@@ -44,7 +44,6 @@
         "jspdf-autotable": "^3.5.29",
         "jwks-rsa": "^3.2.0",
         "lucide-react": "^0.563.0",
-
         "pg": "8.16.3",
         "react-hook-form": "^7.71.1",
         "recharts": "^3.8.1",
