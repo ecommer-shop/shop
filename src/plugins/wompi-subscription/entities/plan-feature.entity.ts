@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDa
 import { Plan } from './plan.entity';
 import { Feature } from './feature.entity';
 
-@Entity('wompi_subscription_plan_feature')
+@Entity('subscription_plan_feature')
 export class PlanFeature {
     @PrimaryGeneratedColumn()
     id: number;

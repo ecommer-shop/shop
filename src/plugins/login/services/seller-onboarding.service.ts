@@ -9,6 +9,8 @@ import {
     Collection,
     CollectionService,
     ConfigService,
+    Customer,
+    CustomerService,
     Facet,
     FacetService,
     FacetValue,
@@ -29,6 +31,16 @@ import crypto from 'crypto';
 
 import { loggerCtx, SELLER_ADMIN_PERMISSIONS } from '../constants';
 import { GoogleSellerRegistrationResult, SellerOnboardingInput } from '../types';
+import {
+    CustomerSubscription,
+    Plan,
+    BillingInterval,
+    Feature,
+    FeatureType,
+    PlanFeature,
+    SubscriptionStatus,
+} from '../../wompi-subscription/entities';
+import { FEATURE_CODES, DEFAULT_PLAN_NAMES } from '../../wompi-subscription/constants';
 
 @Injectable()
 export class SellerOnboardingService {
@@ -43,6 +55,7 @@ export class SellerOnboardingService {
         private collectionService: CollectionService,
         private requestContextService: RequestContextService,
         private connection: TransactionalConnection,
+        private customerService: CustomerService,
     ) { }
 
     async registerSeller(
@@ -82,6 +95,8 @@ export class SellerOnboardingService {
         await this.createSellerStockLocation(superAdminCtx, input.shopName, channel);
         await this.assignFacetsToSellerChannel(superAdminCtx, channel);
         await this.assignCollectionsToSellerChannel(superAdminCtx, channel);
+
+        await this.assignFreePlanToSeller(superAdminCtx, input);
 
         Logger.info(
             `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
@@ -209,6 +224,130 @@ export class SellerOnboardingService {
             user: reloadedUser,
         });
         await administratorRepository.save(administrator);
+    }
+
+    private async assignFreePlanToSeller(
+        ctx: RequestContext,
+        input: SellerOnboardingInput,
+    ): Promise<void> {
+        const planRepository = this.connection.getRepository(ctx, Plan);
+        const featureRepository = this.connection.getRepository(ctx, Feature);
+        const planFeatureRepository = this.connection.getRepository(ctx, PlanFeature);
+        const subRepository = this.connection.getRepository(ctx, CustomerSubscription);
+
+        let freePlan = await planRepository.findOne({ where: { name: DEFAULT_PLAN_NAMES.FREE } });
+        if (!freePlan) {
+            Logger.info('Free plan not found, creating default plans...', loggerCtx);
+            freePlan = await this.createDefaultPlans(ctx, planRepository, featureRepository, planFeatureRepository);
+        }
+
+        const user = await this.connection.getRepository(ctx, User).findOne({
+            where: { identifier: input.emailAddress },
+        });
+        if (!user) {
+            Logger.warn(`User not found for ${input.emailAddress}, cannot assign free plan`, loggerCtx);
+            return;
+        }
+
+        let customer = await this.customerService.findOneByUserId(ctx, user.id);
+        if (!customer) {
+            const customerRepo = this.connection.getRepository(ctx, Customer);
+            customer = customerRepo.create({
+                emailAddress: input.emailAddress,
+                firstName: input.firstName,
+                lastName: input.lastName,
+                user,
+            });
+            customer = await customerRepo.save(customer);
+            Logger.info(`Created Customer record for seller ${input.emailAddress}`, loggerCtx);
+        }
+
+        const numericCustomerId = Number(customer.id);
+        const existingSub = await subRepository.findOne({ where: { customerId: numericCustomerId } });
+        if (existingSub) {
+            Logger.info(`Seller ${input.emailAddress} already has a subscription`, loggerCtx);
+            return;
+        }
+
+        const subscription = subRepository.create({
+            customerId: numericCustomerId,
+            planId: freePlan.id,
+            status: SubscriptionStatus.ACTIVE,
+            startsAt: new Date(),
+            endsAt: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+            autoRenew: false,
+        });
+        await subRepository.save(subscription);
+
+        Logger.info(`Assigned Free plan to seller ${input.emailAddress} (customer ${customer.id})`, loggerCtx);
+    }
+
+    private async createDefaultPlans(
+        ctx: RequestContext,
+        planRepository: any,
+        featureRepository: any,
+        planFeatureRepository: any,
+    ): Promise<Plan> {
+        const freePlan = planRepository.create({
+            name: DEFAULT_PLAN_NAMES.FREE,
+            price: 0,
+            billingInterval: BillingInterval.MONTHLY,
+            isActive: true,
+            description: 'Plan gratuito con características limitadas',
+        });
+        const savedFreePlan = await planRepository.save(freePlan);
+
+        const tiendaPlan = planRepository.create({
+            name: DEFAULT_PLAN_NAMES.TIENDA,
+            price: 29900,
+            billingInterval: BillingInterval.MONTHLY,
+            isActive: true,
+            description: 'Plan para tiendas con hasta 500 productos',
+        });
+        await planRepository.save(tiendaPlan);
+
+        const omnichannelPlan = planRepository.create({
+            name: DEFAULT_PLAN_NAMES.OMNICHANNEL,
+            price: 99900,
+            billingInterval: BillingInterval.MONTHLY,
+            isActive: true,
+            description: 'Plan multicanal con hasta 1.500 productos',
+        });
+        await planRepository.save(omnichannelPlan);
+
+        const features = [
+            { code: FEATURE_CODES.MAX_PRODUCTS, name: 'Max Products', type: FeatureType.NUMERIC },
+            { code: FEATURE_CODES.MAX_VARIATIONS, name: 'Max Variations', type: FeatureType.NUMERIC },
+            { code: FEATURE_CODES.AI_ACCESS, name: 'AI Access', type: FeatureType.BOOLEAN },
+            { code: FEATURE_CODES.ELECTRONIC_BILLING, name: 'Electronic Billing', type: FeatureType.BOOLEAN },
+        ];
+
+        const planConfigs = [
+            { planId: savedFreePlan.id, values: { max_products: '15', max_variations: '250', ai_access: 'false', electronic_billing: 'false' } },
+            { planId: tiendaPlan.id, values: { max_products: '500', max_variations: '5000', ai_access: 'true', electronic_billing: 'true' } },
+            { planId: omnichannelPlan.id, values: { max_products: '1500', max_variations: '15000', ai_access: 'true', electronic_billing: 'true' } },
+        ];
+
+        for (const featureData of features) {
+            let feature = await featureRepository.findOne({ where: { code: featureData.code } });
+            if (!feature) {
+                feature = featureRepository.create(featureData);
+                feature = await featureRepository.save(feature);
+            }
+
+            for (const config of planConfigs) {
+                await planFeatureRepository.save(
+                    planFeatureRepository.create({
+                        planId: config.planId,
+                        featureId: feature.id,
+                        value: config.values[featureData.code as keyof typeof config.values],
+                    })
+                );
+            }
+        }
+
+        Logger.info('Created default subscription plans', loggerCtx);
+        return savedFreePlan;
     }
 
     private async createSellerStockLocation(

@@ -6,7 +6,7 @@ export enum FeatureType {
     BOOLEAN = 'boolean',
 }
 
-@Entity('wompi_subscription_feature')
+@Entity('subscription_feature')
 export class Feature {
     @PrimaryGeneratedColumn()
     id: number;

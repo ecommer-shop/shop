@@ -7,7 +7,7 @@ export enum BillingInterval {
     YEARLY = 'yearly',
 }
 
-@Entity('wompi_subscription_plan')
+@Entity('subscription_plan')
 export class Plan {
     @PrimaryGeneratedColumn()
     id: number;

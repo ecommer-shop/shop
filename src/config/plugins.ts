@@ -50,6 +50,7 @@ import { StorePagePlugin } from '../plugins/store-page/store-page.plugin';
 import { AutoSkuPlugin } from '../plugins/auto-sku/auto-sku.plugin';
 import { ProductVariantEnforcementPlugin } from '../plugins/product-variant-enforcement/product-variant-enforcement.plugin';
 import { SuperadminvisibilityPlugin } from '../plugins/superadminvisibility/superadminvisibility.plugin';
+import { WompiSubscriptionPlugin } from '../plugins/wompi-subscription/wompi-subscription.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -163,5 +164,13 @@ export const plugins: VendureConfig['plugins'] = [
 
   ProductVariantEnforcementPlugin,
   SuperadminvisibilityPlugin,
+
+  WompiSubscriptionPlugin.init({
+    wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
+    wompiApiKey: process.env.WOMPI_API_KEY || '',
+    wompiEventsSecret: process.env.WOMPI_EVENTS_SECRET || '',
+    wompiIntegritySecret: process.env.WOMPI_INTEGRITY_SECRET || '',
+    currency: process.env.WOMPI_CURRENCY || 'COP',
+  }),
 ];
 

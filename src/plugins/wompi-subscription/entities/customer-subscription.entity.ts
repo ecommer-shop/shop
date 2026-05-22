@@ -9,7 +9,7 @@ export enum SubscriptionStatus {
     CANCELLED = 'CANCELLED',
 }
 
-@Entity('wompi_customer_subscription')
+@Entity('customer_subscription')
 export class CustomerSubscription {
     @PrimaryGeneratedColumn()
     id: number;
@@ -30,19 +30,19 @@ export class CustomerSubscription {
     endsAt: Date;
 
     @Column({ type: 'timestamp', nullable: true })
-    gracePeriodStart: Date;
+    gracePeriodStart: Date | null;
 
     @Column({ default: true })
     autoRenew: boolean;
 
-    @Column({ name: 'wompi_payment_source_id', nullable: true })
-    wompiPaymentSourceId: string;
+    @Column({ name: 'billing_payment_source_id', nullable: true })
+    billingPaymentSourceId: string;
 
-    @Column({ name: 'wompi_customer_email', nullable: true })
-    wompiCustomerEmail: string;
+    @Column({ name: 'billing_customer_email', nullable: true })
+    billingCustomerEmail: string;
 
-    @Column({ name: 'wompi_customer_id', nullable: true })
-    wompiCustomerId: string;
+    @Column({ name: 'billing_customer_id', nullable: true })
+    billingCustomerId: string;
 
     @CreateDateColumn()
     createdAt: Date;
