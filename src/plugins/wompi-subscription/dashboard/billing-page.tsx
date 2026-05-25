@@ -103,9 +103,9 @@ const STOP_AUTO_RENEW_MUTATION = `
 `;
 
 const GET_PAYMENT_SIGNATURE_QUERY = `
-  query GetWompiIntegritySignature($amountInCents: Int!, $paymentReference: String!) {
-    GetWompiIntegritySignature(amountInCents: $amountInCents, paymentReference: $paymentReference)
-  }
+    query GetWompiIntegritySignature($amountInCents: Int!, $paymentReference: String!){
+        GetWompiIntegritySignature(amountInCents: $amountInCents, paymentReference: $paymentReference)
+    }
 `;
 
 const CANCEL_SUBSCRIPTION_MUTATION = `
@@ -804,12 +804,14 @@ function WompiPaymentWidget({
         }
 
         loadWompiScript()
-            .then(() => {
+            .then(async () => {
                 setState('loading-signature');
-                return gql<{ GetWompiIntegritySignature: string }>(GET_PAYMENT_SIGNATURE_QUERY, {
+                const signature = await gql<{ GetWompiIntegritySignature: string }>(GET_PAYMENT_SIGNATURE_QUERY, {
                     amountInCents,
                     paymentReference: reference,
                 });
+                console.log('Wompi integrity signature:', signature);
+                return signature
             })
             .then((data) => {
                 const signature = data.GetWompiIntegritySignature;

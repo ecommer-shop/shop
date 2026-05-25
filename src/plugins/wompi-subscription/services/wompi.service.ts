@@ -142,8 +142,7 @@ export class WompiService {
     }
 
     generateWidgetIntegritySignature(amountInCents: number, reference: string): string {
-        const concatenated = `${amountInCents}${reference}${this.options.currency}${this.options.wompiIntegritySecret}`;
-        return crypto.createHash('sha256').update(concatenated).digest('hex');
+        return this.generateTransactionSignature(amountInCents, reference);
     }
 
     validateWebhookSignature(payload: any): boolean {
