@@ -36,6 +36,18 @@ export class BillingJobService implements OnModuleInit {
             });
         }, 24 * 60 * 60 * 1000);
 
+        setInterval(() => {
+            this.processManualRenewalReminders().catch(err => {
+                this.logger.error('Manual renewal reminders failed: ' + err.message);
+            });
+        }, 24 * 60 * 60 * 1000);
+
+        setInterval(() => {
+            this.processExpiredPendingPayments().catch(err => {
+                this.logger.error('Expired pending payments cleanup failed: ' + err.message);
+            });
+        }, 6 * 60 * 60 * 1000);
+
         this.logger.log('Registered billing scheduled jobs');
     }
 
@@ -57,11 +69,14 @@ export class BillingJobService implements OnModuleInit {
                 const amountInCents = Math.round(plan.price * 100);
                 const reference = `SUB-${subscription.id}-${Date.now()}`;
 
+                const acceptanceToken = await this.wompiService.getAcceptanceToken();
+
                 const transaction = await this.wompiService.createRecurringTransaction(
                     subscription.billingPaymentSourceId,
                     amountInCents,
                     reference,
                     subscription.billingCustomerEmail,
+                    acceptanceToken,
                 );
 
                 if (transaction.status === 'APPROVED') {
@@ -114,6 +129,33 @@ export class BillingJobService implements OnModuleInit {
                 this.logger.log(`Permanently suspended subscription ${subscription.id}`);
             } catch (error: any) {
                 this.logger.error(`Failed to process suspension ${subscription.id}: ${error.message}`);
+            }
+        }
+    }
+
+    async processManualRenewalReminders(): Promise<void> {
+        this.logger.log('Starting manual renewal reminder process');
+
+        const subscriptions = await this.subscriptionService.getManualSubscriptionsDueForRenewal();
+        this.logger.log(`Found ${subscriptions.length} subscriptions needing manual renewal`);
+
+        for (const subscription of subscriptions) {
+            this.logger.log(`Subscription ${subscription.id} for customer ${subscription.customerId} is due for manual renewal (ends at ${subscription.endsAt})`);
+        }
+    }
+
+    async processExpiredPendingPayments(): Promise<void> {
+        this.logger.log('Starting expired pending payments cleanup');
+
+        const subscriptions = await this.subscriptionService.getPendingPaymentSubscriptions();
+        this.logger.log(`Found ${subscriptions.length} expired pending subscriptions`);
+
+        for (const subscription of subscriptions) {
+            try {
+                await this.subscriptionService.updateSubscriptionStatus(subscription.id, SubscriptionStatus.GRACE_PERIOD);
+                this.logger.log(`Moved expired pending subscription ${subscription.id} to grace period`);
+            } catch (error: any) {
+                this.logger.error(`Failed to process pending subscription ${subscription.id}: ${error.message}`);
             }
         }
     }

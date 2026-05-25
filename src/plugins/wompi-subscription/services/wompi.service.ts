@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Logger } from '@vendure/core';
-import { WompiSubscriptionPluginInitOptions, WompiPaymentSourceResponse, WompiCreateTransactionResponse } from '../constants';
+import {
+    WompiSubscriptionPluginInitOptions,
+    WompiPaymentSourceResponse,
+    WompiCreateTransactionResponse,
+    WompiAcceptanceTokenResponse,
+} from '../constants';
 import axios, { AxiosInstance } from 'axios';
 import crypto from 'crypto';
 
@@ -13,6 +18,7 @@ export class WompiService {
         this.options = {
             wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
             wompiApiKey: process.env.WOMPI_API_KEY || '',
+            wompiPublicKey: process.env.WOMPI_PUBLIC_KEY || '',
             wompiEventsSecret: process.env.WOMPI_EVENTS_SECRET || '',
             wompiIntegritySecret: process.env.WOMPI_INTEGRITY_SECRET || '',
             currency: process.env.WOMPI_CURRENCY || 'COP',
@@ -27,12 +33,31 @@ export class WompiService {
         });
     }
 
-    async createPaymentSource(token: string, customerEmail: string): Promise<WompiPaymentSourceResponse> {
+    async getAcceptanceToken(): Promise<string> {
+        try {
+            const publicKey = this.options.wompiPublicKey;
+            const response = await axios.get<WompiAcceptanceTokenResponse>(
+                `${this.options.wompiApiUrl}/v1/merchants/${publicKey}`,
+            );
+            return response.data.data.presigned_acceptance.acceptance_token;
+        } catch (error: any) {
+            Logger.error('Failed to get acceptance token: ' + error.message, 'WompiService');
+            throw new Error('Failed to get acceptance token');
+        }
+    }
+
+    async createPaymentSource(
+        type: string,
+        token: string,
+        customerEmail: string,
+        acceptanceToken: string,
+    ): Promise<WompiPaymentSourceResponse> {
         try {
             const response = await this.apiClient.post('/v1/payment_sources', {
+                type,
                 token,
-                type: 'CARD',
                 customer_email: customerEmail,
+                acceptance_token: acceptanceToken,
             });
             Logger.debug('Created payment source: ' + response.data.data.id, 'WompiService');
             return response.data.data;
@@ -42,21 +67,14 @@ export class WompiService {
         }
     }
 
-    async createRecurringTransaction(
-        paymentSourceId: string,
-        amountInCents: number,
-        reference: string,
-        customerEmail: string,
-    ): Promise<WompiCreateTransactionResponse> {
+    async createTransaction(payload: Record<string, any>): Promise<WompiCreateTransactionResponse> {
+        const amountInCents = payload.amount_in_cents;
+        const reference = payload.reference;
         const signature = this.generateTransactionSignature(amountInCents, reference);
 
         try {
             const response = await this.apiClient.post('/v1/transactions', {
-                payment_source_id: paymentSourceId,
-                amount_in_cents: amountInCents,
-                currency: this.options.currency,
-                reference,
-                customer_email: customerEmail,
+                ...payload,
                 signature,
             });
             Logger.debug(`Created transaction ${response.data.data.id} with status ${response.data.data.status}`, 'WompiService');
@@ -67,6 +85,23 @@ export class WompiService {
         }
     }
 
+    async createRecurringTransaction(
+        paymentSourceId: string,
+        amountInCents: number,
+        reference: string,
+        customerEmail: string,
+        acceptanceToken: string,
+    ): Promise<WompiCreateTransactionResponse> {
+        return this.createTransaction({
+            payment_source_id: paymentSourceId,
+            amount_in_cents: amountInCents,
+            currency: this.options.currency,
+            reference,
+            customer_email: customerEmail,
+            acceptance_token: acceptanceToken,
+        });
+    }
+
     async getTransaction(transactionId: string): Promise<WompiCreateTransactionResponse> {
         try {
             const response = await this.apiClient.get(`/v1/transactions/${transactionId}`);
@@ -74,6 +109,30 @@ export class WompiService {
         } catch (error: any) {
             Logger.error(`Failed to get transaction: ${error.message}`, 'WompiService');
             throw new Error(`Failed to get transaction: ${error.message}`);
+        }
+    }
+
+    async pollTransactionUntilFinal(
+        transactionId: string,
+        maxAttempts = 30,
+        intervalMs = 2000,
+    ): Promise<WompiCreateTransactionResponse> {
+        for (let i = 0; i < maxAttempts; i++) {
+            const transaction = await this.getTransaction(transactionId);
+            if (transaction.status !== 'PENDING') {
+                return transaction;
+            }
+            await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        }
+        throw new Error('Transaction polling timed out');
+    }
+
+    async deletePaymentSource(paymentSourceId: string): Promise<void> {
+        try {
+            await this.apiClient.delete(`/v1/payment_sources/${paymentSourceId}`);
+            Logger.debug('Deleted payment source: ' + paymentSourceId, 'WompiService');
+        } catch (error: any) {
+            Logger.error(`Failed to delete payment source ${paymentSourceId}: ${error.message}`, 'WompiService');
         }
     }
 
@@ -89,17 +148,22 @@ export class WompiService {
                 return false;
             }
 
-            const transaction = payload.data?.transaction;
-            if (!transaction) {
+            const data = payload.data?.transaction;
+            if (!data) {
                 return false;
             }
 
-            const toSign = signature.properties.map((prop: string) => {
-                return this.getNestedValue(transaction, prop);
-            }).join('');
+            const values = signature.properties.map((prop: string) => {
+                return this.getNestedValue(data, prop);
+            });
 
-            const signed = crypto.createHmac('sha256', this.options.wompiEventsSecret).update(toSign).digest('hex');
-            return signed === signature.checksum;
+            const toSign = values.join('') + (payload.timestamp ?? '');
+
+            const eventsSecret = this.options.wompiEventsSecret;
+            const signed = crypto.createHash('sha256').update(toSign + eventsSecret).digest('hex').toUpperCase();
+
+            const checksum = (signature.checksum as string).toUpperCase();
+            return signed === checksum;
         } catch (error) {
             Logger.error('Webhook signature validation failed', 'WompiService');
             return false;

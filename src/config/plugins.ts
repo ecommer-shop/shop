@@ -171,6 +171,7 @@ export const plugins: VendureConfig['plugins'] = [
     wompiEventsSecret: process.env.WOMPI_EVENTS_SECRET || '',
     wompiIntegritySecret: process.env.WOMPI_INTEGRITY_SECRET || '',
     currency: process.env.WOMPI_CURRENCY || 'COP',
+    wompiPublicKey: process.env.WOMPI_PUBLIC_KEY || '',
   }),
 ];
 

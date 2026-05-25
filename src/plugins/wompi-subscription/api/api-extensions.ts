@@ -3,6 +3,7 @@ import gql from 'graphql-tag';
 export const wompiSubscriptionShopApiExtensions = gql`
   enum SubscriptionStatus {
     ACTIVE
+    PENDING_PAYMENT
     GRACE_PERIOD
     SUSPENDED
     CANCELLED
@@ -16,6 +17,11 @@ export const wompiSubscriptionShopApiExtensions = gql`
   enum FeatureType {
     numeric
     boolean
+  }
+
+  enum PaymentFlowType {
+    RECURRENTE
+    MANUAL
   }
 
   type Plan {
@@ -49,10 +55,26 @@ export const wompiSubscriptionShopApiExtensions = gql`
     gracePeriodStart: DateTime
     autoRenew: Boolean!
     plan: Plan!
+    paymentMethodType: String
+    paymentFlowType: String
     productLimit: Int
     variationLimit: Int
     hasAIAccess: Boolean
     hasElectronicBilling: Boolean
+  }
+
+  type PendingSubscriptionResult {
+    id: ID!
+    status: SubscriptionStatus!
+    startsAt: DateTime
+    endsAt: DateTime
+    autoRenew: Boolean!
+    plan: Plan!
+    paymentMethodType: String
+    paymentFlowType: String
+    asyncPaymentUrl: String
+    qrImage: String
+    transactionId: String
   }
 
   type SubscriptionFeatureUsage {
@@ -80,7 +102,14 @@ export const wompiSubscriptionShopApiExtensions = gql`
     createSubscriptionWithPayment(
       token: String!
       planId: Int!
+      paymentMethod: String!
     ): CustomerSubscription
+    createPendingSubscription(
+      planId: Int!
+      paymentMethod: String!
+    ): PendingSubscriptionResult
+    stopAutoRenew(subscriptionId: Int!): CustomerSubscription
+    cancelSubscription(subscriptionId: Int!): CustomerSubscription
   }
 `;
 

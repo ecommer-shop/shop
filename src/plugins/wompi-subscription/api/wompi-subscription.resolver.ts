@@ -1,13 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Resolver, Query, Mutation, Args, Context } from '@nestjs/graphql';
 import { RequestContext, CustomerService } from '@vendure/core';
 import { SubscriptionService } from '../services/subscription.service';
 import { WompiService } from '../services/wompi.service';
-import { FEATURE_CODES } from '../constants';
-import { SubscriptionStatus } from '../entities/customer-subscription.entity';
-import { Plan, BillingInterval } from '../entities/plan.entity';
-import { PlanFeature } from '../entities/plan-feature.entity';
-import { CustomerSubscription } from '../entities/customer-subscription.entity';
+import { FEATURE_CODES, PAYMENT_METHOD_FLOW, PaymentFlowType } from '../constants';
 
 @Injectable()
 export class WompiSubscriptionShopResolver {
@@ -51,6 +47,8 @@ export class WompiSubscriptionShopResolver {
             gracePeriodStart: subscription.gracePeriodStart,
             autoRenew: subscription.autoRenew,
             plan: subscription.plan,
+            paymentMethodType: subscription.paymentMethodType,
+            paymentFlowType: subscription.paymentFlowType,
             productLimit: productLimitValue ? parseInt(productLimitValue, 10) : 0,
             variationLimit: variationLimitValue ? parseInt(variationLimitValue, 10) : 0,
             hasAIAccess: aiAccess,
@@ -97,6 +95,8 @@ export class WompiSubscriptionShopResolver {
             gracePeriodStart: subscription.gracePeriodStart,
             autoRenew: subscription.autoRenew,
             plan: subscription.plan,
+            paymentMethodType: subscription.paymentMethodType,
+            paymentFlowType: subscription.paymentFlowType,
         };
     }
 
@@ -105,6 +105,7 @@ export class WompiSubscriptionShopResolver {
         @Context() ctx: RequestContext,
         @Args('token') token: string,
         @Args('planId') planId: number,
+        @Args('paymentMethod') paymentMethod: string,
     ) {
         const customerId = await this.resolveCustomerId(ctx);
         if (!customerId) {
@@ -116,17 +117,33 @@ export class WompiSubscriptionShopResolver {
             throw new Error('Customer not found or no email');
         }
 
-        const paymentSource = await this.wompiService.createPaymentSource(token, customer.emailAddress);
+        const flowType = PAYMENT_METHOD_FLOW[paymentMethod as keyof typeof PAYMENT_METHOD_FLOW];
+        if (!flowType) {
+            throw new Error(`Invalid payment method: ${paymentMethod}`);
+        }
 
-        const subscription = await this.subscriptionService.createSubscription(
+        if (flowType !== PaymentFlowType.RECURRENTE) {
+            throw new Error('Use createPendingSubscription for manual payment methods');
+        }
+
+        const acceptanceToken = await this.wompiService.getAcceptanceToken();
+
+        const paymentSource = await this.wompiService.createPaymentSource(
+            paymentMethod,
+            token,
+            customer.emailAddress,
+            acceptanceToken,
+        );
+
+        const subscription = await this.subscriptionService.createRecurrentSubscription(
             customerId,
             planId,
+            paymentMethod,
             paymentSource.id,
             customer.emailAddress,
         );
 
-        const plan = subscription.plan;
-        const amountInCents = Math.round(plan.price * 100);
+        const amountInCents = Math.round(subscription.plan.price * 100);
         const reference = `SUB-${subscription.id}-${Date.now()}`;
 
         try {
@@ -135,6 +152,7 @@ export class WompiSubscriptionShopResolver {
                 amountInCents,
                 reference,
                 customer.emailAddress,
+                acceptanceToken,
             );
 
             if (transaction.status === 'APPROVED') {
@@ -157,10 +175,122 @@ export class WompiSubscriptionShopResolver {
             gracePeriodStart: subscription.gracePeriodStart,
             autoRenew: subscription.autoRenew,
             plan: subscription.plan,
+            paymentMethodType: subscription.paymentMethodType,
+            paymentFlowType: subscription.paymentFlowType,
             productLimit: productLimitValue ? parseInt(productLimitValue, 10) : 0,
             variationLimit: variationLimitValue ? parseInt(variationLimitValue, 10) : 0,
             hasAIAccess: aiAccess,
             hasElectronicBilling: billingAccess,
+        };
+    }
+
+    @Mutation('createPendingSubscription')
+    async createPendingSubscription(
+        @Context() ctx: RequestContext,
+        @Args('planId') planId: number,
+        @Args('paymentMethod') paymentMethod: string,
+    ) {
+        const customerId = await this.resolveCustomerId(ctx);
+        if (!customerId) {
+            throw new Error('Not authenticated');
+        }
+
+        const customer = await this.customerService.findOne(ctx, customerId);
+        if (!customer || !customer.emailAddress) {
+            throw new Error('Customer not found or no email');
+        }
+
+        const { subscription, reference } = await this.subscriptionService.createPendingSubscription(
+            customerId,
+            planId,
+            paymentMethod,
+        );
+
+        const acceptanceToken = await this.wompiService.getAcceptanceToken();
+        const amountInCents = Math.round(subscription.plan.price * 100);
+
+        const transaction = await this.wompiService.createTransaction({
+            amount_in_cents: amountInCents,
+            currency: 'COP',
+            reference,
+            customer_email: customer.emailAddress,
+            payment_method: {
+                type: paymentMethod,
+            },
+            acceptance_token: acceptanceToken,
+            redirect_url: '',
+        });
+
+        const asyncPaymentUrl = transaction.payment_method?.extra?.async_payment_url
+            || transaction.payment_method?.extra?.url
+            || null;
+
+        const qrImage = transaction.payment_method?.extra?.qr_image || null;
+
+        return {
+            id: subscription.id,
+            status: subscription.status,
+            startsAt: subscription.startsAt,
+            endsAt: subscription.endsAt,
+            autoRenew: subscription.autoRenew,
+            plan: subscription.plan,
+            paymentMethodType: subscription.paymentMethodType,
+            paymentFlowType: subscription.paymentFlowType,
+            asyncPaymentUrl,
+            qrImage,
+            transactionId: transaction.id,
+        };
+    }
+
+    @Mutation('stopAutoRenew')
+    async stopAutoRenew(
+        @Context() ctx: RequestContext,
+        @Args('subscriptionId') subscriptionId: number,
+    ) {
+        const customerId = await this.resolveCustomerId(ctx);
+        if (!customerId) {
+            throw new Error('Not authenticated');
+        }
+
+        const subscription = await this.subscriptionService.getSubscriptionById(subscriptionId);
+        if (!subscription || subscription.customerId !== customerId) {
+            throw new Error('Subscription not found');
+        }
+
+        const updated = await this.subscriptionService.stopAutoRenew(subscriptionId);
+        return {
+            id: updated.id,
+            status: updated.status,
+            startsAt: updated.startsAt,
+            endsAt: updated.endsAt,
+            autoRenew: updated.autoRenew,
+            plan: updated.plan,
+        };
+    }
+
+    @Mutation('cancelSubscription')
+    async cancelSubscription(
+        @Context() ctx: RequestContext,
+        @Args('subscriptionId') subscriptionId: number,
+    ) {
+        const customerId = await this.resolveCustomerId(ctx);
+        if (!customerId) {
+            throw new Error('Not authenticated');
+        }
+
+        const subscription = await this.subscriptionService.getSubscriptionById(subscriptionId);
+        if (!subscription || subscription.customerId !== customerId) {
+            throw new Error('Subscription not found');
+        }
+
+        const updated = await this.subscriptionService.cancelSubscription(subscriptionId);
+        return {
+            id: updated.id,
+            status: updated.status,
+            startsAt: updated.startsAt,
+            endsAt: updated.endsAt,
+            autoRenew: updated.autoRenew,
+            plan: updated.plan,
         };
     }
 }

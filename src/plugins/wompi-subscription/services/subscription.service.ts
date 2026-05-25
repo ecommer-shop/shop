@@ -1,13 +1,19 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual, IsNull } from 'typeorm';
+import { Repository, LessThanOrEqual, MoreThan, IsNull } from 'typeorm';
 import { Logger, CustomerService, Product, ChannelService, RequestContextService } from '@vendure/core';
 import { Plan, BillingInterval } from '../entities/plan.entity';
 import { Feature, FeatureType } from '../entities/feature.entity';
 import { PlanFeature } from '../entities/plan-feature.entity';
 import { CustomerSubscription, SubscriptionStatus } from '../entities/customer-subscription.entity';
 import { WompiService } from './wompi.service';
-import { FEATURE_CODES, GRACE_PERIOD_DAYS, DEFAULT_PLAN_NAMES } from '../constants';
+import {
+    FEATURE_CODES,
+    GRACE_PERIOD_DAYS,
+    DEFAULT_PLAN_NAMES,
+    MANUAL_RENEWAL_REMINDER_DAYS,
+    PaymentFlowType,
+} from '../constants';
 
 @Injectable()
 export class SubscriptionService implements OnModuleInit {
@@ -49,6 +55,7 @@ export class SubscriptionService implements OnModuleInit {
             startsAt: new Date(),
             endsAt: this.calculateEndDate(freePlan.billingInterval),
             autoRenew: false,
+            paymentFlowType: PaymentFlowType.MANUAL,
         });
 
         const saved = await this.subscriptionRepository.save(subscription);
@@ -104,9 +111,17 @@ export class SubscriptionService implements OnModuleInit {
         });
     }
 
-    async createSubscription(
+    async findByPendingReference(reference: string): Promise<CustomerSubscription | null> {
+        return this.subscriptionRepository.findOne({
+            where: { pendingPaymentReference: reference, status: SubscriptionStatus.PENDING_PAYMENT },
+            relations: ['plan'],
+        });
+    }
+
+    async createRecurrentSubscription(
         customerId: number,
         planId: number,
+        paymentMethodType: string,
         billingPaymentSourceId: string,
         billingCustomerEmail: string,
     ): Promise<CustomerSubscription> {
@@ -129,15 +144,83 @@ export class SubscriptionService implements OnModuleInit {
             autoRenew: true,
             billingPaymentSourceId,
             billingCustomerEmail,
+            paymentMethodType,
+            paymentFlowType: PaymentFlowType.RECURRENTE,
+            lastPaymentAt: new Date(),
         });
 
         const saved = await this.subscriptionRepository.save(subscription);
-        Logger.info(`Created subscription ${saved.id} for customer ${customerId} with plan ${plan.name}`, 'SubscriptionService');
+        Logger.info(`Created recurrent subscription ${saved.id} for customer ${customerId} with plan ${plan.name}`, 'SubscriptionService');
         return saved;
     }
 
+    async createPendingSubscription(
+        customerId: number,
+        planId: number,
+        paymentMethodType: string,
+    ): Promise<{ subscription: CustomerSubscription; reference: string }> {
+        const existing = await this.getSubscriptionByCustomerId(customerId);
+        if (existing) {
+            throw new Error('Customer already has a subscription');
+        }
+
+        const plan = await this.getPlanById(planId);
+        if (!plan) {
+            throw new Error('Plan not found');
+        }
+
+        const reference = `SUB-PENDING-${customerId}-${Date.now()}`;
+
+        const subscription = this.subscriptionRepository.create({
+            customerId,
+            planId,
+            status: SubscriptionStatus.PENDING_PAYMENT,
+            startsAt: new Date(),
+            endsAt: this.calculateEndDate(plan.billingInterval),
+            autoRenew: false,
+            paymentMethodType,
+            paymentFlowType: PaymentFlowType.MANUAL,
+            pendingPaymentReference: reference,
+        });
+
+        const saved = await this.subscriptionRepository.save(subscription);
+        Logger.info(`Created pending subscription ${saved.id} for customer ${customerId}`, 'SubscriptionService');
+        return { subscription: saved, reference };
+    }
+
+    async activateSubscriptionAfterPayment(subscriptionId: number, paymentSourceId?: string): Promise<CustomerSubscription> {
+        const subscription = await this.subscriptionRepository.findOne({ where: { id: subscriptionId }, relations: ['plan'] });
+        if (!subscription) {
+            throw new Error('Subscription not found');
+        }
+
+        subscription.status = SubscriptionStatus.ACTIVE;
+        subscription.pendingPaymentReference = null;
+        subscription.lastPaymentAt = new Date();
+        if (paymentSourceId) {
+            subscription.billingPaymentSourceId = paymentSourceId;
+        }
+
+        return this.subscriptionRepository.save(subscription);
+    }
+
+    async createSubscription(
+        customerId: number,
+        planId: number,
+        billingPaymentSourceId: string,
+        billingCustomerEmail: string,
+    ): Promise<CustomerSubscription> {
+        return this.createRecurrentSubscription(
+            customerId,
+            planId,
+            'CARD',
+            billingPaymentSourceId,
+            billingCustomerEmail,
+        );
+    }
+
     async updateSubscriptionStatus(subscriptionId: number, status: SubscriptionStatus): Promise<CustomerSubscription> {
-        const subscription = await this.subscriptionRepository.findOne({ where: { id: subscriptionId } });
+        const subscription = await this.subscriptionRepository.findOne({ where: { id: subscriptionId }, relations: ['plan'] });
         if (!subscription) {
             throw new Error('Subscription not found');
         }
@@ -164,7 +247,60 @@ export class SubscriptionService implements OnModuleInit {
         }
 
         subscription.endsAt = this.calculateEndDate(subscription.plan.billingInterval, subscription.endsAt);
+        subscription.lastPaymentAt = new Date();
         return this.subscriptionRepository.save(subscription);
+    }
+
+    async extendManualSubscription(subscriptionId: number): Promise<CustomerSubscription> {
+        const subscription = await this.subscriptionRepository.findOne({
+            where: { id: subscriptionId },
+            relations: ['plan'],
+        });
+        if (!subscription) {
+            throw new Error('Subscription not found');
+        }
+
+        subscription.endsAt = this.calculateEndDate(subscription.plan.billingInterval, subscription.endsAt || new Date());
+        subscription.lastPaymentAt = new Date();
+        return this.subscriptionRepository.save(subscription);
+    }
+
+    async stopAutoRenew(subscriptionId: number): Promise<CustomerSubscription> {
+        const subscription = await this.subscriptionRepository.findOne({ where: { id: subscriptionId } });
+        if (!subscription) {
+            throw new Error('Subscription not found');
+        }
+
+        subscription.autoRenew = false;
+        Logger.info(`Stopped auto-renew for subscription ${subscriptionId}`, 'SubscriptionService');
+        return this.subscriptionRepository.save(subscription);
+    }
+
+    async cancelSubscription(subscriptionId: number): Promise<CustomerSubscription> {
+        const subscription = await this.subscriptionRepository.findOne({ where: { id: subscriptionId } });
+        if (!subscription) {
+            throw new Error('Subscription not found');
+        }
+
+        if (subscription.billingPaymentSourceId) {
+            await this.wompiService.deletePaymentSource(subscription.billingPaymentSourceId);
+            subscription.billingPaymentSourceId = null;
+        }
+
+        subscription.status = SubscriptionStatus.CANCELLED;
+        subscription.autoRenew = false;
+
+        const saved = await this.subscriptionRepository.save(subscription);
+
+        const freePlan = await this.getFreePlan();
+        await this.downgradeToFree(subscriptionId);
+
+        const limitValue = await this.getFeatureValue(subscription.customerId, FEATURE_CODES.MAX_PRODUCTS);
+        const limit = limitValue ? parseInt(limitValue, 10) : 15;
+        await this.hideExcessProducts(subscription.customerId, limit);
+
+        Logger.info(`Cancelled subscription ${subscriptionId} for customer ${subscription.customerId}`, 'SubscriptionService');
+        return saved;
     }
 
     async cancelAutoRenew(customerId: number): Promise<CustomerSubscription> {
@@ -280,6 +416,37 @@ export class SubscriptionService implements OnModuleInit {
             where: {
                 status: SubscriptionStatus.SUSPENDED,
                 gracePeriodStart: LessThanOrEqual(cutoffDate),
+            },
+            relations: ['plan'],
+        });
+    }
+
+    async getManualSubscriptionsDueForRenewal(): Promise<CustomerSubscription[]> {
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + MANUAL_RENEWAL_REMINDER_DAYS);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return this.subscriptionRepository.find({
+            where: {
+                status: SubscriptionStatus.ACTIVE,
+                autoRenew: false,
+                paymentFlowType: PaymentFlowType.MANUAL,
+                endsAt: LessThanOrEqual(futureDate),
+            },
+            relations: ['plan'],
+        });
+    }
+
+    async getPendingPaymentSubscriptions(): Promise<CustomerSubscription[]> {
+        const cutoffDate = new Date();
+        cutoffDate.setHours(cutoffDate.getHours() - 24);
+
+        return this.subscriptionRepository.find({
+            where: {
+                status: SubscriptionStatus.PENDING_PAYMENT,
+                createdAt: LessThanOrEqual(cutoffDate),
             },
             relations: ['plan'],
         });
