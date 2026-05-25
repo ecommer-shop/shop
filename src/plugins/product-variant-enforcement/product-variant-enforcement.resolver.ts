@@ -11,16 +11,9 @@ import {
     Transaction,
     UserInputError,
 } from '@vendure/core';
+import { UseGuards } from '@nestjs/common';
+import { ProductLimitGuard } from '../wompi-subscription/guards/feature.guard';
 
-/**
- * Extiende el resolver de Admin API para la mutación `updateProduct`.
- *
- * Bloquea habilitar (enabled: true) un producto que no tenga
- * al menos una variante activa (enabled + no eliminada).
- *
- * Registro en vendure-config.ts dentro del AdminApiExtension del plugin:
- *   resolvers: [ProductVariantEnforcementResolver]
- */
 @Resolver()
 export class ProductVariantEnforcementResolver {
     constructor(
@@ -31,13 +24,13 @@ export class ProductVariantEnforcementResolver {
     @Transaction()
     @Mutation()
     @Allow(Permission.UpdateCatalog, Permission.UpdateProduct)
+    @UseGuards(ProductLimitGuard)
     async updateProduct(
         @Ctx() ctx: RequestContext,
         @Args() args: { input: { id: string; enabled?: boolean } },
     ) {
         const { input } = args;
 
-        // Solo validar si se intenta habilitar explícitamente
         if (input.enabled === true) {
             const activeVariantCount = await this.connection
                 .getRepository(ctx, ProductVariant)

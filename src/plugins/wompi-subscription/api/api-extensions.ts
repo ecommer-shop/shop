@@ -95,6 +95,7 @@ export const wompiSubscriptionShopApiExtensions = gql`
     allPlans: [Plan!]!
     checkProductLimit: SubscriptionCheckResult
     checkFeatureAccess(featureCode: String!): Boolean
+    GetWompiIntegritySignature(amountInCents: Int!, paymentReference: String!): String!
   }
 
   extend type Mutation {

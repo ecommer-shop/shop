@@ -808,6 +808,9 @@ export default defineConfig({
       });
     </script>
     <script>
+      window.__WOMPI_PUBLIC_KEY__ = "${process.env.WOMPI_PUBLIC_KEY || ''}";
+    </script>
+    <script>
         document.addEventListener('click', function(e) {
             const target = e.target;
             const menuButton = target.closest('[data-sidebar="menu-button"]');

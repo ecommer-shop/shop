@@ -18,6 +18,12 @@ export const GRACE_PERIOD_DAYS = 15;
 export const SUSPENSION_DAYS = 30;
 export const MANUAL_RENEWAL_REMINDER_DAYS = 5;
 
+export const PLAN_HIERARCHY: Record<string, number> = {
+    [DEFAULT_PLAN_NAMES.FREE]: 0,
+    [DEFAULT_PLAN_NAMES.TIENDA]: 1,
+    [DEFAULT_PLAN_NAMES.OMNICHANNEL]: 2,
+};
+
 export enum PaymentFlowType {
     RECURRENTE = 'RECURRENTE',
     MANUAL = 'MANUAL',

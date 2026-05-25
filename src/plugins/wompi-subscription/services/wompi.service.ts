@@ -37,7 +37,7 @@ export class WompiService {
         try {
             const publicKey = this.options.wompiPublicKey;
             const response = await axios.get<WompiAcceptanceTokenResponse>(
-                `${this.options.wompiApiUrl}/v1/merchants/${publicKey}`,
+                `${this.options.wompiApiUrl}/merchants/${publicKey}`,
             );
             return response.data.data.presigned_acceptance.acceptance_token;
         } catch (error: any) {
@@ -53,7 +53,7 @@ export class WompiService {
         acceptanceToken: string,
     ): Promise<WompiPaymentSourceResponse> {
         try {
-            const response = await this.apiClient.post('/v1/payment_sources', {
+            const response = await this.apiClient.post('/payment_sources', {
                 type,
                 token,
                 customer_email: customerEmail,
@@ -73,7 +73,7 @@ export class WompiService {
         const signature = this.generateTransactionSignature(amountInCents, reference);
 
         try {
-            const response = await this.apiClient.post('/v1/transactions', {
+            const response = await this.apiClient.post('/transactions', {
                 ...payload,
                 signature,
             });
@@ -104,7 +104,7 @@ export class WompiService {
 
     async getTransaction(transactionId: string): Promise<WompiCreateTransactionResponse> {
         try {
-            const response = await this.apiClient.get(`/v1/transactions/${transactionId}`);
+            const response = await this.apiClient.get(`/transactions/${transactionId}`);
             return response.data.data;
         } catch (error: any) {
             Logger.error(`Failed to get transaction: ${error.message}`, 'WompiService');
@@ -129,7 +129,7 @@ export class WompiService {
 
     async deletePaymentSource(paymentSourceId: string): Promise<void> {
         try {
-            await this.apiClient.delete(`/v1/payment_sources/${paymentSourceId}`);
+            await this.apiClient.delete(`/payment_sources/${paymentSourceId}`);
             Logger.debug('Deleted payment source: ' + paymentSourceId, 'WompiService');
         } catch (error: any) {
             Logger.error(`Failed to delete payment source ${paymentSourceId}: ${error.message}`, 'WompiService');
@@ -138,6 +138,11 @@ export class WompiService {
 
     generateTransactionSignature(amountInCents: number, reference: string): string {
         const concatenated = `${reference}${amountInCents}${this.options.currency}${this.options.wompiIntegritySecret}`;
+        return crypto.createHash('sha256').update(concatenated).digest('hex');
+    }
+
+    generateWidgetIntegritySignature(amountInCents: number, reference: string): string {
+        const concatenated = `${amountInCents}${reference}${this.options.currency}${this.options.wompiIntegritySecret}`;
         return crypto.createHash('sha256').update(concatenated).digest('hex');
     }
 

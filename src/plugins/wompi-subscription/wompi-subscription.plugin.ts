@@ -1,5 +1,5 @@
 import { PluginCommonModule, Type, VendurePlugin, Product } from '@vendure/core';
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WOMPI_SUBSCRIPTION_PLUGIN_OPTIONS, WompiSubscriptionPluginInitOptions } from './constants';
 import { Plan, Feature, PlanFeature, CustomerSubscription } from './entities';
@@ -7,8 +7,9 @@ import { WompiService, SubscriptionService, BillingJobService } from './services
 import { WompiWebhookController, WompiTokenController } from './api/wompi-webhook.controller';
 import { WompiSubscriptionShopResolver } from './api/wompi-subscription.resolver';
 import { shopApiExtensions } from './api/api-extensions';
-import { FeatureGuard, ProductLimitGuard, FeatureAccessGuard } from './guards';
+import { FeatureGuard, ProductLimitGuard, FeatureAccessGuard, PlanGuard } from './guards';
 
+@Global()
 @Module({
     imports: [PluginCommonModule, TypeOrmModule.forFeature([Plan, Feature, PlanFeature, CustomerSubscription, Product])],
     controllers: [WompiWebhookController, WompiTokenController],
@@ -20,8 +21,9 @@ import { FeatureGuard, ProductLimitGuard, FeatureAccessGuard } from './guards';
         FeatureGuard,
         ProductLimitGuard,
         FeatureAccessGuard,
+        PlanGuard,
     ],
-    exports: [SubscriptionService, WompiService],
+    exports: [SubscriptionService, WompiService, FeatureGuard, ProductLimitGuard, FeatureAccessGuard, PlanGuard],
 })
 export class WompiSubscriptionModule {}
 
@@ -40,8 +42,9 @@ export class WompiSubscriptionModule {}
     },
     adminApiExtensions: {
         schema: shopApiExtensions,
-        resolvers: [],
+        resolvers: [WompiSubscriptionShopResolver],
     },
+    dashboard: './dashboard/index.tsx',
     configuration: (config) => {
         return config;
     },

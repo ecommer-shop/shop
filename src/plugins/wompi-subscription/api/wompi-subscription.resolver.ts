@@ -268,6 +268,14 @@ export class WompiSubscriptionShopResolver {
         };
     }
 
+    @Query('GetWompiIntegritySignature')
+    async getWompiIntegritySignature(
+        @Args('amountInCents') amountInCents: number,
+        @Args('paymentReference') paymentReference: string,
+    ) {
+        return this.wompiService.generateWidgetIntegritySignature(amountInCents, paymentReference);
+    }
+
     @Mutation('cancelSubscription')
     async cancelSubscription(
         @Context() ctx: RequestContext,

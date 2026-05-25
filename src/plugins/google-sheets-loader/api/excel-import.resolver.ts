@@ -1,6 +1,8 @@
 import { Resolver, Mutation, Args, ObjectType, Field, InputType } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
+import { UseGuards } from '@nestjs/common';
 import { ExcelImportService, ImportProduct } from '../services/excel-import.service';
+import { ProductLimitGuard } from '../../wompi-subscription/guards/feature.guard';
 
 @InputType()
 export class ImportProductInputType {
@@ -73,6 +75,7 @@ export class ExcelImportResolver {
     ) { }
 
     @Mutation(() => ImportProductsResultType)
+    @UseGuards(ProductLimitGuard)
     async importProductsFromExcel(
         @Ctx() ctx: RequestContext,
         @Args('products', { type: () => [ImportProductInputType] }) products: ImportProduct[],
