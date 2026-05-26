@@ -319,30 +319,41 @@ export class SubscriptionService implements OnModuleInit {
     }
 
     async cancelSubscription(subscriptionId: number): Promise<CustomerSubscription> {
-        const subscription = await this.subscriptionRepository.findOne({ where: { id: subscriptionId } });
+        const subscription = await this.subscriptionRepository.findOne({
+            where: { id: subscriptionId },
+            relations: ['plan'],
+        });
         if (!subscription) {
             throw new Error('Subscription not found');
         }
 
+        const administratorId = subscription.administratorId;
+
         if (subscription.billingPaymentSourceId) {
             await this.wompiService.deletePaymentSource(subscription.billingPaymentSourceId);
-            subscription.billingPaymentSourceId = null;
         }
 
-        subscription.status = SubscriptionStatus.CANCELLED;
+        const freePlan = await this.getFreePlan();
+        subscription.plan = freePlan;
+        subscription.planId = freePlan.id;
+        subscription.status = SubscriptionStatus.ACTIVE;
         subscription.autoRenew = false;
+        subscription.billingPaymentSourceId = null;
+        subscription.billingCustomerEmail = null as any;
+        subscription.paymentMethodType = null as any;
+        subscription.paymentFlowType = null as any;
+        subscription.gracePeriodStart = null as any;
+        subscription.lastPaymentAt = null as any;
 
         const saved = await this.subscriptionRepository.save(subscription);
+        const reloaded = await this.reloadSubscriptionWithPlan(saved.id);
 
-        const freePlan = await this.getFreePlan();
-        await this.downgradeToFree(subscriptionId);
-
-        const limitValue = await this.getFeatureValue(subscription.administratorId, FEATURE_CODES.MAX_PRODUCTS);
+        const limitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
         const limit = limitValue ? parseInt(limitValue, 10) : 15;
-        await this.hideExcessProducts(subscription.administratorId, limit);
+        await this.hideExcessProducts(administratorId, limit);
 
-        Logger.info(`Cancelled subscription ${subscriptionId} for administrator ${subscription.administratorId}`, 'SubscriptionService');
-        return saved;
+        Logger.info(`Subscription ${subscriptionId} reverted to Free plan for administrator ${administratorId}`, 'SubscriptionService');
+        return reloaded ?? saved;
     }
 
     async cancelAutoRenew(administratorId: number): Promise<CustomerSubscription> {
@@ -509,8 +520,9 @@ export class SubscriptionService implements OnModuleInit {
             throw new Error('Subscription not found');
         }
 
+        subscription.plan = freePlan;
         subscription.planId = freePlan.id;
-        subscription.status = SubscriptionStatus.SUSPENDED;
+        subscription.status = SubscriptionStatus.ACTIVE;
 
         return this.subscriptionRepository.save(subscription);
     }

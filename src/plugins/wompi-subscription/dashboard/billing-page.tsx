@@ -238,7 +238,7 @@ export function BillingPage() {
     useEffect(() => {
         gql<{ activeAdministrator: { emailAddress: string } }>(ACTIVE_ADMIN_QUERY)
             .then(d => setAdminEmail(d.activeAdministrator.emailAddress))
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     const loadData = useCallback(async () => {
@@ -289,15 +289,11 @@ export function BillingPage() {
         if (!sub) return;
         setActionLoading('cancel');
         try {
-            const data = await gql<{ cancelSubscription: Subscription }>(CANCEL_SUBSCRIPTION_MUTATION, {
+            await gql(CANCEL_SUBSCRIPTION_MUTATION, {
                 subscriptionId: Number(sub.id),
                 customerEmail: adminEmail,
             });
-            setSub(prev => prev ? {
-                ...prev,
-                status: data.cancelSubscription.status,
-                plan: data.cancelSubscription.plan,
-            } : prev);
+            loadData();
         } catch (e: any) {
             setError(e.message);
         } finally {
@@ -484,7 +480,7 @@ function ViewStep({
                         <div>
                             <h3 className="text-xl font-semibold">{sub.plan.name}</h3>
                             <p className="text-sm text-muted-foreground">
-                                ${sub.plan.price.toLocaleString('es-CO')}/mes
+                                ${(sub.plan?.price ?? 0).toLocaleString('es-CO')}/mes
                             </p>
                         </div>
                         <Badge variant={statusColor(sub.status)}>{statusLabel(sub.status)}</Badge>

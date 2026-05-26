@@ -191,6 +191,7 @@ export class WompiSubscriptionShopResolver {
                 admin.emailAddress,
                 acceptanceToken,
                 personalAuthToken,
+                paymentMethod === 'CARD' ? 1 : undefined,
             );
 
             if (transaction.status === 'APPROVED') {
