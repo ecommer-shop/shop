@@ -94,18 +94,34 @@ export class SubscriptionService implements OnModuleInit {
         return plan;
     }
 
+    private async reloadSubscriptionWithPlan(id: number): Promise<CustomerSubscription | null> {
+        return this.subscriptionRepository
+            .createQueryBuilder('sub')
+            .leftJoinAndSelect('sub.plan', 'plan')
+            .leftJoinAndSelect('plan.planFeatures', 'planFeatures')
+            .leftJoinAndSelect('planFeatures.feature', 'feature')
+            .where('sub.id = :id', { id })
+            .getOne();
+    }
+
     async getSubscriptionByAdministratorId(administratorId: number): Promise<CustomerSubscription | null> {
-        return this.subscriptionRepository.findOne({
-            where: { administratorId },
-            relations: ['plan', 'plan.planFeatures', 'plan.planFeatures.feature'],
-        });
+        return this.subscriptionRepository
+            .createQueryBuilder('sub')
+            .leftJoinAndSelect('sub.plan', 'plan')
+            .leftJoinAndSelect('plan.planFeatures', 'planFeatures')
+            .leftJoinAndSelect('planFeatures.feature', 'feature')
+            .where('sub.administratorId = :adminId', { adminId: administratorId })
+            .getOne();
     }
 
     async getSubscriptionById(subscriptionId: number): Promise<CustomerSubscription | null> {
-        return this.subscriptionRepository.findOne({
-            where: { id: subscriptionId },
-            relations: ['plan', 'plan.planFeatures', 'plan.planFeatures.feature'],
-        });
+        return this.subscriptionRepository
+            .createQueryBuilder('sub')
+            .leftJoinAndSelect('sub.plan', 'plan')
+            .leftJoinAndSelect('plan.planFeatures', 'planFeatures')
+            .leftJoinAndSelect('planFeatures.feature', 'feature')
+            .where('sub.id = :id', { id: subscriptionId })
+            .getOne();
     }
 
     async findByPendingReference(reference: string): Promise<CustomerSubscription | null> {
@@ -123,13 +139,29 @@ export class SubscriptionService implements OnModuleInit {
         billingCustomerEmail: string,
     ): Promise<CustomerSubscription> {
         const existing = await this.getSubscriptionByAdministratorId(administratorId);
-        if (existing) {
-            throw new Error('Administrator already has a subscription');
-        }
 
         const plan = await this.getPlanById(planId);
         if (!plan) {
             throw new Error('Plan not found');
+        }
+
+        if (existing) {
+            existing.plan = plan;
+            existing.planId = planId;
+            existing.paymentMethodType = paymentMethodType;
+            existing.billingPaymentSourceId = billingPaymentSourceId;
+            existing.billingCustomerEmail = billingCustomerEmail;
+            existing.status = SubscriptionStatus.ACTIVE;
+            existing.autoRenew = true;
+            existing.paymentFlowType = PaymentFlowType.RECURRENTE;
+            existing.endsAt = this.calculateEndDate(plan.billingInterval, existing.endsAt);
+            existing.lastPaymentAt = new Date();
+            existing.gracePeriodStart = null as any;
+
+            const saved = await this.subscriptionRepository.save(existing);
+            const reloaded = await this.reloadSubscriptionWithPlan(saved.id);
+            Logger.info(`Upgraded subscription ${saved.id} for administrator ${administratorId} to plan ${plan.name}`, 'SubscriptionService');
+            return reloaded ?? saved;
         }
 
         const subscription = this.subscriptionRepository.create({
@@ -147,10 +179,7 @@ export class SubscriptionService implements OnModuleInit {
         });
 
         const saved = await this.subscriptionRepository.save(subscription);
-        const reloaded = await this.subscriptionRepository.findOne({
-            where: { id: saved.id },
-            relations: ['plan', 'plan.planFeatures', 'plan.planFeatures.feature'],
-        });
+        const reloaded = await this.reloadSubscriptionWithPlan(saved.id);
         Logger.info(`Created recurrent subscription ${saved.id} for administrator ${administratorId} with plan ${plan.name}`, 'SubscriptionService');
         return reloaded ?? saved;
     }
@@ -161,9 +190,6 @@ export class SubscriptionService implements OnModuleInit {
         paymentMethodType: string,
     ): Promise<{ subscription: CustomerSubscription; reference: string }> {
         const existing = await this.getSubscriptionByAdministratorId(administratorId);
-        if (existing) {
-            throw new Error('Administrator already has a subscription');
-        }
 
         const plan = await this.getPlanById(planId);
         if (!plan) {
@@ -171,6 +197,20 @@ export class SubscriptionService implements OnModuleInit {
         }
 
         const reference = `SUB-PENDING-${administratorId}-${Date.now()}`;
+
+        if (existing) {
+            existing.plan = plan;
+            existing.planId = planId;
+            existing.paymentMethodType = paymentMethodType;
+            existing.status = SubscriptionStatus.PENDING_PAYMENT;
+            existing.paymentFlowType = PaymentFlowType.MANUAL;
+            existing.pendingPaymentReference = reference;
+
+            const saved = await this.subscriptionRepository.save(existing);
+            const reloaded = await this.reloadSubscriptionWithPlan(saved.id);
+            Logger.info(`Upgraded pending subscription ${saved.id} for administrator ${administratorId}`, 'SubscriptionService');
+            return { subscription: reloaded ?? saved, reference };
+        }
 
         const subscription = this.subscriptionRepository.create({
             administratorId,
@@ -185,10 +225,7 @@ export class SubscriptionService implements OnModuleInit {
         });
 
         const saved = await this.subscriptionRepository.save(subscription);
-        const reloaded = await this.subscriptionRepository.findOne({
-            where: { id: saved.id },
-            relations: ['plan', 'plan.planFeatures', 'plan.planFeatures.feature'],
-        });
+        const reloaded = await this.reloadSubscriptionWithPlan(saved.id);
         Logger.info(`Created pending subscription ${saved.id} for administrator ${administratorId}`, 'SubscriptionService');
         return { subscription: reloaded ?? saved, reference };
     }

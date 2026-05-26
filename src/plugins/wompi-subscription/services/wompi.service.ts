@@ -96,7 +96,10 @@ export class WompiService {
             return response.data.data;
         } catch (error: any) {
             Logger.error(`Failed to create transaction: ${error.message}`, 'WompiService');
-            throw new Error(`Failed to create transaction: ${error.response?.data?.error?.message || error.message}`);
+            if (error.response?.data) {
+                Logger.error(`Wompi error details: ${JSON.stringify(error.response.data)}`, 'WompiService');
+            }
+            throw new Error(`Failed to create transaction: ${error.response?.data?.message || error.message}`);
         }
     }
 
@@ -106,6 +109,7 @@ export class WompiService {
         reference: string,
         customerEmail: string,
         acceptanceToken: string,
+        personalAuthToken?: string,
     ): Promise<WompiCreateTransactionResponse> {
         return this.createTransaction({
             payment_source_id: paymentSourceId,
@@ -114,6 +118,7 @@ export class WompiService {
             reference,
             customer_email: customerEmail,
             acceptance_token: acceptanceToken,
+            accept_personal_auth: personalAuthToken,
         });
     }
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Resolver, Query, Mutation, Args, Context } from '@nestjs/graphql';
-import { RequestContext, TransactionalConnection, Administrator } from '@vendure/core';
+import { RequestContext, TransactionalConnection, Administrator, Logger } from '@vendure/core';
 import { SubscriptionService } from '../services/subscription.service';
 import { WompiService } from '../services/wompi.service';
 import { FEATURE_CODES, PAYMENT_METHOD_FLOW, PaymentFlowType } from '../constants';
@@ -45,10 +45,13 @@ export class WompiSubscriptionShopResolver {
             return null;
         }
 
-        const productLimitValue = await this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
-        const variationLimitValue = await this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS);
-        const aiAccess = await this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.AI_ACCESS);
-        const billingAccess = await this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.ELECTRONIC_BILLING);
+        const [plan, productLimitValue, variationLimitValue, aiAccess, billingAccess] = await Promise.all([
+            subscription.planId ? this.subscriptionService.getPlanById(subscription.planId) : Promise.resolve(null),
+            this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS),
+            this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS),
+            this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.AI_ACCESS),
+            this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.ELECTRONIC_BILLING),
+        ]);
 
         return {
             id: subscription.id,
@@ -57,7 +60,7 @@ export class WompiSubscriptionShopResolver {
             endsAt: subscription.endsAt,
             gracePeriodStart: subscription.gracePeriodStart,
             autoRenew: subscription.autoRenew,
-            plan: subscription.plan,
+            plan,
             paymentMethodType: subscription.paymentMethodType,
             paymentFlowType: subscription.paymentFlowType,
             productLimit: productLimitValue ? parseInt(productLimitValue, 10) : 0,
@@ -171,8 +174,14 @@ export class WompiSubscriptionShopResolver {
             admin.emailAddress,
         );
 
-        const amountInCents = Math.round(subscription.plan.price * 100);
+        const targetPlan = await this.subscriptionService.getPlanById(planId);
+        if (!targetPlan) {
+            throw new Error(`Plan with id ${planId} not found`);
+        }
+        const amountInCents = Math.round(targetPlan.price * 100);
         const reference = `SUB-${subscription.id}-${Date.now()}`;
+
+        Logger.debug(`[createSubscriptionWithPayment] amountInCents=${amountInCents} plan.price=${targetPlan.price} plan.name=${targetPlan.name} plan.id=${targetPlan.id} sub.status=${subscription.status}`, 'WompiResolver');
 
         try {
             const transaction = await this.wompiService.createRecurringTransaction(
@@ -181,13 +190,16 @@ export class WompiSubscriptionShopResolver {
                 reference,
                 admin.emailAddress,
                 acceptanceToken,
+                personalAuthToken,
             );
 
             if (transaction.status === 'APPROVED') {
                 await this.subscriptionService.extendSubscription(subscription.id);
+            } else {
+                Logger.debug(`Transaction ${transaction.id} initial status: ${transaction.status} — awaiting webhook`, 'WompiResolver');
             }
         } catch (error) {
-            console.error('Initial charge failed:', error);
+            Logger.error(`Initial charge failed: ${error}`, 'WompiResolver');
         }
 
         const productLimitValue = await this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
@@ -202,7 +214,7 @@ export class WompiSubscriptionShopResolver {
             endsAt: subscription.endsAt,
             gracePeriodStart: subscription.gracePeriodStart,
             autoRenew: subscription.autoRenew,
-            plan: subscription.plan,
+            plan: targetPlan,
             paymentMethodType: subscription.paymentMethodType,
             paymentFlowType: subscription.paymentFlowType,
             productLimit: productLimitValue ? parseInt(productLimitValue, 10) : 0,
@@ -237,7 +249,11 @@ export class WompiSubscriptionShopResolver {
         );
 
         const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
-        const amountInCents = Math.round(subscription.plan.price * 100);
+        const targetPlan = await this.subscriptionService.getPlanById(planId);
+        if (!targetPlan) {
+            throw new Error(`Plan with id ${planId} not found`);
+        }
+        const amountInCents = Math.round(targetPlan.price * 100);
 
         const transaction = await this.wompiService.createTransaction({
             amount_in_cents: amountInCents,
@@ -264,7 +280,7 @@ export class WompiSubscriptionShopResolver {
             startsAt: subscription.startsAt,
             endsAt: subscription.endsAt,
             autoRenew: subscription.autoRenew,
-            plan: subscription.plan,
+            plan: targetPlan,
             paymentMethodType: subscription.paymentMethodType,
             paymentFlowType: subscription.paymentFlowType,
             asyncPaymentUrl,

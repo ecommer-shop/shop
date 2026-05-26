@@ -101,8 +101,8 @@ const CREATE_PENDING_MUTATION = `
 `;
 
 const STOP_AUTO_RENEW_MUTATION = `
-  mutation StopAutoRenew($subscriptionId: Int!) {
-    stopAutoRenew(subscriptionId: $subscriptionId) {
+  mutation StopAutoRenew($subscriptionId: Int!, $customerEmail: String) {
+    stopAutoRenew(subscriptionId: $subscriptionId, customerEmail: $customerEmail) {
       id
       status
       autoRenew
@@ -110,11 +110,9 @@ const STOP_AUTO_RENEW_MUTATION = `
   }
 `;
 
-
-
 const CANCEL_SUBSCRIPTION_MUTATION = `
-  mutation CancelSubscription($subscriptionId: Int!) {
-    cancelSubscription(subscriptionId: $subscriptionId) {
+  mutation CancelSubscription($subscriptionId: Int!, $customerEmail: String) {
+    cancelSubscription(subscriptionId: $subscriptionId, customerEmail: $customerEmail) {
       id
       status
       plan { id name }
@@ -161,19 +159,20 @@ interface PaymentMethodOption {
     type: string;
     label: string;
     flow: 'recurrent' | 'manual';
+    description: string;
 }
 
 const PAYMENT_METHODS: PaymentMethodOption[] = [
-    { type: 'CARD', label: 'Tarjeta crédito/débito', flow: 'recurrent' },
-    { type: 'NEQUI', label: 'Nequi', flow: 'recurrent' },
-    { type: 'DAVIPLATA', label: 'Daviplata', flow: 'recurrent' },
-    { type: 'BANCOLOMBIA_TRANSFER', label: 'Transferencia Bancolombia', flow: 'recurrent' },
-    { type: 'PSE', label: 'PSE', flow: 'manual' },
-    { type: 'BANCOLOMBIA_QR', label: 'Bancolombia QR', flow: 'manual' },
-    { type: 'BANCOLOMBIA_COLLECT', label: 'Bancolombia Recogida', flow: 'manual' },
-    { type: 'PCOL', label: 'Pago contra entrega', flow: 'manual' },
-    { type: 'BANCOLOMBIA_BNPL', label: 'Bancolombia Cuotas', flow: 'manual' },
-    { type: 'SU_PLUS', label: 'Su Plus', flow: 'manual' },
+    { type: 'CARD', label: 'Tarjeta crédito/débito', flow: 'recurrent', description: 'Se cobra automáticamente cada período — no necesitas hacer nada' },
+    { type: 'NEQUI', label: 'Nequi', flow: 'recurrent', description: 'Requiere aprobación por notificación push en tu celular en cada renovación' },
+    { type: 'DAVIPLATA', label: 'Daviplata', flow: 'recurrent', description: 'Requiere aprobación por notificación push en tu celular en cada renovación' },
+    { type: 'BANCOLOMBIA_TRANSFER', label: 'Transferencia Bancolombia', flow: 'recurrent', description: 'Se cobra automáticamente desde tu cuenta Bancolombia' },
+    { type: 'PSE', label: 'PSE', flow: 'manual', description: 'Debes iniciar sesión en tu banco y pagar antes del vencimiento' },
+    { type: 'BANCOLOMBIA_QR', label: 'Bancolombia QR', flow: 'manual', description: 'Debes escanear el código QR y pagar antes del vencimiento' },
+    { type: 'BANCOLOMBIA_COLLECT', label: 'Bancolombia Recogida', flow: 'manual', description: 'Debes pagar la factura en Bancolombia antes del vencimiento' },
+    { type: 'PCOL', label: 'Pago contra entrega', flow: 'manual', description: 'Debes pagar contra entrega antes del vencimiento' },
+    { type: 'BANCOLOMBIA_BNPL', label: 'Bancolombia Cuotas', flow: 'manual', description: 'Debes pagar en cuotas antes del vencimiento' },
+    { type: 'SU_PLUS', label: 'Su Plus', flow: 'manual', description: 'Debes pagar con Su Plus antes del vencimiento' },
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -258,6 +257,10 @@ export function BillingPage() {
     useEffect(() => { if (adminEmail) loadData(); }, [adminEmail, loadData]);
 
     const handleSelectPlan = (plan: Plan) => {
+        if (sub?.plan?.name?.toLowerCase() === plan.name.toLowerCase()) {
+            setError('Ya tienes este plan activo');
+            return;
+        }
         setSelectedPlan(plan);
         setStep('payment');
         setError(null);
@@ -272,6 +275,7 @@ export function BillingPage() {
         try {
             const data = await gql<{ stopAutoRenew: Subscription }>(STOP_AUTO_RENEW_MUTATION, {
                 subscriptionId: Number(sub.id),
+                customerEmail: adminEmail,
             });
             setSub(prev => prev ? { ...prev, autoRenew: data.stopAutoRenew.autoRenew } : prev);
         } catch (e: any) {
@@ -287,6 +291,7 @@ export function BillingPage() {
         try {
             const data = await gql<{ cancelSubscription: Subscription }>(CANCEL_SUBSCRIPTION_MUTATION, {
                 subscriptionId: Number(sub.id),
+                customerEmail: adminEmail,
             });
             setSub(prev => prev ? {
                 ...prev,
@@ -511,7 +516,7 @@ function ViewStep({
                                 {actionLoading === 'stopAutoRenew' ? 'Desactivando...' : 'Detener renovación'}
                             </Button>
                         )}
-                        {(sub.status === 'ACTIVE' || sub.status === 'GRACE_PERIOD') && (
+                        {sub.plan.name !== 'Free' && (sub.status === 'ACTIVE' || sub.status === 'GRACE_PERIOD') && (
                             <Button variant="destructive" onClick={onCancel} disabled={actionLoading === 'cancel'}>
                                 {actionLoading === 'cancel' ? 'Cancelando...' : 'Cancelar suscripción'}
                             </Button>
@@ -711,12 +716,24 @@ function PaymentStep({
                 {paymentTab === 'recurrent' && (
                     <Card className="border-primary/30 bg-primary/5">
                         <CardContent className="py-3 text-sm space-y-1">
-                            <p className="font-medium text-primary">Pago automático recurrente</p>
-                            <p className="text-muted-foreground">
-                                Estos métodos se tokenizan (almacenan de forma segura) y se cobran
-                                automáticamente cada período de facturación. No necesitas hacer nada
-                                después del primer pago.
-                            </p>
+                            {selectedMethod ? (
+                                <>
+                                    <p className="font-medium text-primary">
+                                        {PAYMENT_METHODS.find(m => m.type === selectedMethod)?.label}
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                        {PAYMENT_METHODS.find(m => m.type === selectedMethod)?.description}
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="font-medium text-primary">Pago automático recurrente</p>
+                                    <p className="text-muted-foreground">
+                                        Estos métodos se tokenizan (almacenan de forma segura) y se cobran
+                                        automáticamente cada período de facturación.
+                                    </p>
+                                </>
+                            )}
                         </CardContent>
                     </Card>
                 )}
@@ -724,12 +741,25 @@ function PaymentStep({
                 {paymentTab === 'manual' && (
                     <Card className="border-warning/30 bg-warning/5">
                         <CardContent className="py-3 text-sm space-y-1">
-                            <p className="font-medium text-warning-foreground">Pago manual</p>
-                            <p className="text-muted-foreground">
-                                Estos métodos requieren que realices el pago <strong>antes del vencimiento</strong>
-                                {' '}de cada período. Si no pagas a tiempo, la suscripción entrará en
-                                período de gracia y luego será suspendida.
-                            </p>
+                            {selectedMethod ? (
+                                <>
+                                    <p className="font-medium text-warning-foreground">
+                                        {PAYMENT_METHODS.find(m => m.type === selectedMethod)?.label}
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                        {PAYMENT_METHODS.find(m => m.type === selectedMethod)?.description}
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="font-medium text-warning-foreground">Pago manual</p>
+                                    <p className="text-muted-foreground">
+                                        Estos métodos requieren que realices el pago <strong>antes del vencimiento</strong>
+                                        {' '}de cada período. Si no pagas a tiempo, la suscripción entrará en
+                                        período de gracia y luego será suspendida.
+                                    </p>
+                                </>
+                            )}
                         </CardContent>
                     </Card>
                 )}
@@ -749,7 +779,7 @@ function PaymentStep({
                             <div className="flex flex-col items-start">
                                 <span>{method.label}</span>
                                 <span className={`text-[10px] leading-tight ${selectedMethod === method.type ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                                    {method.flow === 'recurrent' ? 'Pago automático recurrente' : 'Pago manual antes del vencimiento'}
+                                    {method.description}
                                 </span>
                             </div>
                         </Button>
