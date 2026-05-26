@@ -88,11 +88,11 @@ export class WompiWebhookController {
             this.logger.log(`Restored subscription ${subscriptionId} to ACTIVE`);
 
             const limitValue = await this.subscriptionService.getFeatureValue(
-                subscription.customerId,
+                subscription.administratorId,
                 'max_products',
             );
             const limit = limitValue ? parseInt(limitValue, 10) : 15;
-            await this.subscriptionService.restoreHiddenProducts(subscription.customerId, limit);
+            await this.subscriptionService.restoreHiddenProducts(subscription.administratorId, limit);
         } else if (subscription.status === SubscriptionStatus.ACTIVE) {
             await this.subscriptionService.extendSubscription(subscriptionId);
             this.logger.log(`Extended subscription ${subscriptionId}`);
@@ -130,12 +130,12 @@ export class WompiTokenController {
 
     @Post('create-payment-source')
     async createPaymentSource(
-        @Body() payload: { token: string; customerId: number; customerEmail: string; planId: number; paymentMethod: string },
+        @Body() payload: { token: string; administratorId: number; customerEmail: string; planId: number; paymentMethod: string },
     ) {
-        this.logger.debug(`Creating payment source for customer ${payload.customerId}`);
+        this.logger.debug(`Creating payment source for administrator ${payload.administratorId}`);
 
         try {
-            const acceptanceToken = await this.wompiService.getAcceptanceToken();
+            const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
             const paymentMethod = payload.paymentMethod || 'CARD';
 
             const paymentSource = await this.wompiService.createPaymentSource(
@@ -143,10 +143,11 @@ export class WompiTokenController {
                 payload.token,
                 payload.customerEmail,
                 acceptanceToken,
+                personalAuthToken,
             );
 
             const subscription = await this.subscriptionService.createRecurrentSubscription(
-                payload.customerId,
+                payload.administratorId,
                 payload.planId,
                 paymentMethod,
                 paymentSource.id,

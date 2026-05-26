@@ -71,7 +71,7 @@ export class CreateSubscriptionTables1773800000000 implements MigrationInterface
         await queryRunner.query(`
             CREATE TABLE IF NOT EXISTS "customer_subscription" (
                 "id" SERIAL NOT NULL,
-                "customer_id" integer NOT NULL,
+                "administrator_id" integer NOT NULL,
                 "plan_id" integer NOT NULL,
                 "status" "customer_subscription_status_enum" NOT NULL DEFAULT 'ACTIVE',
                 "startsAt" TIMESTAMP,
@@ -83,10 +83,10 @@ export class CreateSubscriptionTables1773800000000 implements MigrationInterface
                 "billing_customer_id" character varying,
                 "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
                 "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "UQ_customer_subscription_customer" UNIQUE ("customer_id"),
+                CONSTRAINT "UQ_customer_subscription_administrator" UNIQUE ("administrator_id"),
                 CONSTRAINT "PK_customer_subscription" PRIMARY KEY ("id"),
                 CONSTRAINT "FK_customer_subscription_plan" FOREIGN KEY ("plan_id") REFERENCES "subscription_plan"("id") ON DELETE CASCADE,
-                CONSTRAINT "FK_customer_subscription_customer" FOREIGN KEY ("customer_id") REFERENCES "customer"("id") ON DELETE CASCADE
+                CONSTRAINT "FK_customer_subscription_administrator" FOREIGN KEY ("administrator_id") REFERENCES "administrator"("id") ON DELETE CASCADE
             )
         `);
     }

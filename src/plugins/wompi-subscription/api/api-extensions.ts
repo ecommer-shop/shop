@@ -91,26 +91,30 @@ export const wompiSubscriptionShopApiExtensions = gql`
   }
 
   extend type Query {
-    mySubscription: CustomerSubscription
+    mySubscription(customerEmail: String): CustomerSubscription
     allPlans: [Plan!]!
-    checkProductLimit: SubscriptionCheckResult
-    checkFeatureAccess(featureCode: String!): Boolean
+    checkProductLimit(customerEmail: String): SubscriptionCheckResult
+    checkFeatureAccess(featureCode: String!, customerEmail: String): Boolean
     GetWompiIntegritySignature(amountInCents: Int!, paymentReference: String!): String!
   }
 
   extend type Mutation {
-    cancelAutoRenew: CustomerSubscription
+    cancelAutoRenew(customerEmail: String): CustomerSubscription
     createSubscriptionWithPayment(
       token: String!
       planId: Int!
       paymentMethod: String!
+      customerEmail: String
+      sessionId: String
+      deviceId: String
     ): CustomerSubscription
     createPendingSubscription(
       planId: Int!
       paymentMethod: String!
+      customerEmail: String
     ): PendingSubscriptionResult
-    stopAutoRenew(subscriptionId: Int!): CustomerSubscription
-    cancelSubscription(subscriptionId: Int!): CustomerSubscription
+    stopAutoRenew(subscriptionId: Int!, customerEmail: String): CustomerSubscription
+    cancelSubscription(subscriptionId: Int!, customerEmail: String): CustomerSubscription
   }
 `;
 

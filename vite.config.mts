@@ -754,6 +754,17 @@ export default defineConfig({
                 },
             },
         }),
+        // Plugin: inyecta WOMPI_PUBLIC_KEY en el HTML (corre en dev y build)
+        {
+            name: 'inject-wompi-key',
+            transformIndexHtml(html) {
+                const key = process.env.WOMPI_PUBLIC_KEY || '';
+                return html.replace(
+                    '</head>',
+                    `  <script>window.__WOMPI_PUBLIC_KEY__ = "${key}";</script>\n</head>`
+                );
+            },
+        },
         // Plugin post-dashboard-html: modifica el HTML después de que vendureDashboardPlugin lo genera
         {
             name: 'post-dashboard-html',
@@ -806,9 +817,6 @@ export default defineConfig({
         },
         configurable: true
       });
-    </script>
-    <script>
-      window.__WOMPI_PUBLIC_KEY__ = "${process.env.WOMPI_PUBLIC_KEY || ''}";
     </script>
     <script>
         document.addEventListener('click', function(e) {

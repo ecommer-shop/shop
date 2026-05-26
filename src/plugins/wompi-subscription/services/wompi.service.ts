@@ -33,16 +33,20 @@ export class WompiService {
         });
     }
 
-    async getAcceptanceToken(): Promise<string> {
+    async getAcceptanceTokens(): Promise<{ acceptanceToken: string; personalAuthToken: string }> {
         try {
             const publicKey = this.options.wompiPublicKey;
             const response = await axios.get<WompiAcceptanceTokenResponse>(
                 `${this.options.wompiApiUrl}/merchants/${publicKey}`,
             );
-            return response.data.data.presigned_acceptance.acceptance_token;
+            const merchantData = response.data.data;
+            return {
+                acceptanceToken: merchantData?.presigned_acceptance?.acceptance_token,
+                personalAuthToken: merchantData?.presigned_personal_data_auth?.acceptance_token,
+            };
         } catch (error: any) {
-            Logger.error('Failed to get acceptance token: ' + error.message, 'WompiService');
-            throw new Error('Failed to get acceptance token');
+            Logger.error('Failed to get acceptance tokens: ' + error.message, 'WompiService');
+            throw new Error('Failed to get acceptance tokens');
         }
     }
 
@@ -51,14 +55,25 @@ export class WompiService {
         token: string,
         customerEmail: string,
         acceptanceToken: string,
+        personalAuthToken: string,
+        sessionId?: string,
+        deviceId?: string,
     ): Promise<WompiPaymentSourceResponse> {
         try {
-            const response = await this.apiClient.post('/payment_sources', {
+            const body: any = {
                 type,
                 token,
                 customer_email: customerEmail,
                 acceptance_token: acceptanceToken,
-            });
+                accept_personal_auth: personalAuthToken,
+            };
+            if (sessionId) {
+                body.session_id = sessionId;
+            }
+            if (deviceId) {
+                body.customer_data = { device_id: deviceId };
+            }
+            const response = await this.apiClient.post('/payment_sources', body);
             Logger.debug('Created payment source: ' + response.data.data.id, 'WompiService');
             return response.data.data;
         } catch (error: any) {

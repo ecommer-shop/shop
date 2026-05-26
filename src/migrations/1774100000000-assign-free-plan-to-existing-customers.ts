@@ -1,5 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { Customer } from '@vendure/core';
+import { Administrator } from '@vendure/core';
 import { Plan, CustomerSubscription, SubscriptionStatus } from '../plugins/wompi-subscription/entities';
 
 export class AssignFreePlanToExistingCustomers1774100000000 implements MigrationInterface {
@@ -20,29 +20,29 @@ export class AssignFreePlanToExistingCustomers1774100000000 implements Migration
         let hasMore = true;
 
         while (hasMore) {
-            const customers = await queryRunner.manager
-                .getRepository(Customer)
-                .createQueryBuilder('customer')
-                .leftJoinAndSelect('customer.user', 'user')
+            const administrators = await queryRunner.manager
+                .getRepository(Administrator)
+                .createQueryBuilder('admin')
+                .leftJoinAndSelect('admin.user', 'user')
                 .leftJoinAndSelect('user.roles', 'roles')
-                .leftJoin(CustomerSubscription, 'sub', 'sub.customer_id = customer.id')
+                .leftJoin(CustomerSubscription, 'sub', 'sub.administrator_id = admin.id')
                 .where('sub.id IS NULL')
-                .andWhere('customer.id > :lastId', { lastId })
-                .orderBy('customer.id', 'ASC')
+                .andWhere('admin.id > :lastId', { lastId })
+                .orderBy('admin.id', 'ASC')
                 .take(batchSize)
                 .getMany();
 
-            if (customers.length === 0) {
+            if (administrators.length === 0) {
                 hasMore = false;
                 break;
             }
 
-            const newSubs = customers
-                .filter(c => !c.user?.roles?.some(
+            const newSubs = administrators
+                .filter(a => !a.user?.roles?.some(
                     r => r.code === '__super_admin_role__'
                 ))
-                .map(c => ({
-                    customerId: Number(c.id),
+                .map(a => ({
+                    administratorId: Number(a.id),
                     planId: freePlan.id,
                     status: SubscriptionStatus.ACTIVE,
                     startsAt: new Date(),
@@ -60,7 +60,7 @@ export class AssignFreePlanToExistingCustomers1774100000000 implements Migration
                     .execute();
             }
 
-            lastId = Number(customers[customers.length - 1].id);
+            lastId = Number(administrators[administrators.length - 1].id);
         }
     }
 

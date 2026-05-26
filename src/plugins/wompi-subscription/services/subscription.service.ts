@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual, MoreThan, IsNull } from 'typeorm';
-import { Logger, CustomerService, Product, ChannelService, RequestContextService } from '@vendure/core';
+import { Logger, Administrator, Product } from '@vendure/core';
 import { Plan, BillingInterval } from '../entities/plan.entity';
 import { Feature, FeatureType } from '../entities/feature.entity';
 import { PlanFeature } from '../entities/plan-feature.entity';
@@ -23,9 +23,6 @@ export class SubscriptionService implements OnModuleInit {
         @InjectRepository(PlanFeature) private planFeatureRepository: Repository<PlanFeature>,
         @InjectRepository(CustomerSubscription) private subscriptionRepository: Repository<CustomerSubscription>,
         @InjectRepository(Product) private productRepository: Repository<Product>,
-        private customerService: CustomerService,
-        private channelService: ChannelService,
-        private requestContextService: RequestContextService,
         private wompiService: WompiService,
     ) { }
 
@@ -41,15 +38,15 @@ export class SubscriptionService implements OnModuleInit {
         }
     }
 
-    async assignFreePlanToCustomer(customerId: number): Promise<CustomerSubscription> {
-        const existing = await this.getSubscriptionByCustomerId(customerId);
+    async assignFreePlanToAdministrator(administratorId: number): Promise<CustomerSubscription> {
+        const existing = await this.getSubscriptionByAdministratorId(administratorId);
         if (existing) {
             return existing;
         }
 
         const freePlan = await this.getFreePlan();
         const subscription = this.subscriptionRepository.create({
-            customerId,
+            administratorId,
             planId: freePlan.id,
             status: SubscriptionStatus.ACTIVE,
             startsAt: new Date(),
@@ -59,7 +56,7 @@ export class SubscriptionService implements OnModuleInit {
         });
 
         const saved = await this.subscriptionRepository.save(subscription);
-        Logger.info(`Assigned free plan to customer ${customerId}`, 'SubscriptionService');
+        Logger.info(`Assigned free plan to administrator ${administratorId}`, 'SubscriptionService');
         return saved;
     }
 
@@ -97,9 +94,9 @@ export class SubscriptionService implements OnModuleInit {
         return plan;
     }
 
-    async getSubscriptionByCustomerId(customerId: number): Promise<CustomerSubscription | null> {
+    async getSubscriptionByAdministratorId(administratorId: number): Promise<CustomerSubscription | null> {
         return this.subscriptionRepository.findOne({
-            where: { customerId },
+            where: { administratorId },
             relations: ['plan', 'plan.planFeatures', 'plan.planFeatures.feature'],
         });
     }
@@ -119,15 +116,15 @@ export class SubscriptionService implements OnModuleInit {
     }
 
     async createRecurrentSubscription(
-        customerId: number,
+        administratorId: number,
         planId: number,
         paymentMethodType: string,
         billingPaymentSourceId: string,
         billingCustomerEmail: string,
     ): Promise<CustomerSubscription> {
-        const existing = await this.getSubscriptionByCustomerId(customerId);
+        const existing = await this.getSubscriptionByAdministratorId(administratorId);
         if (existing) {
-            throw new Error('Customer already has a subscription');
+            throw new Error('Administrator already has a subscription');
         }
 
         const plan = await this.getPlanById(planId);
@@ -136,7 +133,7 @@ export class SubscriptionService implements OnModuleInit {
         }
 
         const subscription = this.subscriptionRepository.create({
-            customerId,
+            administratorId,
             planId,
             status: SubscriptionStatus.ACTIVE,
             startsAt: new Date(),
@@ -150,18 +147,22 @@ export class SubscriptionService implements OnModuleInit {
         });
 
         const saved = await this.subscriptionRepository.save(subscription);
-        Logger.info(`Created recurrent subscription ${saved.id} for customer ${customerId} with plan ${plan.name}`, 'SubscriptionService');
-        return saved;
+        const reloaded = await this.subscriptionRepository.findOne({
+            where: { id: saved.id },
+            relations: ['plan', 'plan.planFeatures', 'plan.planFeatures.feature'],
+        });
+        Logger.info(`Created recurrent subscription ${saved.id} for administrator ${administratorId} with plan ${plan.name}`, 'SubscriptionService');
+        return reloaded ?? saved;
     }
 
     async createPendingSubscription(
-        customerId: number,
+        administratorId: number,
         planId: number,
         paymentMethodType: string,
     ): Promise<{ subscription: CustomerSubscription; reference: string }> {
-        const existing = await this.getSubscriptionByCustomerId(customerId);
+        const existing = await this.getSubscriptionByAdministratorId(administratorId);
         if (existing) {
-            throw new Error('Customer already has a subscription');
+            throw new Error('Administrator already has a subscription');
         }
 
         const plan = await this.getPlanById(planId);
@@ -169,10 +170,10 @@ export class SubscriptionService implements OnModuleInit {
             throw new Error('Plan not found');
         }
 
-        const reference = `SUB-PENDING-${customerId}-${Date.now()}`;
+        const reference = `SUB-PENDING-${administratorId}-${Date.now()}`;
 
         const subscription = this.subscriptionRepository.create({
-            customerId,
+            administratorId,
             planId,
             status: SubscriptionStatus.PENDING_PAYMENT,
             startsAt: new Date(),
@@ -184,8 +185,12 @@ export class SubscriptionService implements OnModuleInit {
         });
 
         const saved = await this.subscriptionRepository.save(subscription);
-        Logger.info(`Created pending subscription ${saved.id} for customer ${customerId}`, 'SubscriptionService');
-        return { subscription: saved, reference };
+        const reloaded = await this.subscriptionRepository.findOne({
+            where: { id: saved.id },
+            relations: ['plan', 'plan.planFeatures', 'plan.planFeatures.feature'],
+        });
+        Logger.info(`Created pending subscription ${saved.id} for administrator ${administratorId}`, 'SubscriptionService');
+        return { subscription: reloaded ?? saved, reference };
     }
 
     async activateSubscriptionAfterPayment(subscriptionId: number, paymentSourceId?: string): Promise<CustomerSubscription> {
@@ -205,13 +210,13 @@ export class SubscriptionService implements OnModuleInit {
     }
 
     async createSubscription(
-        customerId: number,
+        administratorId: number,
         planId: number,
         billingPaymentSourceId: string,
         billingCustomerEmail: string,
     ): Promise<CustomerSubscription> {
         return this.createRecurrentSubscription(
-            customerId,
+            administratorId,
             planId,
             'CARD',
             billingPaymentSourceId,
@@ -295,16 +300,16 @@ export class SubscriptionService implements OnModuleInit {
         const freePlan = await this.getFreePlan();
         await this.downgradeToFree(subscriptionId);
 
-        const limitValue = await this.getFeatureValue(subscription.customerId, FEATURE_CODES.MAX_PRODUCTS);
+        const limitValue = await this.getFeatureValue(subscription.administratorId, FEATURE_CODES.MAX_PRODUCTS);
         const limit = limitValue ? parseInt(limitValue, 10) : 15;
-        await this.hideExcessProducts(subscription.customerId, limit);
+        await this.hideExcessProducts(subscription.administratorId, limit);
 
-        Logger.info(`Cancelled subscription ${subscriptionId} for customer ${subscription.customerId}`, 'SubscriptionService');
+        Logger.info(`Cancelled subscription ${subscriptionId} for administrator ${subscription.administratorId}`, 'SubscriptionService');
         return saved;
     }
 
-    async cancelAutoRenew(customerId: number): Promise<CustomerSubscription> {
-        const subscription = await this.getSubscriptionByCustomerId(customerId);
+    async cancelAutoRenew(administratorId: number): Promise<CustomerSubscription> {
+        const subscription = await this.getSubscriptionByAdministratorId(administratorId);
         if (!subscription) {
             throw new Error('No active subscription found');
         }
@@ -313,8 +318,8 @@ export class SubscriptionService implements OnModuleInit {
         return this.subscriptionRepository.save(subscription);
     }
 
-    async getFeatureValue(customerId: number, featureCode: string): Promise<string | null> {
-        const subscription = await this.getSubscriptionByCustomerId(customerId);
+    async getFeatureValue(administratorId: number, featureCode: string): Promise<string | null> {
+        const subscription = await this.getSubscriptionByAdministratorId(administratorId);
         if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
             return null;
         }
@@ -331,8 +336,8 @@ export class SubscriptionService implements OnModuleInit {
         return planFeature?.value || null;
     }
 
-    async checkFeatureAccess(customerId: number, featureCode: string): Promise<boolean> {
-        const value = await this.getFeatureValue(customerId, featureCode);
+    async checkFeatureAccess(administratorId: number, featureCode: string): Promise<boolean> {
+        const value = await this.getFeatureValue(administratorId, featureCode);
         const feature = await this.featureRepository.findOne({ where: { code: featureCode } });
 
         if (!feature || !value) {
@@ -346,16 +351,16 @@ export class SubscriptionService implements OnModuleInit {
         return true;
     }
 
-    async checkProductLimit(customerId: number): Promise<{ allowed: boolean; current: number; limit: number }> {
-        const subscription = await this.getSubscriptionByCustomerId(customerId);
+    async checkProductLimit(administratorId: number): Promise<{ allowed: boolean; current: number; limit: number }> {
+        const subscription = await this.getSubscriptionByAdministratorId(administratorId);
         if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
             return { allowed: false, current: 0, limit: 0 };
         }
 
-        const limitValue = await this.getFeatureValue(customerId, FEATURE_CODES.MAX_PRODUCTS);
+        const limitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
         const limit = limitValue ? parseInt(limitValue, 10) : 0;
 
-        const channel = await this.getChannelBySellerId(customerId);
+        const channel = await this.getChannelByAdministratorId(administratorId);
         if (!channel) {
             return { allowed: limit > 0, current: 0, limit };
         }
@@ -374,11 +379,18 @@ export class SubscriptionService implements OnModuleInit {
         };
     }
 
-    private async getChannelBySellerId(sellerId: number): Promise<any> {
+    private async getChannelByAdministratorId(administratorId: number): Promise<any> {
         const { Channel } = await import('@vendure/core');
-        return this.planRepository.manager.findOne(Channel, {
-            where: { sellerId },
+        const admin = await this.planRepository.manager.findOne(Administrator, {
+            where: { id: administratorId },
+            relations: ['user', 'user.roles', 'user.roles.channels'],
         });
+        if (!admin) return null;
+        for (const role of admin.user.roles) {
+            const sellerChannel = role.channels.find((ch: any) => ch.sellerId != null);
+            if (sellerChannel) return sellerChannel;
+        }
+        return null;
     }
 
     async getActiveSubscriptionsForRenewal(): Promise<CustomerSubscription[]> {
@@ -466,10 +478,10 @@ export class SubscriptionService implements OnModuleInit {
         return this.subscriptionRepository.save(subscription);
     }
 
-    async hideExcessProducts(customerId: number, maxAllowed: number): Promise<number> {
-        const channel = await this.getChannelBySellerId(customerId);
+    async hideExcessProducts(administratorId: number, maxAllowed: number): Promise<number> {
+        const channel = await this.getChannelByAdministratorId(administratorId);
         if (!channel) {
-            Logger.warn(`No channel found for seller ${customerId}`, 'SubscriptionService');
+            Logger.warn(`No channel found for administrator ${administratorId}`, 'SubscriptionService');
             return 0;
         }
 
@@ -491,14 +503,14 @@ export class SubscriptionService implements OnModuleInit {
             hiddenCount++;
         }
 
-        Logger.info(`Hidden ${hiddenCount} products for customer ${customerId}`, 'SubscriptionService');
+        Logger.info(`Hidden ${hiddenCount} products for administrator ${administratorId}`, 'SubscriptionService');
         return hiddenCount;
     }
 
-    async restoreHiddenProducts(customerId: number, maxAllowed: number): Promise<number> {
-        const channel = await this.getChannelBySellerId(customerId);
+    async restoreHiddenProducts(administratorId: number, maxAllowed: number): Promise<number> {
+        const channel = await this.getChannelByAdministratorId(administratorId);
         if (!channel) {
-            Logger.warn(`No channel found for seller ${customerId}`, 'SubscriptionService');
+            Logger.warn(`No channel found for administrator ${administratorId}`, 'SubscriptionService');
             return 0;
         }
 
@@ -521,7 +533,7 @@ export class SubscriptionService implements OnModuleInit {
             }
         }
 
-        Logger.info(`Restored ${restoredCount} products for customer ${customerId}`, 'SubscriptionService');
+        Logger.info(`Restored ${restoredCount} products for administrator ${administratorId}`, 'SubscriptionService');
         return restoredCount;
     }
 

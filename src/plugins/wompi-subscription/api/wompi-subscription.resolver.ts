@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Resolver, Query, Mutation, Args, Context } from '@nestjs/graphql';
-import { RequestContext, CustomerService } from '@vendure/core';
+import { RequestContext, TransactionalConnection, Administrator } from '@vendure/core';
 import { SubscriptionService } from '../services/subscription.service';
 import { WompiService } from '../services/wompi.service';
 import { FEATURE_CODES, PAYMENT_METHOD_FLOW, PaymentFlowType } from '../constants';
@@ -10,34 +10,45 @@ export class WompiSubscriptionShopResolver {
     constructor(
         private subscriptionService: SubscriptionService,
         private wompiService: WompiService,
-        private customerService: CustomerService,
-    ) {}
+        private connection: TransactionalConnection,
+    ) { }
 
-    private async resolveCustomerId(ctx: RequestContext): Promise<number | null> {
-        const userId = ctx.activeUserId;
-        if (!userId) {
-            return null;
+    private async resolveAdministratorId(ctx: RequestContext, customerEmail?: string): Promise<number | null> {
+        if (ctx.activeUserId) {
+            const repo = this.connection.rawConnection.getRepository(Administrator);
+            const admin = await repo.findOne({
+                where: { user: { id: Number(ctx.activeUserId) } },
+                relations: ['user'],
+            });
+            if (admin) return Number(admin.id);
         }
-        const customer = await this.customerService.findOneByUserId(ctx, Number(userId));
-        return customer ? Number(customer.id) : null;
+        if (customerEmail) {
+            const repo = this.connection.rawConnection.getRepository(Administrator);
+            const admin = await repo.findOne({ where: { emailAddress: customerEmail } });
+            if (admin) return Number(admin.id);
+        }
+        return null;
     }
 
     @Query('mySubscription')
-    async getMySubscription(@Context() ctx: RequestContext) {
-        const customerId = await this.resolveCustomerId(ctx);
-        if (!customerId) {
+    async getMySubscription(
+        @Context() ctx: RequestContext,
+        @Args('customerEmail') customerEmail?: string,
+    ) {
+        const administratorId = await this.resolveAdministratorId(ctx, customerEmail);
+        if (!administratorId) {
             return null;
         }
 
-        const subscription = await this.subscriptionService.getSubscriptionByCustomerId(customerId);
+        const subscription = await this.subscriptionService.getSubscriptionByAdministratorId(administratorId);
         if (!subscription) {
             return null;
         }
 
-        const productLimitValue = await this.subscriptionService.getFeatureValue(customerId, FEATURE_CODES.MAX_PRODUCTS);
-        const variationLimitValue = await this.subscriptionService.getFeatureValue(customerId, FEATURE_CODES.MAX_VARIATIONS);
-        const aiAccess = await this.subscriptionService.checkFeatureAccess(customerId, FEATURE_CODES.AI_ACCESS);
-        const billingAccess = await this.subscriptionService.checkFeatureAccess(customerId, FEATURE_CODES.ELECTRONIC_BILLING);
+        const productLimitValue = await this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
+        const variationLimitValue = await this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS);
+        const aiAccess = await this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.AI_ACCESS);
+        const billingAccess = await this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.ELECTRONIC_BILLING);
 
         return {
             id: subscription.id,
@@ -62,31 +73,41 @@ export class WompiSubscriptionShopResolver {
     }
 
     @Query('checkProductLimit')
-    async checkProductLimit(@Context() ctx: RequestContext) {
-        const customerId = await this.resolveCustomerId(ctx);
-        if (!customerId) {
+    async checkProductLimit(
+        @Context() ctx: RequestContext,
+        @Args('customerEmail') customerEmail?: string,
+    ) {
+        const administratorId = await this.resolveAdministratorId(ctx, customerEmail);
+        if (!administratorId) {
             return { allowed: false, current: 0, limit: 0 };
         }
-        return this.subscriptionService.checkProductLimit(customerId);
+        return this.subscriptionService.checkProductLimit(administratorId);
     }
 
     @Query('checkFeatureAccess')
-    async checkFeatureAccess(@Context() ctx: RequestContext, @Args('featureCode') featureCode: string) {
-        const customerId = await this.resolveCustomerId(ctx);
-        if (!customerId) {
+    async checkFeatureAccess(
+        @Context() ctx: RequestContext,
+        @Args('featureCode') featureCode: string,
+        @Args('customerEmail') customerEmail?: string,
+    ) {
+        const administratorId = await this.resolveAdministratorId(ctx, customerEmail);
+        if (!administratorId) {
             return false;
         }
-        return this.subscriptionService.checkFeatureAccess(customerId, featureCode);
+        return this.subscriptionService.checkFeatureAccess(administratorId, featureCode);
     }
 
     @Mutation('cancelAutoRenew')
-    async cancelAutoRenew(@Context() ctx: RequestContext) {
-        const customerId = await this.resolveCustomerId(ctx);
-        if (!customerId) {
+    async cancelAutoRenew(
+        @Context() ctx: RequestContext,
+        @Args('customerEmail') customerEmail?: string,
+    ) {
+        const administratorId = await this.resolveAdministratorId(ctx, customerEmail);
+        if (!administratorId) {
             throw new Error('Not authenticated');
         }
 
-        const subscription = await this.subscriptionService.cancelAutoRenew(customerId);
+        const subscription = await this.subscriptionService.cancelAutoRenew(administratorId);
         return {
             id: subscription.id,
             status: subscription.status,
@@ -106,15 +127,19 @@ export class WompiSubscriptionShopResolver {
         @Args('token') token: string,
         @Args('planId') planId: number,
         @Args('paymentMethod') paymentMethod: string,
+        @Args('customerEmail') customerEmail?: string,
+        @Args('sessionId') sessionId?: string,
+        @Args('deviceId') deviceId?: string,
     ) {
-        const customerId = await this.resolveCustomerId(ctx);
-        if (!customerId) {
+        let administratorId = await this.resolveAdministratorId(ctx, customerEmail);
+        if (!administratorId) {
             throw new Error('Not authenticated');
         }
 
-        const customer = await this.customerService.findOne(ctx, customerId);
-        if (!customer || !customer.emailAddress) {
-            throw new Error('Customer not found or no email');
+        const repo = this.connection.rawConnection.getRepository(Administrator);
+        const admin = await repo.findOne({ where: { id: administratorId } });
+        if (!admin || !admin.emailAddress) {
+            throw new Error('Administrator not found or no email');
         }
 
         const flowType = PAYMENT_METHOD_FLOW[paymentMethod as keyof typeof PAYMENT_METHOD_FLOW];
@@ -126,21 +151,24 @@ export class WompiSubscriptionShopResolver {
             throw new Error('Use createPendingSubscription for manual payment methods');
         }
 
-        const acceptanceToken = await this.wompiService.getAcceptanceToken();
+        const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
 
         const paymentSource = await this.wompiService.createPaymentSource(
             paymentMethod,
             token,
-            customer.emailAddress,
+            admin.emailAddress,
             acceptanceToken,
+            personalAuthToken,
+            sessionId,
+            deviceId,
         );
 
         const subscription = await this.subscriptionService.createRecurrentSubscription(
-            customerId,
+            administratorId,
             planId,
             paymentMethod,
             paymentSource.id,
-            customer.emailAddress,
+            admin.emailAddress,
         );
 
         const amountInCents = Math.round(subscription.plan.price * 100);
@@ -151,7 +179,7 @@ export class WompiSubscriptionShopResolver {
                 paymentSource.id,
                 amountInCents,
                 reference,
-                customer.emailAddress,
+                admin.emailAddress,
                 acceptanceToken,
             );
 
@@ -162,10 +190,10 @@ export class WompiSubscriptionShopResolver {
             console.error('Initial charge failed:', error);
         }
 
-        const productLimitValue = await this.subscriptionService.getFeatureValue(customerId, FEATURE_CODES.MAX_PRODUCTS);
-        const variationLimitValue = await this.subscriptionService.getFeatureValue(customerId, FEATURE_CODES.MAX_VARIATIONS);
-        const aiAccess = await this.subscriptionService.checkFeatureAccess(customerId, FEATURE_CODES.AI_ACCESS);
-        const billingAccess = await this.subscriptionService.checkFeatureAccess(customerId, FEATURE_CODES.ELECTRONIC_BILLING);
+        const productLimitValue = await this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
+        const variationLimitValue = await this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS);
+        const aiAccess = await this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.AI_ACCESS);
+        const billingAccess = await this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.ELECTRONIC_BILLING);
 
         return {
             id: subscription.id,
@@ -189,35 +217,38 @@ export class WompiSubscriptionShopResolver {
         @Context() ctx: RequestContext,
         @Args('planId') planId: number,
         @Args('paymentMethod') paymentMethod: string,
+        @Args('customerEmail') customerEmail?: string,
     ) {
-        const customerId = await this.resolveCustomerId(ctx);
-        if (!customerId) {
+        let administratorId = await this.resolveAdministratorId(ctx, customerEmail);
+        if (!administratorId) {
             throw new Error('Not authenticated');
         }
 
-        const customer = await this.customerService.findOne(ctx, customerId);
-        if (!customer || !customer.emailAddress) {
-            throw new Error('Customer not found or no email');
+        const repo = this.connection.rawConnection.getRepository(Administrator);
+        const admin = await repo.findOne({ where: { id: administratorId } });
+        if (!admin || !admin.emailAddress) {
+            throw new Error('Administrator not found or no email');
         }
 
         const { subscription, reference } = await this.subscriptionService.createPendingSubscription(
-            customerId,
+            administratorId,
             planId,
             paymentMethod,
         );
 
-        const acceptanceToken = await this.wompiService.getAcceptanceToken();
+        const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
         const amountInCents = Math.round(subscription.plan.price * 100);
 
         const transaction = await this.wompiService.createTransaction({
             amount_in_cents: amountInCents,
             currency: 'COP',
             reference,
-            customer_email: customer.emailAddress,
+            customer_email: admin.emailAddress,
             payment_method: {
                 type: paymentMethod,
             },
             acceptance_token: acceptanceToken,
+            accept_personal_auth: personalAuthToken,
             redirect_url: '',
         });
 
@@ -246,14 +277,15 @@ export class WompiSubscriptionShopResolver {
     async stopAutoRenew(
         @Context() ctx: RequestContext,
         @Args('subscriptionId') subscriptionId: number,
+        @Args('customerEmail') customerEmail?: string,
     ) {
-        const customerId = await this.resolveCustomerId(ctx);
-        if (!customerId) {
+        const administratorId = await this.resolveAdministratorId(ctx, customerEmail);
+        if (!administratorId) {
             throw new Error('Not authenticated');
         }
 
         const subscription = await this.subscriptionService.getSubscriptionById(subscriptionId);
-        if (!subscription || subscription.customerId !== customerId) {
+        if (!subscription || subscription.administratorId !== administratorId) {
             throw new Error('Subscription not found');
         }
 
@@ -280,14 +312,15 @@ export class WompiSubscriptionShopResolver {
     async cancelSubscription(
         @Context() ctx: RequestContext,
         @Args('subscriptionId') subscriptionId: number,
+        @Args('customerEmail') customerEmail?: string,
     ) {
-        const customerId = await this.resolveCustomerId(ctx);
-        if (!customerId) {
+        const administratorId = await this.resolveAdministratorId(ctx, customerEmail);
+        if (!administratorId) {
             throw new Error('Not authenticated');
         }
 
         const subscription = await this.subscriptionService.getSubscriptionById(subscriptionId);
-        if (!subscription || subscription.customerId !== customerId) {
+        if (!subscription || subscription.administratorId !== administratorId) {
             throw new Error('Subscription not found');
         }
 

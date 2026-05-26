@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Plan } from './plan.entity';
-import { Customer } from '@vendure/core';
+import { Administrator } from '@vendure/core';
 
 export enum SubscriptionStatus {
     ACTIVE = 'ACTIVE',
@@ -15,8 +15,8 @@ export class CustomerSubscription {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column({ name: 'customer_id', type: 'int', unique: true })
-    customerId: number;
+    @Column({ name: 'administrator_id', type: 'int', unique: true })
+    administratorId: number;
 
     @Column({ name: 'plan_id', type: 'int' })
     planId: number;
@@ -67,7 +67,7 @@ export class CustomerSubscription {
     @JoinColumn({ name: 'plan_id' })
     plan: Plan;
 
-    @ManyToOne(() => Customer)
-    @JoinColumn({ name: 'customer_id' })
-    customer: Customer;
+    @ManyToOne(() => Administrator)
+    @JoinColumn({ name: 'administrator_id' })
+    administrator: Administrator;
 }

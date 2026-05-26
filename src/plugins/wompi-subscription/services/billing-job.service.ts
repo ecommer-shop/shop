@@ -69,7 +69,7 @@ export class BillingJobService implements OnModuleInit {
                 const amountInCents = Math.round(plan.price * 100);
                 const reference = `SUB-${subscription.id}-${Date.now()}`;
 
-                const acceptanceToken = await this.wompiService.getAcceptanceToken();
+                const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
 
                 const transaction = await this.wompiService.createRecurringTransaction(
                     subscription.billingPaymentSourceId,
@@ -102,12 +102,12 @@ export class BillingJobService implements OnModuleInit {
         for (const subscription of subscriptions) {
             try {
                 const productLimitValue = await this.subscriptionService.getFeatureValue(
-                    subscription.customerId,
+                    subscription.administratorId,
                     FEATURE_CODES.MAX_PRODUCTS,
                 );
                 const productLimit = productLimitValue ? parseInt(productLimitValue, 10) : 15;
 
-                await this.subscriptionService.hideExcessProducts(subscription.customerId, productLimit);
+                await this.subscriptionService.hideExcessProducts(subscription.administratorId, productLimit);
                 await this.subscriptionService.downgradeToFree(subscription.id);
 
                 this.logger.log(`Downgraded subscription ${subscription.id} to Free plan`);
@@ -125,7 +125,7 @@ export class BillingJobService implements OnModuleInit {
 
         for (const subscription of subscriptions) {
             try {
-                await this.subscriptionService.cancelAutoRenew(subscription.customerId);
+                await this.subscriptionService.cancelAutoRenew(subscription.administratorId);
                 this.logger.log(`Permanently suspended subscription ${subscription.id}`);
             } catch (error: any) {
                 this.logger.error(`Failed to process suspension ${subscription.id}: ${error.message}`);
@@ -140,7 +140,7 @@ export class BillingJobService implements OnModuleInit {
         this.logger.log(`Found ${subscriptions.length} subscriptions needing manual renewal`);
 
         for (const subscription of subscriptions) {
-            this.logger.log(`Subscription ${subscription.id} for customer ${subscription.customerId} is due for manual renewal (ends at ${subscription.endsAt})`);
+            this.logger.log(`Subscription ${subscription.id} for administrator ${subscription.administratorId} is due for manual renewal (ends at ${subscription.endsAt})`);
         }
     }
 

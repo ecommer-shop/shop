@@ -12,15 +12,15 @@ import {
     TabsList,
     TabsTrigger,
 } from '@vendure/dashboard';
-import { CreditCard, ExternalLink } from 'lucide-react';
+import { CreditCard, ExternalLink, CheckCircle2, Loader2, Smartphone } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PlanCard } from './components/plan-card';
 
 // ─── GraphQL documents ──────────────────────────────────────────
 
 const MY_SUBSCRIPTION_QUERY = `
-  query MySubscription {
-    mySubscription {
+  query MySubscription($customerEmail: String) {
+    mySubscription(customerEmail: $customerEmail) {
       id
       status
       startsAt
@@ -66,9 +66,17 @@ const ALL_PLANS_QUERY = `
   }
 `;
 
+const ACTIVE_ADMIN_QUERY = `
+  query ActiveAdmin {
+    activeAdministrator {
+      emailAddress
+    }
+  }
+`;
+
 const CREATE_SUBSCRIPTION_MUTATION = `
-  mutation CreateSubscriptionWithPayment($token: String!, $planId: Int!, $paymentMethod: String!) {
-    createSubscriptionWithPayment(token: $token, planId: $planId, paymentMethod: $paymentMethod) {
+  mutation CreateSubscriptionWithPayment($token: String!, $planId: Int!, $paymentMethod: String!, $customerEmail: String, $sessionId: String, $deviceId: String) {
+    createSubscriptionWithPayment(token: $token, planId: $planId, paymentMethod: $paymentMethod, customerEmail: $customerEmail, sessionId: $sessionId, deviceId: $deviceId) {
       id
       status
       startsAt
@@ -80,8 +88,8 @@ const CREATE_SUBSCRIPTION_MUTATION = `
 `;
 
 const CREATE_PENDING_MUTATION = `
-  mutation CreatePendingSubscription($planId: Int!, $paymentMethod: String!) {
-    createPendingSubscription(planId: $planId, paymentMethod: $paymentMethod) {
+  mutation CreatePendingSubscription($planId: Int!, $paymentMethod: String!, $customerEmail: String) {
+    createPendingSubscription(planId: $planId, paymentMethod: $paymentMethod, customerEmail: $customerEmail) {
       id
       status
       asyncPaymentUrl
@@ -102,11 +110,7 @@ const STOP_AUTO_RENEW_MUTATION = `
   }
 `;
 
-const GET_PAYMENT_SIGNATURE_QUERY = `
-    query GetWompiIntegritySignature($amountInCents: Int!, $paymentReference: String!){
-        GetWompiIntegritySignature(amountInCents: $amountInCents, paymentReference: $paymentReference)
-    }
-`;
+
 
 const CANCEL_SUBSCRIPTION_MUTATION = `
   mutation CancelSubscription($subscriptionId: Int!) {
@@ -228,14 +232,20 @@ export function BillingPage() {
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
     const [paymentProcessing, setPaymentProcessing] = useState(false);
 
-    // Widget states
-    const [widgetToken, setWidgetToken] = useState<string | null>(null);
+    const [showTokenForm, setShowTokenForm] = useState(false);
     const [pendingResult, setPendingResult] = useState<any>(null);
+    const [adminEmail, setAdminEmail] = useState<string | undefined>();
+
+    useEffect(() => {
+        gql<{ activeAdministrator: { emailAddress: string } }>(ACTIVE_ADMIN_QUERY)
+            .then(d => setAdminEmail(d.activeAdministrator.emailAddress))
+            .catch(() => {});
+    }, []);
 
     const loadData = useCallback(async () => {
         try {
             const [subData, plansData] = await Promise.all([
-                gql<{ mySubscription: Subscription | null }>(MY_SUBSCRIPTION_QUERY),
+                gql<{ mySubscription: Subscription | null }>(MY_SUBSCRIPTION_QUERY, { customerEmail: adminEmail }),
                 gql<{ allPlans: Plan[] }>(ALL_PLANS_QUERY),
             ]);
             setSub(subData.mySubscription ?? null);
@@ -243,16 +253,16 @@ export function BillingPage() {
         } catch (e: any) {
             setError(e.message);
         }
-    }, []);
+    }, [adminEmail]);
 
-    useEffect(() => { loadData(); }, [loadData]);
+    useEffect(() => { if (adminEmail) loadData(); }, [adminEmail, loadData]);
 
     const handleSelectPlan = (plan: Plan) => {
         setSelectedPlan(plan);
         setStep('payment');
         setError(null);
         setPendingResult(null);
-        setWidgetToken(null);
+        setShowTokenForm(false);
         setSelectedMethod(null);
     };
 
@@ -292,21 +302,23 @@ export function BillingPage() {
 
     const handlePayment = async () => {
         if (!selectedPlan || !selectedMethod) return;
+
+        const method = PAYMENT_METHODS.find(m => m.type === selectedMethod);
+        if (!method) throw new Error('Método de pago no válido');
+
+        if (method.flow === 'recurrent') {
+            setShowTokenForm(true);
+            return;
+        }
+
         setPaymentProcessing(true);
         setError(null);
 
         try {
-            const method = PAYMENT_METHODS.find(m => m.type === selectedMethod);
-            if (!method) throw new Error('Método de pago no válido');
-
-            if (method.flow === 'recurrent') {
-                setWidgetToken('awaiting_widget');
-                return;
-            }
-
             const data = await gql<{ createPendingSubscription: any }>(CREATE_PENDING_MUTATION, {
-                planId: selectedPlan.id,
+                planId: Number(selectedPlan.id),
                 paymentMethod: selectedMethod,
+                customerEmail: adminEmail || null,
             });
             setPendingResult(data.createPendingSubscription);
         } catch (e: any) {
@@ -316,14 +328,21 @@ export function BillingPage() {
         }
     };
 
-    const handleWidgetTokenReceived = async (token: string) => {
+    const handleCloseTokenForm = useCallback(() => {
+        setShowTokenForm(false);
+    }, []);
+
+    const handleWidgetTokenReceived = async (token: string, sessionId?: string, deviceId?: string) => {
         if (!selectedPlan || !selectedMethod) return;
         setPaymentProcessing(true);
         try {
             const data = await gql<{ createSubscriptionWithPayment: any }>(CREATE_SUBSCRIPTION_MUTATION, {
                 token,
-                planId: selectedPlan.id,
+                planId: Number(selectedPlan.id),
                 paymentMethod: selectedMethod,
+                customerEmail: adminEmail || null,
+                sessionId: sessionId || null,
+                deviceId: deviceId || null,
             });
             setSelectedPlan(null);
             setStep('view');
@@ -332,7 +351,7 @@ export function BillingPage() {
             setError(e.message);
         } finally {
             setPaymentProcessing(false);
-            setWidgetToken(null);
+            setShowTokenForm(false);
         }
     };
 
@@ -340,7 +359,7 @@ export function BillingPage() {
         setSelectedPlan(null);
         setStep('view');
         setPendingResult(null);
-        setWidgetToken(null);
+        setShowTokenForm(false);
         loadData();
     };
 
@@ -377,11 +396,12 @@ export function BillingPage() {
                             setSelectedMethod={setSelectedMethod}
                             onPay={handlePayment}
                             paymentProcessing={paymentProcessing}
-                            widgetToken={widgetToken}
-                            onWidgetToken={handleWidgetTokenReceived}
+                            showTokenForm={showTokenForm}
+                            onCloseTokenForm={handleCloseTokenForm}
+                            onTokenReceived={handleWidgetTokenReceived}
                             pendingResult={pendingResult}
                             onSuccess={handlePaymentSuccess}
-                            onBack={() => { setStep('plans'); setSelectedPlan(null); setPendingResult(null); setWidgetToken(null); setSelectedMethod(null); }}
+                            onBack={() => { setStep('plans'); setSelectedPlan(null); setPendingResult(null); setShowTokenForm(false); setSelectedMethod(null); }}
                         />
                     )}
 
@@ -576,8 +596,8 @@ function PaymentStep({
     setSelectedMethod,
     onPay,
     paymentProcessing,
-    widgetToken,
-    onWidgetToken,
+    showTokenForm,
+    onTokenReceived,
     pendingResult,
     onSuccess,
     onBack,
@@ -589,25 +609,13 @@ function PaymentStep({
     setSelectedMethod: (method: string | null) => void;
     onPay: () => void;
     paymentProcessing: boolean;
-    widgetToken: string | null;
-    onWidgetToken: (token: string) => void;
+    showTokenForm: boolean;
+    onCloseTokenForm: () => void;
+    onTokenReceived: (token: string, sessionId?: string, deviceId?: string) => void;
     pendingResult: any;
     onSuccess: () => void;
     onBack: () => void;
 }) {
-    const [loadWidget, setLoadWidget] = useState(false);
-
-    useEffect(() => {
-        if (widgetToken === 'awaiting_widget' && selectedMethod) {
-            setLoadWidget(true);
-        }
-    }, [widgetToken, selectedMethod]);
-
-    const handleOpenWidget = () => {
-        if (!selectedMethod) return;
-        setLoadWidget(true);
-    };
-
     if (pendingResult?.asyncPaymentUrl) {
         return (
             <Card>
@@ -649,6 +657,34 @@ function PaymentStep({
                     <Button variant="outline" onClick={onSuccess}>
                         Ya pagué
                     </Button>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    const [formVisible, setFormVisible] = useState(false);
+    useEffect(() => {
+        if (showTokenForm && selectedMethod) setFormVisible(true);
+    }, [showTokenForm, selectedMethod]);
+
+    if (formVisible && selectedMethod) {
+        return (
+            <Card>
+                <CardContent className="py-6 space-y-6">
+                    <div>
+                        <h3 className="text-lg font-semibold">
+                            Tokenizar: {PAYMENT_METHODS.find(m => m.type === selectedMethod)?.label}
+                        </h3>
+                        <p className="text-2xl font-bold mt-1">
+                            ${plan.price.toLocaleString('es-CO')}
+                            <span className="text-sm font-normal text-muted-foreground">/mes</span>
+                        </p>
+                    </div>
+                    <WompiTokenizationForm
+                        paymentMethod={selectedMethod}
+                        onToken={onTokenReceived}
+                        onBack={() => { setFormVisible(false); onCloseTokenForm(); }}
+                    />
                 </CardContent>
             </Card>
         );
@@ -720,9 +756,9 @@ function PaymentStep({
                     ))}
                 </div>
 
-                {selectedMethod && isRecurrent(selectedMethod) && !loadWidget && (
-                    <Button variant="default" onClick={handleOpenWidget} disabled={paymentProcessing}>
-                        Abrir formulario de pago
+                {selectedMethod && isRecurrent(selectedMethod) && (
+                    <Button variant="default" onClick={onPay} disabled={paymentProcessing}>
+                        {paymentProcessing ? 'Procesando...' : `Tokenizar con ${PAYMENT_METHODS.find(m => m.type === selectedMethod)?.label}`}
                     </Button>
                 )}
 
@@ -736,16 +772,6 @@ function PaymentStep({
                     </Button>
                 )}
 
-                {loadWidget && selectedMethod && isRecurrent(selectedMethod) && (
-                    <WompiPaymentWidget
-                        paymentMethod={selectedMethod}
-                        amountInCents={Math.round(plan.price * 100)}
-                        reference={`SUB-${plan.id}-${Date.now()}`}
-                        onToken={onWidgetToken}
-                        loading={paymentProcessing}
-                    />
-                )}
-
                 <Button variant="ghost" size="sm" onClick={onBack} disabled={paymentProcessing}>
                     Cancelar
                 </Button>
@@ -754,123 +780,580 @@ function PaymentStep({
     );
 }
 
-const WOMPI_SCRIPT_URL = 'https://checkout.wompi.co/widget.js';
-const WOMPI_SCRIPT_ID = 'wompi-widget-script';
+// ─── Wompi API helpers ──────────────────────────────────────────
 
-function loadWompiScript(): Promise<void> {
+function getWompiApiBaseUrl(): string {
+    const key = (window as any).__WOMPI_PUBLIC_KEY__;
+    return key?.startsWith('pub_test_') ? 'https://sandbox.wompi.co' : 'https://production.wompi.co';
+}
+
+async function wompiFetch(path: string, options?: RequestInit): Promise<any> {
+    const publicKey = (window as any).__WOMPI_PUBLIC_KEY__;
+    if (!publicKey) throw new Error('Wompi no está configurado');
+    const res = await fetch(`${getWompiApiBaseUrl()}${path}`, {
+        ...options,
+        headers: {
+            'Authorization': `Bearer ${publicKey}`,
+            'Content-Type': 'application/json',
+            ...options?.headers,
+        },
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || json.error || 'Error en Wompi');
+    return json;
+}
+
+// ─── WompiJS ($wompi) loading & initialization ─────────────────
+
+const WOMPI_JS_URL = 'https://wompijs.wompi.com/libs/js/v1.js';
+const WOMPI_JS_ID = 'wompi-js-script';
+
+function loadWompiJSScript(): Promise<void> {
     return new Promise((resolve, reject) => {
-        if (typeof window === 'undefined') return reject(new Error('Not browser'));
-        if ((window as any).WidgetCheckout) return resolve();
-        if (document.getElementById(WOMPI_SCRIPT_ID)) {
+        if (typeof window === 'undefined') return reject();
+        if ((window as any).$wompi) return resolve();
+        if (document.getElementById(WOMPI_JS_ID)) {
             const check = () => {
-                if ((window as any).WidgetCheckout) return resolve();
+                if ((window as any).$wompi) return resolve();
                 setTimeout(check, 100);
             };
             check();
             return;
         }
         const script = document.createElement('script');
-        script.id = WOMPI_SCRIPT_ID;
-        script.src = WOMPI_SCRIPT_URL;
+        script.id = WOMPI_JS_ID;
+        script.src = WOMPI_JS_URL;
+        script.setAttribute('data-public-key', (window as any).__WOMPI_PUBLIC_KEY__);
         script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Failed to load Wompi widget'));
+        script.onerror = () => reject(new Error('Failed to load WompiJS'));
         document.head.appendChild(script);
     });
 }
 
-function WompiPaymentWidget({
+function initWompiJS(): Promise<{ sessionId: string; deviceId: string }> {
+    return new Promise((resolve, reject) => {
+        loadWompiJSScript()
+            .then(() => {
+                (window as any).$wompi.initialize((data: any, error: any) => {
+                    if (error) return reject(error);
+                    resolve({
+                        sessionId: data.sessionId,
+                        deviceId: data.deviceData?.deviceID || '',
+                    });
+                });
+            })
+            .catch(reject);
+    });
+}
+
+// ─── Tokenization Form ─────────────────────────────────────────
+
+const WOMPI_TOKEN_POLL_INTERVAL = 2000;
+const WOMPI_TOKEN_MAX_ATTEMPTS = 30;
+
+function WompiTokenizationForm({
     paymentMethod,
-    amountInCents,
-    reference,
     onToken,
-    loading,
+    onBack,
 }: {
     paymentMethod: string;
-    amountInCents: number;
-    reference: string;
-    onToken: (token: string) => void;
-    loading: boolean;
+    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onBack: () => void;
 }) {
-    const [state, setState] = useState<'loading-script' | 'loading-signature' | 'ready' | 'error'>('loading-script');
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
-    const widgetRef = useRef<HTMLDivElement>(null);
-    const widgetOpened = useRef(false);
+    const [wompiEnv, setWompiEnv] = useState<{ sessionId: string; deviceId: string } | null>(null);
+    const [envLoading, setEnvLoading] = useState(true);
+    const [envError, setEnvError] = useState<string | null>(null);
+
     useEffect(() => {
-        const publicKey = (window as any).__WOMPI_PUBLIC_KEY__;
-        if (!publicKey) {
-            setErrorMsg('Wompi no está configurado. Contacta al administrador.');
-            setState('error');
+        initWompiJS()
+            .then((env) => {
+                setWompiEnv(env);
+                setEnvLoading(false);
+            })
+            .catch((e) => {
+                setEnvError('Error al inicializar WompiJS');
+                setEnvLoading(false);
+            });
+    }, []);
+
+    if (envLoading) {
+        return (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner />
+                Inicializando entorno seguro...
+            </div>
+        );
+    }
+
+    if (envError) {
+        return (
+            <div className="space-y-4">
+                <div className="text-sm text-destructive p-3 border border-destructive/30 rounded">
+                    {envError}
+                </div>
+                <Button variant="ghost" size="sm" onClick={onBack}>Volver</Button>
+            </div>
+        );
+    }
+
+    if (paymentMethod === 'NEQUI') {
+        return <NequiTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} />;
+    }
+
+    if (paymentMethod === 'DAVIPLATA') {
+        return <DaviplataTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} />;
+    }
+
+    if (paymentMethod === 'CARD') {
+        return <CardTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} />;
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="text-sm text-muted-foreground p-3 border rounded">
+                Tokenización no implementada para {paymentMethod}
+            </div>
+            <Button variant="ghost" size="sm" onClick={onBack}>Volver</Button>
+        </div>
+    );
+}
+
+// ─── NEQUI Token Form ──────────────────────────────────────────
+
+function NequiTokenForm({
+    wompiEnv,
+    onToken,
+    onBack,
+}: {
+    wompiEnv: { sessionId: string; deviceId: string };
+    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onBack: () => void;
+}) {
+    const [phone, setPhone] = useState('');
+    const [step, setStep] = useState<'form' | 'waiting' | 'done' | 'error'>('form');
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleStart = async () => {
+        if (!phone || phone.length < 7) {
+            setErrorMsg('Ingresa un número de teléfono válido');
+            return;
+        }
+        setLoading(true);
+        setErrorMsg(null);
+        try {
+            const res = await wompiFetch('/v1/tokens/nequi', {
+                method: 'POST',
+                body: JSON.stringify({ phone_number: phone }),
+            });
+            const tokenId: string = res.data.id;
+            setStep('waiting');
+
+            let attempts = 0;
+            const poll = setInterval(async () => {
+                attempts++;
+                try {
+                    const statusRes = await wompiFetch(`/v1/tokens/nequi/${tokenId}`);
+                    if (statusRes.data.status === 'APPROVED') {
+                        clearInterval(poll);
+                        setStep('done');
+                        setTimeout(() => onToken(statusRes.data.id, wompiEnv.sessionId, wompiEnv.deviceId), 500);
+                    } else if (statusRes.data.status === 'DECLINED' || statusRes.data.status === 'ERROR') {
+                        clearInterval(poll);
+                        setStep('error');
+                        setErrorMsg('La tokenización fue rechazada');
+                    }
+                } catch { }
+                if (attempts >= WOMPI_TOKEN_MAX_ATTEMPTS) {
+                    clearInterval(poll);
+                    setStep('error');
+                    setErrorMsg('Tiempo de espera agotado');
+                }
+            }, WOMPI_TOKEN_POLL_INTERVAL);
+        } catch (e: any) {
+            setErrorMsg(e.message || 'Error al tokenizar');
+            setStep('error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (step === 'waiting') {
+        return (
+            <div className="text-center py-8 space-y-4">
+                <Smartphone className="h-12 w-12 mx-auto text-primary animate-pulse" />
+                <h3 className="font-semibold">Esperando confirmación en Nequi</h3>
+                <p className="text-sm text-muted-foreground">
+                    Revisa la app de Nequi en tu celular y acepta la suscripción.
+                </p>
+                <Spinner />
+            </div>
+        );
+    }
+
+    if (step === 'done') {
+        return (
+            <div className="text-center py-8 space-y-4">
+                <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
+                <h3 className="font-semibold">Nequi tokenizado exitosamente</h3>
+                <p className="text-sm text-muted-foreground">Creando suscripción...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+                Ingresa tu número de celular registrado en Nequi. Recibirás una notificación en la app para confirmar.
+            </p>
+            <input
+                type="tel"
+                value={phone}
+                onChange={(e) => { setPhone(e.target.value); setErrorMsg(null); }}
+                placeholder="Teléfono Nequi (ej: 3991111111)"
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading}
+            />
+            {errorMsg && (
+                <div className="text-sm text-destructive p-2 border border-destructive/30 rounded">{errorMsg}</div>
+            )}
+            <div className="flex gap-3">
+                <Button variant="default" onClick={handleStart} disabled={loading}>
+                    {loading ? <><Spinner /> Tokenizando...</> : 'Tokenizar con Nequi'}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>Volver</Button>
+            </div>
+        </div>
+    );
+}
+
+// ─── DAVIPLATA Token Form ──────────────────────────────────────
+
+function DaviplataTokenForm({
+    wompiEnv,
+    onToken,
+    onBack,
+}: {
+    wompiEnv: { sessionId: string; deviceId: string };
+    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onBack: () => void;
+}) {
+    const [docType, setDocType] = useState('CC');
+    const [docNumber, setDocNumber] = useState('');
+    const [phone, setPhone] = useState('');
+    const [step, setStep] = useState<'form' | 'otp' | 'waiting' | 'done' | 'error'>('form');
+    const [otp, setOtp] = useState('');
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const tokenIdRef = useRef<string | null>(null);
+    const otpValidateUrlRef = useRef<string | null>(null);
+    const authTokenRef = useRef<string | null>(null);
+
+    const handleTokenize = async () => {
+        if (!phone || phone.length < 7) {
+            setErrorMsg('Ingresa un número de teléfono válido');
+            return;
+        }
+        setLoading(true);
+        setErrorMsg(null);
+        try {
+            const res = await wompiFetch('/v1/tokens/daviplata', {
+                method: 'POST',
+                body: JSON.stringify({
+                    type_document: docType,
+                    number_document: docNumber,
+                    product_number: phone,
+                }),
+            });
+            const d = res.data;
+            tokenIdRef.current = d.id;
+            authTokenRef.current = d.url_services.token;
+            otpValidateUrlRef.current = d.url_services.code_otp_validate;
+
+            await fetch(d.url_services.code_otp_send, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${d.url_services.token}` },
+            });
+
+            setStep('otp');
+        } catch (e: any) {
+            setErrorMsg(e.message || 'Error al tokenizar');
+            setStep('error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        if (!otp || otp.length < 4) {
+            setErrorMsg('Ingresa el código OTP');
+            return;
+        }
+        setLoading(true);
+        setErrorMsg(null);
+        try {
+            await fetch(otpValidateUrlRef.current!, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authTokenRef.current}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code: otp }),
+            });
+
+            setStep('waiting');
+
+            let attempts = 0;
+            const poll = setInterval(async () => {
+                attempts++;
+                try {
+                    const statusRes = await wompiFetch(`/v1/tokens/daviplata/${tokenIdRef.current}`);
+                    if (statusRes.data.status === 'APPROVED') {
+                        clearInterval(poll);
+                        setStep('done');
+                        setTimeout(() => onToken(statusRes.data.id, wompiEnv.sessionId, wompiEnv.deviceId), 500);
+                    } else if (statusRes.data.status === 'DECLINED' || statusRes.data.status === 'ERROR') {
+                        clearInterval(poll);
+                        setStep('error');
+                        setErrorMsg('La tokenización fue rechazada');
+                    }
+                } catch { }
+                if (attempts >= WOMPI_TOKEN_MAX_ATTEMPTS) {
+                    clearInterval(poll);
+                    setStep('error');
+                    setErrorMsg('Tiempo de espera agotado');
+                }
+            }, WOMPI_TOKEN_POLL_INTERVAL);
+        } catch (e: any) {
+            setErrorMsg(e.message || 'Error al verificar OTP');
+            setStep('error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (step === 'waiting') {
+        return (
+            <div className="text-center py-8 space-y-4">
+                <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin" />
+                <h3 className="font-semibold">Verificando código OTP...</h3>
+            </div>
+        );
+    }
+
+    if (step === 'done') {
+        return (
+            <div className="text-center py-8 space-y-4">
+                <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
+                <h3 className="font-semibold">Daviplata tokenizado exitosamente</h3>
+                <p className="text-sm text-muted-foreground">Creando suscripción...</p>
+            </div>
+        );
+    }
+
+    if (step === 'otp') {
+        return (
+            <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                    Hemos enviado un código OTP a tu celular. Ingrésalo para confirmar.
+                </p>
+                <input
+                    type="text"
+                    value={otp}
+                    onChange={(e) => { setOtp(e.target.value); setErrorMsg(null); }}
+                    placeholder="Código OTP (sandbox: 574829)"
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={loading}
+                />
+                {errorMsg && (
+                    <div className="text-sm text-destructive p-2 border border-destructive/30 rounded">{errorMsg}</div>
+                )}
+                <div className="flex gap-3">
+                    <Button variant="default" onClick={handleVerifyOtp} disabled={loading}>
+                        {loading ? <><Spinner /> Verificando...</> : 'Verificar OTP'}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setStep('form')} disabled={loading}>Volver</Button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+                Ingresa los datos de tu cuenta Daviplata para tokenizarla.
+            </p>
+            <select
+                value={docType}
+                onChange={(e) => setDocType(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading}
+            >
+                <option value="CC">Cédula de Ciudadanía</option>
+                <option value="CE">Cédula de Extranjería</option>
+                <option value="NIT">NIT</option>
+                <option value="PP">Pasaporte</option>
+            </select>
+            <input
+                type="text"
+                value={docNumber}
+                onChange={(e) => { setDocNumber(e.target.value); setErrorMsg(null); }}
+                placeholder="Número de documento"
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading}
+            />
+            <input
+                type="tel"
+                value={phone}
+                onChange={(e) => { setPhone(e.target.value); setErrorMsg(null); }}
+                placeholder="Teléfono Daviplata (sandbox: 3991111111)"
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading}
+            />
+            {errorMsg && (
+                <div className="text-sm text-destructive p-2 border border-destructive/30 rounded">{errorMsg}</div>
+            )}
+            <div className="flex gap-3">
+                <Button variant="default" onClick={handleTokenize} disabled={loading}>
+                    {loading ? <><Spinner /> Tokenizando...</> : 'Tokenizar con Daviplata'}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>Volver</Button>
+            </div>
+        </div>
+    );
+}
+
+// ─── CARD Token Form ───────────────────────────────────────────
+
+function CardTokenForm({
+    wompiEnv,
+    onToken,
+    onBack,
+}: {
+    wompiEnv: { sessionId: string; deviceId: string };
+    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onBack: () => void;
+}) {
+    const [number, setNumber] = useState('');
+    const [expMonth, setExpMonth] = useState('');
+    const [expYear, setExpYear] = useState('');
+    const [cvc, setCvc] = useState('');
+    const [cardHolder, setCardHolder] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [step, setStep] = useState<'form' | 'done' | 'error'>('form');
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+    const handleTokenize = async () => {
+        if (number.length < 13) {
+            setErrorMsg('Número de tarjeta inválido');
+            return;
+        }
+        if (!expMonth || !expYear) {
+            setErrorMsg('Fecha de expiración inválida');
+            return;
+        }
+        if (!cvc || cvc.length < 3) {
+            setErrorMsg('CVC inválido');
+            return;
+        }
+        if (!cardHolder) {
+            setErrorMsg('Nombre del titular requerido');
             return;
         }
 
-        loadWompiScript()
-            .then(async () => {
-                setState('loading-signature');
-                const signature = await gql<{ GetWompiIntegritySignature: string }>(GET_PAYMENT_SIGNATURE_QUERY, {
-                    amountInCents,
-                    paymentReference: reference,
-                });
-                console.log('Wompi integrity signature:', signature);
-                return signature
-            })
-            .then((data) => {
-                const signature = data.GetWompiIntegritySignature;
-                widgetOpened.current = true;
-                setTimeout(() => {
-                    try {
-                        const widget = new (window as any).WidgetCheckout({
-                            currency: 'COP',
-                            publicKey: (window as any).__WOMPI_PUBLIC_KEY__,
-                            amountInCents,
-                            reference,
-                            signature: {
-                                integrity: signature,
-                            },
-                        });
-                        widget.open((data: any) => {
-                            if (data?.token) {
-                                onToken(data.token);
-                            }
-                        });
-                    } catch (e) {
-                        console.error('Wompi widget error:', e);
-                        setErrorMsg('Error al abrir el formulario de pago');
-                        setState('error');
-                    }
-                }, 300);
-                setState('ready');
-            })
-            .catch((e: any) => {
-                setErrorMsg(e.message || 'Error al preparar el pago');
-                setState('error');
+        setLoading(true);
+        setErrorMsg(null);
+        try {
+            const res = await wompiFetch('/v1/tokens/cards', {
+                method: 'POST',
+                body: JSON.stringify({
+                    number: number.replace(/\s/g, ''),
+                    cvc,
+                    exp_month: expMonth,
+                    exp_year: expYear,
+                    card_holder: cardHolder,
+                }),
             });
-    }, [amountInCents, reference, paymentMethod, onToken]);
+            setStep('done');
+            setTimeout(() => onToken(res.data.id, wompiEnv.sessionId, wompiEnv.deviceId), 500);
+        } catch (e: any) {
+            setErrorMsg(e.message || 'Error al tokenizar tarjeta');
+            setStep('error');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    if (loading) {
+    if (step === 'done') {
         return (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Spinner />
-                Procesando pago...
+            <div className="text-center py-8 space-y-4">
+                <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
+                <h3 className="font-semibold">Tarjeta tokenizada exitosamente</h3>
+                <p className="text-sm text-muted-foreground">Creando suscripción...</p>
             </div>
         );
     }
 
-    if (state === 'error') {
-        return (
-            <div className="text-sm text-destructive p-3 border border-destructive/30 rounded">
-                {errorMsg}
+    return (
+        <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+                Ingresa los datos de tu tarjeta. La información se envía directamente a Wompi de forma segura.
+            </p>
+            <input
+                type="text"
+                value={number}
+                onChange={(e) => { setNumber(e.target.value); setErrorMsg(null); }}
+                placeholder="Número de tarjeta"
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading}
+                maxLength={19}
+            />
+            <div className="grid grid-cols-3 gap-2">
+                <input
+                    type="text"
+                    value={expMonth}
+                    onChange={(e) => { setExpMonth(e.target.value); setErrorMsg(null); }}
+                    placeholder="Mes (MM)"
+                    className="px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={loading}
+                    maxLength={2}
+                />
+                <input
+                    type="text"
+                    value={expYear}
+                    onChange={(e) => { setExpYear(e.target.value); setErrorMsg(null); }}
+                    placeholder="Año (YY)"
+                    className="px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={loading}
+                    maxLength={2}
+                />
+                <input
+                    type="text"
+                    value={cvc}
+                    onChange={(e) => { setCvc(e.target.value); setErrorMsg(null); }}
+                    placeholder="CVC"
+                    className="px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={loading}
+                    maxLength={4}
+                />
             </div>
-        );
-    }
-
-    if (state !== 'ready') {
-        return (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Spinner />
-                {state === 'loading-signature' ? 'Preparando pago...' : 'Cargando formulario de pago...'}
+            <input
+                type="text"
+                value={cardHolder}
+                onChange={(e) => { setCardHolder(e.target.value); setErrorMsg(null); }}
+                placeholder="Nombre del titular"
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading}
+            />
+            {errorMsg && (
+                <div className="text-sm text-destructive p-2 border border-destructive/30 rounded">{errorMsg}</div>
+            )}
+            <div className="flex gap-3">
+                <Button variant="default" onClick={handleTokenize} disabled={loading}>
+                    {loading ? <><Spinner /> Tokenizando...</> : 'Tokenizar tarjeta'}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>Volver</Button>
             </div>
-        );
-    }
-
-    return <div ref={widgetRef} />;
+        </div>
+    );
 }

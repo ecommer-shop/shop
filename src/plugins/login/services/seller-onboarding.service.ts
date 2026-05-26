@@ -9,8 +9,6 @@ import {
     Collection,
     CollectionService,
     ConfigService,
-    Customer,
-    CustomerService,
     Facet,
     FacetService,
     FacetValue,
@@ -55,7 +53,6 @@ export class SellerOnboardingService {
         private collectionService: CollectionService,
         private requestContextService: RequestContextService,
         private connection: TransactionalConnection,
-        private customerService: CustomerService,
     ) { }
 
     async registerSeller(
@@ -249,28 +246,22 @@ export class SellerOnboardingService {
             return;
         }
 
-        let customer = await this.customerService.findOneByUserId(ctx, user.id);
-        if (!customer) {
-            const customerRepo = this.connection.getRepository(ctx, Customer);
-            customer = customerRepo.create({
-                emailAddress: input.emailAddress,
-                firstName: input.firstName,
-                lastName: input.lastName,
-                user,
-            });
-            customer = await customerRepo.save(customer);
-            Logger.info(`Created Customer record for seller ${input.emailAddress}`, loggerCtx);
+        const adminRepo = this.connection.getRepository(ctx, Administrator);
+        const admin = await adminRepo.findOne({ where: { user: { id: user.id } } });
+        if (!admin) {
+            Logger.warn(`Administrator not found for ${input.emailAddress}, cannot assign free plan`, loggerCtx);
+            return;
         }
 
-        const numericCustomerId = Number(customer.id);
-        const existingSub = await subRepository.findOne({ where: { customerId: numericCustomerId } });
+        const numericAdminId = Number(admin.id);
+        const existingSub = await subRepository.findOne({ where: { administratorId: numericAdminId } });
         if (existingSub) {
             Logger.info(`Seller ${input.emailAddress} already has a subscription`, loggerCtx);
             return;
         }
 
         const subscription = subRepository.create({
-            customerId: numericCustomerId,
+            administratorId: numericAdminId,
             planId: freePlan.id,
             status: SubscriptionStatus.ACTIVE,
             startsAt: new Date(),
@@ -279,7 +270,7 @@ export class SellerOnboardingService {
         });
         await subRepository.save(subscription);
 
-        Logger.info(`Assigned Free plan to seller ${input.emailAddress} (customer ${customer.id})`, loggerCtx);
+        Logger.info(`Assigned Free plan to seller ${input.emailAddress} (administrator ${admin.id})`, loggerCtx);
     }
 
     private async createDefaultPlans(

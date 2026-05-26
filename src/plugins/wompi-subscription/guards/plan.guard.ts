@@ -1,7 +1,8 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import { CustomerService, Permission, RequestContext } from '@vendure/core';
+import { Permission, RequestContext, Administrator } from '@vendure/core';
+import { TransactionalConnection } from '@vendure/core';
 import { SubscriptionService } from '../services/subscription.service';
 import { SubscriptionStatus } from '../entities/customer-subscription.entity';
 import { PLAN_HIERARCHY } from '../constants';
@@ -11,7 +12,7 @@ import { REQUIRED_PLAN_KEY } from '../decorators/requires-plan.decorator';
 export class PlanGuard implements CanActivate {
     constructor(
         private subscriptionService: SubscriptionService,
-        private customerService: CustomerService,
+        private connection: TransactionalConnection,
         private reflector: Reflector,
     ) {}
 
@@ -25,12 +26,12 @@ export class PlanGuard implements CanActivate {
             return true;
         }
 
-        const customerId = await this.resolveCustomerId(context);
-        if (!customerId) {
+        const administratorId = await this.resolveAdministratorId(context);
+        if (!administratorId) {
             throw new ForbiddenException('Authentication required');
         }
 
-        const subscription = await this.subscriptionService.getSubscriptionByCustomerId(customerId);
+        const subscription = await this.subscriptionService.getSubscriptionByAdministratorId(administratorId);
         if (!subscription) {
             throw new ForbiddenException('No active subscription found');
         }
@@ -74,20 +75,20 @@ export class PlanGuard implements CanActivate {
         }
     }
 
-    private async resolveCustomerId(context: ExecutionContext): Promise<number | null> {
+    private async resolveAdministratorId(context: ExecutionContext): Promise<number | null> {
         let req: any;
-        let requestContext: RequestContext | undefined;
         try {
             const gqlCtx = GqlExecutionContext.create(context);
-            requestContext = gqlCtx.getContext() as unknown as RequestContext;
-            req = requestContext.req;
+            req = gqlCtx.getContext() as unknown as RequestContext;
         } catch {
-            req = context.switchToHttp().getRequest();
+            req = context.switchToHttp().getRequest() as any;
         }
-        const userId = req?.activeUserId || req?.raw?.activeUserId;
+        const userId = (req as any)?.activeUserId || (req as any)?.raw?.activeUserId;
         if (!userId) return null;
 
-        const customer = await this.customerService.findOneByUserId(requestContext as RequestContext, Number(userId));
-        return customer ? Number(customer.id) : null;
+        const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
+            where: { user: { id: Number(userId) } },
+        });
+        return admin ? Number(admin.id) : null;
     }
 }
