@@ -157,9 +157,10 @@ export function App() {
                 if (authResult?.id) {
                     setStatus('¡Sesión iniciada! Redirigiendo...');
                     sessionStorage.setItem(POST_LOGIN_RELOAD_KEY, '1');
+                    document.body.classList.remove('hide-native-login');
                     setTimeout(() => {
                         window.location.href = '/dashboard';
-                    }, 1500);
+                    }, 500);
                 } else {
                     if (!fromRegistration) {
                         redirectToRegisterFlow();
