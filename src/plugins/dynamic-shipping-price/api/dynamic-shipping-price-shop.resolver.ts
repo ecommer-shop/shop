@@ -54,10 +54,12 @@ export class DynamicShippingPriceShopResolver {
 
         await this.connection.getRepository(ctx, ShippingLine).save(shippingLine, { reload: false });
 
-        order.shipping = order.shippingLines.reduce((total, line) => total + line.price, 0);
-        order.shippingWithTax = order.shippingLines.reduce((total, line) => total + line.priceWithTax, 0);
+        const shipping = order.shippingLines.reduce((total, line) => total + line.price, 0);
+        const shippingWithTax = order.shippingLines.reduce((total, line) => total + line.priceWithTax, 0);
 
-        await this.connection.getRepository(ctx, Order).save(order, { reload: false });
+        await this.connection
+            .getRepository(ctx, Order)
+            .update(order.id, { shipping, shippingWithTax });
 
         return true;
     }
