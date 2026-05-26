@@ -110,7 +110,7 @@ export class WompiService {
         customerEmail: string,
         acceptanceToken: string,
         personalAuthToken?: string,
-        installments?: number,
+        paymentMethod?: { type: string; installments: number },
     ): Promise<WompiCreateTransactionResponse> {
         return this.createTransaction({
             payment_source_id: paymentSourceId,
@@ -120,7 +120,7 @@ export class WompiService {
             customer_email: customerEmail,
             acceptance_token: acceptanceToken,
             accept_personal_auth: personalAuthToken,
-            ...(installments ? { installments } : {}),
+            ...(paymentMethod ? { payment_method: paymentMethod } : {}),
         });
     }
 

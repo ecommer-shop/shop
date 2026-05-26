@@ -184,6 +184,10 @@ export class WompiSubscriptionShopResolver {
         Logger.debug(`[createSubscriptionWithPayment] amountInCents=${amountInCents} plan.price=${targetPlan.price} plan.name=${targetPlan.name} plan.id=${targetPlan.id} sub.status=${subscription.status}`, 'WompiResolver');
 
         try {
+            const paymentMethodInfo = paymentMethod === 'CARD'
+                ? { type: 'CARD', installments: 1 }
+                : undefined;
+
             const transaction = await this.wompiService.createRecurringTransaction(
                 paymentSource.id,
                 amountInCents,
@@ -191,7 +195,7 @@ export class WompiSubscriptionShopResolver {
                 admin.emailAddress,
                 acceptanceToken,
                 personalAuthToken,
-                paymentMethod === 'CARD' ? 1 : undefined,
+                paymentMethodInfo,
             );
 
             if (transaction.status === 'APPROVED') {
