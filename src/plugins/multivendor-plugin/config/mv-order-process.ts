@@ -12,6 +12,7 @@ import {
     OrderService,
     RequestContext,
     RequestContextService,
+    ShippingMethod,
     TransactionalConnection,
     User,
 } from '@vendure/core';
@@ -32,14 +33,12 @@ export const multivendorOrderProcess: CustomOrderProcess<any> = {
     async onTransitionStart(fromState, toState, data) {
         const { ctx, order } = data;
         if (fromState === 'AddingItems' && toState === 'ArrangingPayment') {
-            for (const line of data.order.lines) {
-                // Only require shippingLineId for seller lines (multivendor).
-                // Lines without a sellerChannelId belong to the default channel and
-                // are covered by the global shipping line on the aggregate order,
-                // so they may not have an individual shippingLineId assigned.
-                if (line.sellerChannelId && !line.shippingLineId) {
-                    return 'not all lines have shipping';
-                }
+            const hasSellerLineWithoutShipping = (data.order.lines ?? []).some(
+                line => line.sellerChannelId && !line.shippingLineId,
+            );
+
+            if (hasSellerLineWithoutShipping && !(await hasGlobalShippingLine(ctx, order))) {
+                return 'not all lines have shipping';
             }
         }
 
@@ -122,5 +121,42 @@ export const multivendorOrderProcess: CustomOrderProcess<any> = {
 async function findOrderWithFulfillments(ctx: RequestContext, id: ID): Promise<Order> {
     return await connection.getEntityOrThrow(ctx, Order, id, {
         relations: ['lines', 'fulfillments', 'fulfillments.lines', 'fulfillments.lines.fulfillment'],
+    });
+}
+
+async function hasGlobalShippingLine(ctx: RequestContext, order: Order): Promise<boolean> {
+    const orderWithShippingLines = order.shippingLines?.length
+        ? order
+        : await connection.getEntityOrThrow(ctx, Order, order.id, {
+            relations: ['shippingLines'],
+        });
+    const shippingMethodIds = [
+        ...new Set(
+            (orderWithShippingLines.shippingLines ?? [])
+                .map(line => line.shippingMethodId)
+                .filter((id): id is ID => id != null),
+        ),
+    ];
+
+    if (shippingMethodIds.length === 0) {
+        return false;
+    }
+
+    const defaultChannel = await channelService.getDefaultChannel();
+    const shippingMethods = await connection
+        .getRepository(ctx, ShippingMethod)
+        .createQueryBuilder('shippingMethod')
+        .leftJoinAndSelect('shippingMethod.channels', 'channel')
+        .where('shippingMethod.id IN (:...ids)', { ids: shippingMethodIds })
+        .getMany();
+
+    return shippingMethods.some(method => {
+        const checkerCode = (method.checker as { code?: string } | undefined)?.code;
+        const channels = method.channels ?? [];
+
+        return (
+            checkerCode === 'default-shipping-eligibility-checker' ||
+            (channels.length > 0 && channels.every(channel => idsAreEqual(channel.id, defaultChannel.id)))
+        );
     });
 }
