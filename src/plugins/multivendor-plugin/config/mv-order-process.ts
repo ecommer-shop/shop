@@ -37,7 +37,11 @@ export const multivendorOrderProcess: CustomOrderProcess<any> = {
                 line => line.sellerChannelId && !line.shippingLineId,
             );
 
-            if (hasSellerLineWithoutShipping && !(await hasGlobalShippingLine(ctx, order))) {
+            if (
+                hasSellerLineWithoutShipping &&
+                !(await hasAnyShippingLine(ctx, order)) &&
+                !(await hasGlobalShippingLine(ctx, order))
+            ) {
                 return 'not all lines have shipping';
             }
         }
@@ -160,4 +164,16 @@ async function hasGlobalShippingLine(ctx: RequestContext, order: Order): Promise
             sellerChannels.length !== 1
         );
     });
+}
+
+async function hasAnyShippingLine(ctx: RequestContext, order: Order): Promise<boolean> {
+    if (order.shippingLines?.length) {
+        return true;
+    }
+
+    const orderWithShippingLines = await connection.getEntityOrThrow(ctx, Order, order.id, {
+        relations: ['shippingLines'],
+    });
+
+    return (orderWithShippingLines.shippingLines ?? []).length > 0;
 }
