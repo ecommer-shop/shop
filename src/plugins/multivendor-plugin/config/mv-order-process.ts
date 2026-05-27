@@ -153,10 +153,11 @@ async function hasGlobalShippingLine(ctx: RequestContext, order: Order): Promise
     return shippingMethods.some(method => {
         const checkerCode = (method.checker as { code?: string } | undefined)?.code;
         const channels = method.channels ?? [];
+        const sellerChannels = channels.filter(channel => !idsAreEqual(channel.id, defaultChannel.id));
 
         return (
             checkerCode === 'default-shipping-eligibility-checker' ||
-            (channels.length > 0 && channels.every(channel => idsAreEqual(channel.id, defaultChannel.id)))
+            sellerChannels.length !== 1
         );
     });
 }
