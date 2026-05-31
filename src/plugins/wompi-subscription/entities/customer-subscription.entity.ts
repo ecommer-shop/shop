@@ -28,7 +28,7 @@ export class CustomerSubscription {
     startsAt: Date;
 
     @Column({ type: 'timestamp', nullable: true })
-    endsAt: Date;
+    endsAt: Date | null;
 
     @Column({ type: 'timestamp', nullable: true })
     gracePeriodStart: Date | null;

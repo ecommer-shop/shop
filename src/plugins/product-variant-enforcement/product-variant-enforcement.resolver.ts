@@ -1,9 +1,7 @@
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
 import { IsNull } from 'typeorm';
 import {
-    Allow,
     Ctx,
-    Permission,
     ProductService,
     RequestContext,
     TransactionalConnection,
@@ -23,7 +21,6 @@ export class ProductVariantEnforcementResolver {
 
     @Transaction()
     @Mutation()
-    @Allow(Permission.UpdateCatalog, Permission.UpdateProduct)
     @UseGuards(ProductLimitGuard)
     async updateProduct(
         @Ctx() ctx: RequestContext,

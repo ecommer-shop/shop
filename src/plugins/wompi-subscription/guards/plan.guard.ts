@@ -76,19 +76,32 @@ export class PlanGuard implements CanActivate {
     }
 
     private async resolveAdministratorId(context: ExecutionContext): Promise<number | null> {
-        let req: any;
+        let ctx: any;
+        let customerEmail: string | undefined;
         try {
             const gqlCtx = GqlExecutionContext.create(context);
-            req = gqlCtx.getContext() as unknown as RequestContext;
+            ctx = gqlCtx.getContext();
+            customerEmail = gqlCtx.getArgs()?.customerEmail;
         } catch {
-            req = context.switchToHttp().getRequest() as any;
+            ctx = context.switchToHttp().getRequest() as any;
+            customerEmail = ctx?.body?.variables?.customerEmail;
         }
-        const userId = (req as any)?.activeUserId || (req as any)?.raw?.activeUserId;
-        if (!userId) return null;
 
-        const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
-            where: { user: { id: Number(userId) } },
-        });
-        return admin ? Number(admin.id) : null;
+        const userId = ctx?.activeUserId || ctx?.req?.activeUserId || ctx?.req?.raw?.activeUserId || ctx?.session?.activeUserId;
+        if (userId) {
+            const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
+                where: { user: { id: Number(userId) } },
+            });
+            if (admin) return Number(admin.id);
+        }
+
+        if (customerEmail) {
+            const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
+                where: { emailAddress: customerEmail },
+            });
+            if (admin) return Number(admin.id);
+        }
+
+        return null;
     }
 }

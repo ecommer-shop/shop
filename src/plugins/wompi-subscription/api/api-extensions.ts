@@ -93,7 +93,8 @@ export const wompiSubscriptionShopApiExtensions = gql`
   extend type Query {
     mySubscription(customerEmail: String): CustomerSubscription
     allPlans: [Plan!]!
-    checkProductLimit(customerEmail: String): SubscriptionCheckResult
+    checkProductLimit(channelToken: String, customerEmail: String): SubscriptionCheckResult
+    checkVariationLimit(channelToken: String, customerEmail: String): SubscriptionCheckResult
     checkFeatureAccess(featureCode: String!, customerEmail: String): Boolean
     GetWompiIntegritySignature(amountInCents: Int!, paymentReference: String!): String!
   }

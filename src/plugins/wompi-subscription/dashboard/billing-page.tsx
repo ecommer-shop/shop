@@ -74,6 +74,22 @@ const ACTIVE_ADMIN_QUERY = `
   }
 `;
 
+const CHECK_PRODUCT_LIMIT_QUERY = `
+  query CheckProductLimit($channelToken: String, $customerEmail: String) {
+    checkProductLimit(channelToken: $channelToken, customerEmail: $customerEmail) {
+      allowed current limit
+    }
+  }
+`;
+
+const CHECK_VARIATION_LIMIT_QUERY = `
+  query CheckVariationLimit($channelToken: String, $customerEmail: String) {
+    checkVariationLimit(channelToken: $channelToken, customerEmail: $customerEmail) {
+      allowed current limit
+    }
+  }
+`;
+
 const CREATE_SUBSCRIPTION_MUTATION = `
   mutation CreateSubscriptionWithPayment($token: String!, $planId: Int!, $paymentMethod: String!, $customerEmail: String, $sessionId: String, $deviceId: String) {
     createSubscriptionWithPayment(token: $token, planId: $planId, paymentMethod: $paymentMethod, customerEmail: $customerEmail, sessionId: $sessionId, deviceId: $deviceId) {
@@ -234,6 +250,7 @@ export function BillingPage() {
     const [showTokenForm, setShowTokenForm] = useState(false);
     const [pendingResult, setPendingResult] = useState<any>(null);
     const [adminEmail, setAdminEmail] = useState<string | undefined>();
+    const [usage, setUsage] = useState<{ product: { allowed: boolean; current: number; limit: number }; variation: { allowed: boolean; current: number; limit: number } } | null>(null);
 
     useEffect(() => {
         gql<{ activeAdministrator: { emailAddress: string } }>(ACTIVE_ADMIN_QUERY)
@@ -252,6 +269,24 @@ export function BillingPage() {
         } catch (e: any) {
             setError(e.message);
         }
+    }, [adminEmail]);
+
+    useEffect(() => {
+        if (!adminEmail) return;
+        const token = typeof window !== 'undefined'
+            ? localStorage.getItem('vendure-selected-channel-token')
+            : undefined;
+        if (!token) return;
+        Promise.all([
+            gql<{ checkProductLimit: { allowed: boolean; current: number; limit: number } }>(
+                CHECK_PRODUCT_LIMIT_QUERY, { channelToken: token, customerEmail: adminEmail }
+            ),
+            gql<{ checkVariationLimit: { allowed: boolean; current: number; limit: number } }>(
+                CHECK_VARIATION_LIMIT_QUERY, { channelToken: token, customerEmail: adminEmail }
+            ),
+        ]).then(([product, variation]) => {
+            setUsage({ product: product.checkProductLimit, variation: variation.checkVariationLimit });
+        }).catch(() => { });
     }, [adminEmail]);
 
     useEffect(() => { if (adminEmail) loadData(); }, [adminEmail, loadData]);
@@ -418,6 +453,7 @@ export function BillingPage() {
                     {step === 'view' && (
                         <ViewStep
                             sub={sub}
+                            usage={usage}
                             onShowPlans={() => setStep('plans')}
                             onStopAutoRenew={handleStopAutoRenew}
                             onCancel={handleCancel}
@@ -430,21 +466,25 @@ export function BillingPage() {
     );
 }
 
-// ─── Sub-steps ──────────────────────────────────────────────────
+// ─── Sub-steps ───
 
 function ViewStep({
     sub,
+    usage,
     onShowPlans,
     onStopAutoRenew,
     onCancel,
     actionLoading,
 }: {
     sub: Subscription | null | undefined;
+    usage: { product: { allowed: boolean; current: number; limit: number }; variation: { allowed: boolean; current: number; limit: number } } | null;
     onShowPlans: () => void;
     onStopAutoRenew: () => void;
     onCancel: () => void;
     actionLoading: string | null;
 }) {
+    console.log('Subscription:', sub);
+    console.log('Usage:', usage);
     if (sub === undefined) {
         return (
             <Card>
@@ -540,6 +580,74 @@ function ViewStep({
                     </CardContent>
                 </Card>
             )}
+
+            {usage && sub.status === 'ACTIVE' && (
+                <Card>
+                    <CardContent className="py-4 space-y-4">
+                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Uso del plan</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <UsageBar
+                                label="Productos"
+                                current={usage.product.current}
+                                limit={usage.product.limit}
+                            />
+                            <UsageBar
+                                label="Variantes"
+                                current={usage.variation.current}
+                                limit={usage.variation.limit}
+                            />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                                <span className={sub.hasAIAccess ? 'text-green-600' : 'text-muted-foreground'}>
+                                    {sub.hasAIAccess ? '✅' : '❌'}
+                                </span>
+                                <span>AI Access</span>
+                                <span className="text-muted-foreground">
+                                    {sub.hasAIAccess ? 'Activado' : 'No disponible en tu plan'}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className={sub.hasElectronicBilling ? 'text-green-600' : 'text-muted-foreground'}>
+                                    {sub.hasElectronicBilling ? '✅' : '❌'}
+                                </span>
+                                <span>Facturación Electrónica</span>
+                                <span className="text-muted-foreground">
+                                    {sub.hasElectronicBilling ? 'Activado' : 'No disponible en tu plan'}
+                                </span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+    );
+}
+
+function UsageBar({ label, current, limit }: { label: string; current: number; limit: number }) {
+    const pct = limit > 0 ? Math.round((current / limit) * 100) : 0;
+    const remaining = limit - current;
+    const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-blue-500';
+
+    return (
+        <div className="space-y-1">
+            <div className="flex justify-between text-sm">
+                <span className="font-medium">{label}</span>
+                <span className="text-muted-foreground">{current} / {limit}</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                    className={`h-full rounded-full transition-all duration-300 ${barColor}`}
+                    style={{ width: `${Math.min(pct, 100)}%` }}
+                />
+            </div>
+            <p className="text-xs text-muted-foreground">
+                {remaining > 0
+                    ? `${remaining} disponibles`
+                    : pct >= 100
+                        ? 'Límite alcanzado — actualiza tu plan'
+                        : `${remaining} disponibles`}
+            </p>
         </div>
     );
 }

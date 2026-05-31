@@ -62,20 +62,33 @@ export class FeatureGuard implements CanActivate {
     }
 
     protected async resolveAdministratorId(context: ExecutionContext): Promise<number | null> {
-        let req: any;
+        let ctx: any;
+        let customerEmail: string | undefined;
         try {
             const gqlCtx = GqlExecutionContext.create(context);
-            req = gqlCtx.getContext() as unknown as RequestContext;
+            ctx = gqlCtx.getContext();
+            customerEmail = gqlCtx.getArgs()?.customerEmail;
         } catch {
-            req = context.switchToHttp().getRequest() as any;
+            ctx = context.switchToHttp().getRequest() as any;
+            customerEmail = ctx?.body?.variables?.customerEmail;
         }
-        const userId = (req as any)?.activeUserId || (req as any)?.raw?.activeUserId;
-        if (!userId) return null;
 
-        const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
-            where: { user: { id: Number(userId) } },
-        });
-        return admin ? Number(admin.id) : null;
+        const userId = ctx?.activeUserId || ctx?.req?.activeUserId || ctx?.req?.raw?.activeUserId || ctx?.session?.activeUserId;
+        if (userId) {
+            const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
+                where: { user: { id: Number(userId) } },
+            });
+            if (admin) return Number(admin.id);
+        }
+
+        if (customerEmail) {
+            const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
+                where: { emailAddress: customerEmail },
+            });
+            if (admin) return Number(admin.id);
+        }
+
+        return null;
     }
 }
 
@@ -104,6 +117,38 @@ export class ProductLimitGuard extends FeatureGuard {
         if (!allowed) {
             throw new ForbiddenException(
                 `Product limit reached. You have ${current}/${limit} products. Upgrade your plan to add more.`,
+            );
+        }
+
+        return true;
+    }
+}
+
+@Injectable()
+export class ProductVariationLimitGuard extends FeatureGuard {
+    constructor(
+        subscriptionService: SubscriptionService,
+        connection: TransactionalConnection,
+    ) {
+        super(subscriptionService, connection);
+    }
+
+    async canActivate(context: ExecutionContext): Promise<boolean> {
+        if (await this.isSuperAdmin(context)) {
+            return true;
+        }
+
+        const administratorId = await this.resolveAdministratorId(context);
+        if (!administratorId) {
+            throw new ForbiddenException('Authentication required');
+        }
+
+        await super.canActivate(context);
+
+        const { allowed, current, limit } = await this.subscriptionService.checkVariationLimit(administratorId);
+        if (!allowed) {
+            throw new ForbiddenException(
+                `Variation limit reached. You have ${current}/${limit} variations. Upgrade your plan to add more.`,
             );
         }
 

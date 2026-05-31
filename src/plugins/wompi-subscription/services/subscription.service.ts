@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual, MoreThan, IsNull } from 'typeorm';
-import { Logger, Administrator, Product } from '@vendure/core';
+import { Logger, Administrator, Product, ProductVariant } from '@vendure/core';
 import { Plan, BillingInterval } from '../entities/plan.entity';
 import { Feature, FeatureType } from '../entities/feature.entity';
 import { PlanFeature } from '../entities/plan-feature.entity';
@@ -23,6 +23,7 @@ export class SubscriptionService implements OnModuleInit {
         @InjectRepository(PlanFeature) private planFeatureRepository: Repository<PlanFeature>,
         @InjectRepository(CustomerSubscription) private subscriptionRepository: Repository<CustomerSubscription>,
         @InjectRepository(Product) private productRepository: Repository<Product>,
+        @InjectRepository(ProductVariant) private variantRepository: Repository<ProductVariant>,
         private wompiService: WompiService,
     ) { }
 
@@ -50,7 +51,7 @@ export class SubscriptionService implements OnModuleInit {
             planId: freePlan.id,
             status: SubscriptionStatus.ACTIVE,
             startsAt: new Date(),
-            endsAt: this.calculateEndDate(freePlan.billingInterval),
+            endsAt: null,
             autoRenew: false,
             paymentFlowType: PaymentFlowType.MANUAL,
         });
@@ -154,12 +155,23 @@ export class SubscriptionService implements OnModuleInit {
             existing.status = SubscriptionStatus.ACTIVE;
             existing.autoRenew = true;
             existing.paymentFlowType = PaymentFlowType.RECURRENTE;
-            existing.endsAt = this.calculateEndDate(plan.billingInterval, existing.endsAt);
+            existing.endsAt = this.calculateEndDate(plan.billingInterval, existing.endsAt ?? undefined);
             existing.lastPaymentAt = new Date();
             existing.gracePeriodStart = null as any;
 
             const saved = await this.subscriptionRepository.save(existing);
             const reloaded = await this.reloadSubscriptionWithPlan(saved.id);
+
+            const productLimitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
+            if (productLimitValue) {
+                await this.restoreHiddenProducts(administratorId, parseInt(productLimitValue, 10));
+            }
+
+            const variantLimitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS);
+            if (variantLimitValue) {
+                await this.restoreHiddenVariants(administratorId, parseInt(variantLimitValue, 10));
+            }
+
             Logger.info(`Upgraded subscription ${saved.id} for administrator ${administratorId} to plan ${plan.name}`, 'SubscriptionService');
             return reloaded ?? saved;
         }
@@ -288,7 +300,7 @@ export class SubscriptionService implements OnModuleInit {
             throw new Error('Subscription not found');
         }
 
-        subscription.endsAt = this.calculateEndDate(subscription.plan.billingInterval, subscription.endsAt);
+        subscription.endsAt = this.calculateEndDate(subscription.plan.billingInterval, subscription.endsAt ?? undefined);
         subscription.lastPaymentAt = new Date();
         return this.subscriptionRepository.save(subscription);
     }
@@ -348,9 +360,13 @@ export class SubscriptionService implements OnModuleInit {
         const saved = await this.subscriptionRepository.save(subscription);
         const reloaded = await this.reloadSubscriptionWithPlan(saved.id);
 
-        const limitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
-        const limit = limitValue ? parseInt(limitValue, 10) : 15;
-        await this.hideExcessProducts(administratorId, limit);
+        const productLimitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
+        const productLimit = productLimitValue ? parseInt(productLimitValue, 10) : 15;
+        await this.hideExcessProducts(administratorId, productLimit);
+
+        const variantLimitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS);
+        const variantLimit = variantLimitValue ? parseInt(variantLimitValue, 10) : 0;
+        await this.hideExcessVariants(administratorId, variantLimit);
 
         Logger.info(`Subscription ${subscriptionId} reverted to Free plan for administrator ${administratorId}`, 'SubscriptionService');
         return reloaded ?? saved;
@@ -399,7 +415,7 @@ export class SubscriptionService implements OnModuleInit {
         return true;
     }
 
-    async checkProductLimit(administratorId: number): Promise<{ allowed: boolean; current: number; limit: number }> {
+    async checkProductLimit(administratorId: number, channelToken?: string): Promise<{ allowed: boolean; current: number; limit: number }> {
         const subscription = await this.getSubscriptionByAdministratorId(administratorId);
         if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
             return { allowed: false, current: 0, limit: 0 };
@@ -408,23 +424,66 @@ export class SubscriptionService implements OnModuleInit {
         const limitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
         const limit = limitValue ? parseInt(limitValue, 10) : 0;
 
-        const channel = await this.getChannelByAdministratorId(administratorId);
+        const channel = channelToken
+            ? await this.findChannelByCode(channelToken) ?? await this.getChannelByAdministratorId(administratorId)
+            : await this.getChannelByAdministratorId(administratorId);
         if (!channel) {
             return { allowed: limit > 0, current: 0, limit };
         }
 
-        const productCount = await this.productRepository.count({
-            where: {
-                channels: { id: channel.id },
-                deletedAt: IsNull(),
-            },
-        });
+        const productCount = await this.productRepository
+            .createQueryBuilder('product')
+            .innerJoin('product.channels', 'channel')
+            .where('channel.id = :channelId', { channelId: channel.id })
+            .andWhere('product.deletedAt IS NULL')
+            .andWhere('product."customFieldsHidden" IS DISTINCT FROM true')
+            .getCount();
 
         return {
             allowed: productCount < limit,
             current: productCount,
             limit,
         };
+    }
+
+    async checkVariationLimit(administratorId: number, channelToken?: string): Promise<{ allowed: boolean; current: number; limit: number }> {
+        const subscription = await this.getSubscriptionByAdministratorId(administratorId);
+        if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
+            return { allowed: false, current: 0, limit: 0 };
+        }
+
+        const limitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS);
+        const limit = limitValue ? parseInt(limitValue, 10) : 0;
+
+        const channel = channelToken
+            ? await this.findChannelByCode(channelToken) ?? await this.getChannelByAdministratorId(administratorId)
+            : await this.getChannelByAdministratorId(administratorId);
+        if (!channel) {
+            return { allowed: limit > 0, current: 0, limit };
+        }
+
+        const variantCount = await this.variantRepository
+            .createQueryBuilder('variant')
+            .innerJoin('variant.product', 'product')
+            .innerJoin('product.channels', 'channel')
+            .where('channel.id = :channelId', { channelId: channel.id })
+            .andWhere('product.deletedAt IS NULL')
+            .andWhere('variant.deletedAt IS NULL')
+            .andWhere('variant.enabled = :enabled', { enabled: true })
+            .andWhere('variant."customFieldsHidden" IS DISTINCT FROM true')
+            .getCount();
+
+        return {
+            allowed: variantCount < limit,
+            current: variantCount,
+            limit,
+        };
+    }
+
+    private async findChannelByCode(code: string): Promise<any> {
+        const { Channel } = await import('@vendure/core');
+        const repo = this.planRepository.manager.getRepository(Channel);
+        return repo.findOne({ where: { code } });
     }
 
     private async getChannelByAdministratorId(administratorId: number): Promise<any> {
@@ -544,11 +603,18 @@ export class SubscriptionService implements OnModuleInit {
             take: 1000,
         });
 
-        const productsToHide = products.slice(maxAllowed);
+        const activeProducts = products.filter(p => !(p as any).customFields?.hidden);
+        const productsToHide = activeProducts.slice(maxAllowed);
         let hiddenCount = 0;
 
         for (const product of productsToHide) {
-            await this.productRepository.update(product.id, { deletedAt: new Date() });
+            const existingCustomFields = (product as any).customFields || {};
+            (product as any).customFields = {
+                ...existingCustomFields,
+                hidden: true,
+                hiddenAt: new Date(),
+            };
+            await this.productRepository.save(product);
             hiddenCount++;
         }
 
@@ -563,7 +629,7 @@ export class SubscriptionService implements OnModuleInit {
             return 0;
         }
 
-        const products = await this.productRepository.find({
+        const allProducts = await this.productRepository.find({
             where: {
                 channels: { id: channel.id },
             },
@@ -572,17 +638,120 @@ export class SubscriptionService implements OnModuleInit {
             take: 1000,
         });
 
-        const productsToRestore = products.slice(0, maxAllowed);
+        const activeCount = allProducts.filter(
+            p => !(p as any).customFields?.hidden && !p.deletedAt
+        ).length;
+
+        const hiddenProducts = allProducts.filter(
+            p => (p as any).customFields?.hidden && !p.deletedAt
+        );
+
+        const canRestore = Math.max(0, maxAllowed - activeCount);
+        if (canRestore <= 0) return 0;
+
+        const toRestore = hiddenProducts.slice(0, canRestore);
         let restoredCount = 0;
 
-        for (const product of productsToRestore) {
-            if (product.deletedAt) {
-                await this.productRepository.update(product.id, { deletedAt: null });
-                restoredCount++;
-            }
+        for (const product of toRestore) {
+            const existingCustomFields = (product as any).customFields || {};
+            (product as any).customFields = {
+                ...existingCustomFields,
+                hidden: false,
+                hiddenAt: null,
+            };
+            await this.productRepository.save(product);
+            restoredCount++;
         }
 
         Logger.info(`Restored ${restoredCount} products for administrator ${administratorId}`, 'SubscriptionService');
+        return restoredCount;
+    }
+
+    async hideExcessVariants(administratorId: number, maxAllowed: number): Promise<number> {
+        const channel = await this.getChannelByAdministratorId(administratorId);
+        if (!channel) {
+            Logger.warn(`No channel found for administrator ${administratorId}`, 'SubscriptionService');
+            return 0;
+        }
+
+        const variants = await this.variantRepository.find({
+            where: {
+                product: {
+                    channels: { id: channel.id },
+                    deletedAt: IsNull(),
+                },
+                enabled: true,
+                deletedAt: IsNull(),
+            },
+            relations: ['product', 'product.channels'],
+            order: { createdAt: 'ASC' },
+            take: 10000,
+        });
+
+        const activeVariants = variants.filter(v => !(v as any).customFields?.hidden);
+        const variantsToHide = activeVariants.slice(maxAllowed);
+        let hiddenCount = 0;
+
+        for (const variant of variantsToHide) {
+            const existingCustomFields = (variant as any).customFields || {};
+            (variant as any).customFields = {
+                ...existingCustomFields,
+                hidden: true,
+                hiddenAt: new Date(),
+            };
+            await this.variantRepository.save(variant);
+            hiddenCount++;
+        }
+
+        Logger.info(`Hidden ${hiddenCount} variants for administrator ${administratorId}`, 'SubscriptionService');
+        return hiddenCount;
+    }
+
+    async restoreHiddenVariants(administratorId: number, maxAllowed: number): Promise<number> {
+        const channel = await this.getChannelByAdministratorId(administratorId);
+        if (!channel) {
+            Logger.warn(`No channel found for administrator ${administratorId}`, 'SubscriptionService');
+            return 0;
+        }
+
+        const allVariants = await this.variantRepository.find({
+            where: {
+                product: {
+                    channels: { id: channel.id },
+                },
+                deletedAt: IsNull(),
+            },
+            relations: ['product', 'product.channels'],
+            order: { createdAt: 'ASC' },
+            take: 10000,
+        });
+
+        const activeCount = allVariants.filter(
+            v => !(v as any).customFields?.hidden && v.enabled
+        ).length;
+
+        const hiddenVariants = allVariants.filter(
+            v => (v as any).customFields?.hidden
+        );
+
+        const canRestore = Math.max(0, maxAllowed - activeCount);
+        if (canRestore <= 0) return 0;
+
+        const toRestore = hiddenVariants.slice(0, canRestore);
+        let restoredCount = 0;
+
+        for (const variant of toRestore) {
+            const existingCustomFields = (variant as any).customFields || {};
+            (variant as any).customFields = {
+                ...existingCustomFields,
+                hidden: false,
+                hiddenAt: null,
+            };
+            await this.variantRepository.save(variant);
+            restoredCount++;
+        }
+
+        Logger.info(`Restored ${restoredCount} variants for administrator ${administratorId}`, 'SubscriptionService');
         return restoredCount;
     }
 

@@ -172,6 +172,24 @@ export const customFields: VendureConfig['customFields'] = {
       ],
       ui: { component: 'ecommer-store-featured-star' },
     },
+    {
+      name: 'hidden',
+      type: 'boolean',
+      defaultValue: false,
+      label: [
+        { languageCode: LanguageCode.es, value: 'Oculto por límite del plan' },
+        { languageCode: LanguageCode.en, value: 'Hidden by plan limit' },
+      ],
+    },
+    {
+      name: 'hiddenAt',
+      type: 'datetime',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.es, value: 'Oculto desde' },
+        { languageCode: LanguageCode.en, value: 'Hidden since' },
+      ],
+    },
   ],
   ProductVariant: [
     {
@@ -244,6 +262,24 @@ export const customFields: VendureConfig['customFields'] = {
           languageCode: LanguageCode.es,
           value: 'Ancho del producto en centímetros',
         },
+      ],
+    },
+    {
+      name: 'hidden',
+      type: 'boolean',
+      defaultValue: false,
+      label: [
+        { languageCode: LanguageCode.es, value: 'Oculto por límite del plan' },
+        { languageCode: LanguageCode.en, value: 'Hidden by plan limit' },
+      ],
+    },
+    {
+      name: 'hiddenAt',
+      type: 'datetime',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.es, value: 'Oculto desde' },
+        { languageCode: LanguageCode.en, value: 'Hidden since' },
       ],
     },
   ],

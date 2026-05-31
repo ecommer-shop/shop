@@ -78,13 +78,27 @@ export class WompiSubscriptionShopResolver {
     @Query('checkProductLimit')
     async checkProductLimit(
         @Context() ctx: RequestContext,
+        @Args('channelToken') channelToken?: string,
         @Args('customerEmail') customerEmail?: string,
     ) {
         const administratorId = await this.resolveAdministratorId(ctx, customerEmail);
         if (!administratorId) {
             return { allowed: false, current: 0, limit: 0 };
         }
-        return this.subscriptionService.checkProductLimit(administratorId);
+        return this.subscriptionService.checkProductLimit(administratorId, channelToken);
+    }
+
+    @Query('checkVariationLimit')
+    async checkVariationLimit(
+        @Context() ctx: RequestContext,
+        @Args('channelToken') channelToken?: string,
+        @Args('customerEmail') customerEmail?: string,
+    ) {
+        const administratorId = await this.resolveAdministratorId(ctx, customerEmail);
+        if (!administratorId) {
+            return { allowed: false, current: 0, limit: 0 };
+        }
+        return this.subscriptionService.checkVariationLimit(administratorId, channelToken);
     }
 
     @Query('checkFeatureAccess')
