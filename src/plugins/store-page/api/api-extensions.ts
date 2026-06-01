@@ -4,6 +4,9 @@ export const storePageShopApiExtensions = gql`
     type SellerShopLink {
         channelCode: String!
         sellerName: String!
+        pickupAddress: String
+        pickupLatLng: String
+        pickupNeighborhood: String
     }
 
     extend type Product {

@@ -30,10 +30,11 @@ export class MultivendorShippingLineAssignmentStrategy implements ShippingLineAs
             .getOne();
         const channels = method?.channels ?? [];
 
-        // Find the seller channel: any non-default channel the shipping method belongs to.
-        // Previously this assumed exactly 2 channels, but a method may belong to the default
-        // channel plus one or more seller channels.
-        const sellerChannel = channels.find(c => !idsAreEqual(c.id, defaultChannel.id));
+        const sellerChannels = channels.filter(c => !idsAreEqual(c.id, defaultChannel.id));
+
+        // If a shipping method belongs to exactly one seller channel, it is seller-specific.
+        // If it belongs to multiple seller channels, treat it as a global marketplace method.
+        const sellerChannel = sellerChannels.length === 1 ? sellerChannels[0] : undefined;
         if (sellerChannel) {
             // Once we have established the seller's Channel, we can filter the OrderLines
             // that belong to that Channel. The `sellerChannelId` was previously established
