@@ -57,6 +57,7 @@ import {
   DeliveryOrderPlugin,
   MessengerDomisDeliveryOrderStrategy,
 } from '../plugins/delivery-order';
+import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -144,6 +145,8 @@ export const plugins: VendureConfig['plugins'] = [
       url: process.env.DELIVERY_ORDER_API_URL,
     }),
   }),
+
+  DynamicShippingPricePlugin,
 
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
