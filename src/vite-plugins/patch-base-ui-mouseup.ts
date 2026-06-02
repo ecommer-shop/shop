@@ -16,7 +16,7 @@ export function patchBaseUiMouseUp(): Plugin {
         enforce: 'pre' as const,
         transform(code: string, id: string) {
             const normalizedId = id.replace(/\\/g, '/');
-            if (!normalizedId.includes('@base-ui/react/esm/menu/item/useMenuItemCommonProps')) {
+if (!normalizedId.includes('useMenuItemCommonProps')) {
                 return null;
             }
 
