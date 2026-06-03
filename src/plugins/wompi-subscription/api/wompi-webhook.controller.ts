@@ -1,6 +1,10 @@
 import { Controller, Post, Body, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { WompiService } from '../services/wompi.service';
-import { SubscriptionService } from '../services/subscription.service';
+import { SubscriptionQueryService } from '../services/subscription-query.service';
+import { SubscriptionWriteService } from '../services/subscription-write.service';
+import { SubscriptionLifecycleService } from '../services/subscription-lifecycle.service';
+import { FeatureCheckService } from '../services/feature-check.service';
+import { ProductLimitEnforcementService } from '../services/product-limit-enforcement.service';
 import { SubscriptionStatus } from '../entities/customer-subscription.entity';
 
 @Controller('api/wompi-subscription')
@@ -9,7 +13,11 @@ export class WompiWebhookController {
 
     constructor(
         private wompiService: WompiService,
-        private subscriptionService: SubscriptionService,
+        private subscriptionQueryService: SubscriptionQueryService,
+        private subscriptionWriteService: SubscriptionWriteService,
+        private lifecycleService: SubscriptionLifecycleService,
+        private featureCheckService: FeatureCheckService,
+        private limitEnforcementService: ProductLimitEnforcementService,
     ) { }
 
     @Post('webhook')
@@ -54,7 +62,7 @@ export class WompiWebhookController {
     }
 
     private async handlePendingPaymentActivation(transaction: any, reference: string) {
-        const subscription = await this.subscriptionService.findByPendingReference(reference);
+        const subscription = await this.subscriptionQueryService.findByPendingReference(reference);
         if (!subscription) {
             this.logger.warn(`No pending subscription found for reference ${reference}`);
             return;
@@ -62,7 +70,7 @@ export class WompiWebhookController {
 
         this.logger.log(`Activating pending subscription ${subscription.id} after approved payment`);
 
-        await this.subscriptionService.activateSubscriptionAfterPayment(subscription.id);
+        await this.subscriptionWriteService.activateSubscriptionAfterPayment(subscription.id);
         this.logger.log(`Subscription ${subscription.id} activated successfully`);
     }
 
@@ -76,7 +84,7 @@ export class WompiWebhookController {
         const subscriptionId = parseInt(subscriptionIdMatch[1], 10);
         this.logger.log(`Processing approved transaction for subscription ${subscriptionId}`);
 
-        const subscription = await this.subscriptionService.getSubscriptionById(subscriptionId);
+        const subscription = await this.subscriptionQueryService.getSubscriptionById(subscriptionId);
 
         if (!subscription) {
             this.logger.warn(`Subscription ${subscriptionId} not found`);
@@ -84,17 +92,17 @@ export class WompiWebhookController {
         }
 
         if (subscription.status === SubscriptionStatus.GRACE_PERIOD) {
-            await this.subscriptionService.updateSubscriptionStatus(subscriptionId, SubscriptionStatus.ACTIVE);
+            await this.lifecycleService.updateSubscriptionStatus(subscriptionId, SubscriptionStatus.ACTIVE);
             this.logger.log(`Restored subscription ${subscriptionId} to ACTIVE`);
 
-            const limitValue = await this.subscriptionService.getFeatureValue(
+            const limitValue = await this.featureCheckService.getFeatureValue(
                 subscription.administratorId,
                 'max_products',
             );
             const limit = limitValue ? parseInt(limitValue, 10) : 15;
-            await this.subscriptionService.restoreHiddenProducts(subscription.administratorId, limit);
+            await this.limitEnforcementService.restoreHiddenProducts(subscription.administratorId, limit);
         } else if (subscription.status === SubscriptionStatus.ACTIVE) {
-            await this.subscriptionService.extendSubscription(subscriptionId);
+            await this.lifecycleService.extendSubscription(subscriptionId);
             this.logger.log(`Extended subscription ${subscriptionId}`);
         }
     }
@@ -111,73 +119,10 @@ export class WompiWebhookController {
             const subscriptionId = parseInt(subscriptionIdMatch[1], 10);
             this.logger.warn(`Payment declined for subscription ${subscriptionId}`);
 
-            const subscription = await this.subscriptionService.getSubscriptionById(subscriptionId);
+            const subscription = await this.subscriptionQueryService.getSubscriptionById(subscriptionId);
             if (subscription) {
-                await this.subscriptionService.updateSubscriptionStatus(subscriptionId, SubscriptionStatus.GRACE_PERIOD);
+                await this.lifecycleService.updateSubscriptionStatus(subscriptionId, SubscriptionStatus.GRACE_PERIOD);
             }
-        }
-    }
-}
-
-@Controller('api/wompi-subscription')
-export class WompiTokenController {
-    private readonly logger = new Logger(WompiTokenController.name);
-
-    constructor(
-        private wompiService: WompiService,
-        private subscriptionService: SubscriptionService,
-    ) { }
-
-    @Post('create-payment-source')
-    async createPaymentSource(
-        @Body() payload: { token: string; administratorId: number; customerEmail: string; planId: number; paymentMethod: string },
-    ) {
-        this.logger.debug(`Creating payment source for administrator ${payload.administratorId}`);
-
-        try {
-            const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
-            const paymentMethod = payload.paymentMethod || 'CARD';
-
-            const paymentSource = await this.wompiService.createPaymentSource(
-                paymentMethod,
-                payload.token,
-                payload.customerEmail,
-                acceptanceToken,
-                personalAuthToken,
-            );
-
-            const subscription = await this.subscriptionService.createRecurrentSubscription(
-                payload.administratorId,
-                payload.planId,
-                paymentMethod,
-                paymentSource.id,
-                payload.customerEmail,
-            );
-
-            const amountInCents = Math.round(subscription.plan.price * 100);
-            const reference = `SUB-${subscription.id}-${Date.now()}`;
-
-            const transaction = await this.wompiService.createRecurringTransaction(
-                paymentSource.id,
-                amountInCents,
-                reference,
-                payload.customerEmail,
-                acceptanceToken,
-            );
-
-            if (transaction.status === 'APPROVED') {
-                await this.subscriptionService.extendSubscription(subscription.id);
-            }
-
-            return {
-                subscriptionId: subscription.id,
-                status: subscription.status,
-                paymentSourceId: paymentSource.id,
-                transactionStatus: transaction.status,
-            };
-        } catch (error: any) {
-            this.logger.error(`Failed to create payment source: ${error.message}`);
-            throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
         }
     }
 }

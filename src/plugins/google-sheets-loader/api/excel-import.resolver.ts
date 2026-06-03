@@ -2,7 +2,7 @@ import { Resolver, Mutation, Args, ObjectType, Field, InputType } from '@nestjs/
 import { Ctx, RequestContext } from '@vendure/core';
 import { UseGuards } from '@nestjs/common';
 import { ExcelImportService, ImportProduct } from '../services/excel-import.service';
-import { ProductLimitGuard } from '../../wompi-subscription/guards/feature.guard';
+import { ProductLimitGuard } from '../../wompi-subscription/guards';
 
 @InputType()
 export class ImportProductInputType {

@@ -1,9 +1,9 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Permission, RequestContext, Administrator } from '@vendure/core';
 import { TransactionalConnection } from '@vendure/core';
-import { SubscriptionService } from '../services/subscription.service';
+import { SubscriptionQueryService } from '../services/subscription-query.service';
+import { PlanManagementService } from '../services/plan-management.service';
 import { SubscriptionStatus } from '../entities/customer-subscription.entity';
 import { PLAN_HIERARCHY } from '../constants';
 import { REQUIRED_PLAN_KEY } from '../decorators/requires-plan.decorator';
@@ -11,67 +11,62 @@ import { REQUIRED_PLAN_KEY } from '../decorators/requires-plan.decorator';
 @Injectable()
 export class PlanGuard implements CanActivate {
     constructor(
-        private subscriptionService: SubscriptionService,
+        private subscriptionQueryService: SubscriptionQueryService,
+        private planManagementService: PlanManagementService,
         private connection: TransactionalConnection,
-        private reflector: Reflector,
-    ) {}
+    ) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        if (await this.isSuperAdmin(context)) {
-            return true;
-        }
-
-        const requiredPlan = this.reflector.get<string>(REQUIRED_PLAN_KEY, context.getHandler());
-        if (!requiredPlan) {
-            return true;
-        }
-
-        const administratorId = await this.resolveAdministratorId(context);
-        if (!administratorId) {
-            throw new ForbiddenException('Authentication required');
-        }
-
-        const subscription = await this.subscriptionService.getSubscriptionByAdministratorId(administratorId);
-        if (!subscription) {
-            throw new ForbiddenException('No active subscription found');
-        }
-
-        if (subscription.status !== SubscriptionStatus.ACTIVE) {
-            throw new ForbiddenException('Subscription is not active.');
-        }
-
-        const planName = subscription.plan?.name;
-        if (!planName) {
-            throw new ForbiddenException('No plan assigned.');
-        }
-
-        const userLevel = PLAN_HIERARCHY[planName];
-        const requiredLevel = PLAN_HIERARCHY[requiredPlan];
-
-        if (userLevel === undefined) {
-            throw new ForbiddenException(`Unknown plan: ${planName}`);
-        }
-
-        if (requiredLevel === undefined) {
-            throw new ForbiddenException(`Unknown required plan: ${requiredPlan}`);
-        }
-
-        if (userLevel < requiredLevel) {
-            throw new ForbiddenException(
-                `This action requires the "${requiredPlan}" plan or higher. Your current plan is "${planName}".`,
-            );
-        }
-
-        return true;
-    }
-
-    private async isSuperAdmin(context: ExecutionContext): Promise<boolean> {
         try {
             const gqlCtx = GqlExecutionContext.create(context);
             const ctx = gqlCtx.getContext() as unknown as RequestContext;
-            return ctx?.userHasPermissions?.([Permission.SuperAdmin]) ?? false;
-        } catch {
-            return false;
+
+            if (ctx?.userHasPermissions?.([Permission.SuperAdmin])) {
+                return true;
+            }
+
+            const { Reflector } = await import('@nestjs/core');
+            const reflector = new Reflector();
+            const requiredPlanName = reflector.get<string>(REQUIRED_PLAN_KEY, context.getHandler());
+            if (!requiredPlanName) {
+                return true;
+            }
+
+            const administratorId = await this.resolveAdministratorId(context);
+            if (!administratorId) {
+                throw new ForbiddenException('Authentication required');
+            }
+
+            const subscription = await this.subscriptionQueryService.getSubscriptionByAdministratorId(administratorId);
+            if (!subscription) {
+                await this.planManagementService.assignFreePlanToAdministrator(administratorId);
+                throw new ForbiddenException('Free plan does not have access to this feature');
+            }
+
+            if (subscription.status !== SubscriptionStatus.ACTIVE) {
+                throw new ForbiddenException('Active subscription required');
+            }
+
+            const currentPlanName = subscription.plan?.name;
+            if (!currentPlanName) {
+                throw new ForbiddenException('No plan assigned');
+            }
+
+            const currentLevel = PLAN_HIERARCHY[currentPlanName] ?? -1;
+            const requiredLevel = PLAN_HIERARCHY[requiredPlanName] ?? -1;
+
+            if (currentLevel < requiredLevel) {
+                throw new ForbiddenException(
+                    `This feature requires the "${requiredPlanName}" plan or higher. Your current plan is "${currentPlanName}".`
+                );
+            }
+
+            return true;
+        } catch (error) {
+            if (error instanceof ForbiddenException) {
+                throw error;
+            }
+            throw new ForbiddenException('Access denied');
         }
     }
 

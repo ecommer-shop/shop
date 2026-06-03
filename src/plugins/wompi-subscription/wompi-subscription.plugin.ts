@@ -1,11 +1,15 @@
 import { PluginCommonModule, Type, VendurePlugin, Product, ProductVariant } from '@vendure/core';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { WOMPI_SUBSCRIPTION_PLUGIN_OPTIONS, WompiSubscriptionPluginInitOptions } from './constants';
+import { WOMPI_SUBSCRIPTION_PLUGIN_OPTIONS } from './constants';
+import { WompiSubscriptionPluginInitOptions } from './interfaces';
 import { Plan, Feature, PlanFeature, CustomerSubscription } from './entities';
-import { WompiService, SubscriptionService, BillingJobService } from './services';
-import { WompiWebhookController, WompiTokenController } from './api/wompi-webhook.controller';
-import { WompiSubscriptionShopResolver } from './api/wompi-subscription.resolver';
+import { WompiService, PlanManagementService, SubscriptionQueryService, SubscriptionWriteService, SubscriptionLifecycleService, FeatureCheckService, ProductLimitEnforcementService, BillingJobService, BillingEmailService } from './services';
+import { WompiWebhookController } from './api/wompi-webhook.controller';
+import { WompiTokenController } from './api/wompi-token.controller';
+import { PlanResolver } from './api/plan.resolver';
+import { SubscriptionResolver } from './api/subscription.resolver';
+import { WompiResolver } from './api/wompi.resolver';
 import { shopApiExtensions } from './api/api-extensions';
 import { FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAccessGuard, PlanGuard } from './guards';
 
@@ -15,16 +19,35 @@ import { FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAcc
     controllers: [WompiWebhookController, WompiTokenController],
     providers: [
         WompiService,
-        SubscriptionService,
+        PlanManagementService,
+        SubscriptionQueryService,
+        SubscriptionWriteService,
+        SubscriptionLifecycleService,
+        FeatureCheckService,
+        ProductLimitEnforcementService,
         BillingJobService,
-        WompiSubscriptionShopResolver,
+        BillingEmailService,
+        PlanResolver,
+        SubscriptionResolver,
+        WompiResolver,
         FeatureGuard,
         ProductLimitGuard,
         ProductVariationLimitGuard,
         FeatureAccessGuard,
         PlanGuard,
     ],
-    exports: [SubscriptionService, WompiService, FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAccessGuard, PlanGuard],
+    exports: [
+        SubscriptionQueryService,
+        FeatureCheckService,
+        PlanManagementService,
+        WompiService,
+        BillingEmailService,
+        FeatureGuard,
+        ProductLimitGuard,
+        ProductVariationLimitGuard,
+        FeatureAccessGuard,
+        PlanGuard,
+    ],
 })
 export class WompiSubscriptionModule {}
 
@@ -39,11 +62,11 @@ export class WompiSubscriptionModule {}
     ],
     shopApiExtensions: {
         schema: shopApiExtensions,
-        resolvers: [WompiSubscriptionShopResolver],
+        resolvers: [PlanResolver, SubscriptionResolver, WompiResolver],
     },
     adminApiExtensions: {
         schema: shopApiExtensions,
-        resolvers: [WompiSubscriptionShopResolver],
+        resolvers: [PlanResolver, SubscriptionResolver, WompiResolver],
     },
     dashboard: './dashboard/index.tsx',
     configuration: (config) => {

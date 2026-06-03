@@ -1,7 +1,7 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
 import { UseGuards } from '@nestjs/common';
-import { FeatureAccessGuard } from '../../wompi-subscription/guards/feature.guard';
+import { FeatureAccessGuard } from '../../wompi-subscription/guards';
 import { RequiresFeature } from '../../wompi-subscription/decorators/requires-feature.decorator';
 import { FEATURE_CODES } from '../../wompi-subscription/constants';
 import { InvoiceQueryService } from '../services/invoice-query.service';

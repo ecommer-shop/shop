@@ -1,7 +1,7 @@
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
 import { Ctx, ProductService, ProductVariantService, RequestContext, UserInputError } from '@vendure/core';
 import { UseGuards } from '@nestjs/common';
-import { ProductLimitGuard, ProductVariationLimitGuard } from '../guards/feature.guard';
+import { ProductLimitGuard, ProductVariationLimitGuard } from '../guards';
 
 @Resolver()
 export class ProductLimitResolver {

@@ -5,7 +5,7 @@ import {
     WompiPaymentSourceResponse,
     WompiCreateTransactionResponse,
     WompiAcceptanceTokenResponse,
-} from '../constants';
+} from '../interfaces';
 import axios, { AxiosInstance } from 'axios';
 import crypto from 'crypto';
 

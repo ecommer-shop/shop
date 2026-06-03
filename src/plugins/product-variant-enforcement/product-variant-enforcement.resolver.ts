@@ -10,7 +10,7 @@ import {
     UserInputError,
 } from '@vendure/core';
 import { UseGuards } from '@nestjs/common';
-import { ProductLimitGuard } from '../wompi-subscription/guards/feature.guard';
+import { ProductLimitGuard } from '../wompi-subscription/guards';
 
 @Resolver()
 export class ProductVariantEnforcementResolver {

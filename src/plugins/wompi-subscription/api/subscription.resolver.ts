@@ -1,14 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { Resolver, Query, Mutation, Args, Context } from '@nestjs/graphql';
 import { RequestContext, TransactionalConnection, Administrator, Logger } from '@vendure/core';
-import { SubscriptionService } from '../services/subscription.service';
+import { PlanManagementService } from '../services/plan-management.service';
+import { SubscriptionQueryService } from '../services/subscription-query.service';
+import { SubscriptionWriteService } from '../services/subscription-write.service';
+import { SubscriptionLifecycleService } from '../services/subscription-lifecycle.service';
+import { FeatureCheckService } from '../services/feature-check.service';
 import { WompiService } from '../services/wompi.service';
-import { FEATURE_CODES, PAYMENT_METHOD_FLOW, PaymentFlowType } from '../constants';
+import { FEATURE_CODES } from '../constants';
+import { PAYMENT_METHOD_FLOW, PaymentFlowType } from '../payment-methods';
 
 @Injectable()
-export class WompiSubscriptionShopResolver {
+@Resolver()
+export class SubscriptionResolver {
     constructor(
-        private subscriptionService: SubscriptionService,
+        private planManagementService: PlanManagementService,
+        private subscriptionQueryService: SubscriptionQueryService,
+        private subscriptionWriteService: SubscriptionWriteService,
+        private lifecycleService: SubscriptionLifecycleService,
+        private featureCheckService: FeatureCheckService,
         private wompiService: WompiService,
         private connection: TransactionalConnection,
     ) { }
@@ -40,17 +50,17 @@ export class WompiSubscriptionShopResolver {
             return null;
         }
 
-        const subscription = await this.subscriptionService.getSubscriptionByAdministratorId(administratorId);
+        const subscription = await this.subscriptionQueryService.getSubscriptionByAdministratorId(administratorId);
         if (!subscription) {
             return null;
         }
 
         const [plan, productLimitValue, variationLimitValue, aiAccess, billingAccess] = await Promise.all([
-            subscription.planId ? this.subscriptionService.getPlanById(subscription.planId) : Promise.resolve(null),
-            this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS),
-            this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS),
-            this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.AI_ACCESS),
-            this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.ELECTRONIC_BILLING),
+            subscription.planId ? this.planManagementService.getPlanById(subscription.planId) : Promise.resolve(null),
+            this.featureCheckService.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS),
+            this.featureCheckService.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS),
+            this.featureCheckService.checkFeatureAccess(administratorId, FEATURE_CODES.AI_ACCESS),
+            this.featureCheckService.checkFeatureAccess(administratorId, FEATURE_CODES.ELECTRONIC_BILLING),
         ]);
 
         return {
@@ -70,11 +80,6 @@ export class WompiSubscriptionShopResolver {
         };
     }
 
-    @Query('allPlans')
-    async getAllPlans() {
-        return this.subscriptionService.getAllPlans();
-    }
-
     @Query('checkProductLimit')
     async checkProductLimit(
         @Context() ctx: RequestContext,
@@ -85,7 +90,7 @@ export class WompiSubscriptionShopResolver {
         if (!administratorId) {
             return { allowed: false, current: 0, limit: 0 };
         }
-        return this.subscriptionService.checkProductLimit(administratorId, channelToken);
+        return this.featureCheckService.checkProductLimit(administratorId, channelToken);
     }
 
     @Query('checkVariationLimit')
@@ -98,7 +103,7 @@ export class WompiSubscriptionShopResolver {
         if (!administratorId) {
             return { allowed: false, current: 0, limit: 0 };
         }
-        return this.subscriptionService.checkVariationLimit(administratorId, channelToken);
+        return this.featureCheckService.checkVariationLimit(administratorId, channelToken);
     }
 
     @Query('checkFeatureAccess')
@@ -111,7 +116,7 @@ export class WompiSubscriptionShopResolver {
         if (!administratorId) {
             return false;
         }
-        return this.subscriptionService.checkFeatureAccess(administratorId, featureCode);
+        return this.featureCheckService.checkFeatureAccess(administratorId, featureCode);
     }
 
     @Mutation('cancelAutoRenew')
@@ -124,7 +129,7 @@ export class WompiSubscriptionShopResolver {
             throw new Error('Not authenticated');
         }
 
-        const subscription = await this.subscriptionService.cancelAutoRenew(administratorId);
+        const subscription = await this.lifecycleService.cancelAutoRenew(administratorId);
         return {
             id: subscription.id,
             status: subscription.status,
@@ -180,7 +185,7 @@ export class WompiSubscriptionShopResolver {
             deviceId,
         );
 
-        const subscription = await this.subscriptionService.createRecurrentSubscription(
+        const subscription = await this.subscriptionWriteService.createRecurrentSubscription(
             administratorId,
             planId,
             paymentMethod,
@@ -188,14 +193,14 @@ export class WompiSubscriptionShopResolver {
             admin.emailAddress,
         );
 
-        const targetPlan = await this.subscriptionService.getPlanById(planId);
+        const targetPlan = await this.planManagementService.getPlanById(planId);
         if (!targetPlan) {
             throw new Error(`Plan with id ${planId} not found`);
         }
         const amountInCents = Math.round(targetPlan.price * 100);
         const reference = `SUB-${subscription.id}-${Date.now()}`;
 
-        Logger.debug(`[createSubscriptionWithPayment] amountInCents=${amountInCents} plan.price=${targetPlan.price} plan.name=${targetPlan.name} plan.id=${targetPlan.id} sub.status=${subscription.status}`, 'WompiResolver');
+        Logger.debug(`[createSubscriptionWithPayment] amountInCents=${amountInCents} plan.price=${targetPlan.price} plan.name=${targetPlan.name} plan.id=${targetPlan.id} sub.status=${subscription.status}`, 'SubscriptionResolver');
 
         try {
             const paymentMethodInfo = paymentMethod === 'CARD'
@@ -213,18 +218,18 @@ export class WompiSubscriptionShopResolver {
             );
 
             if (transaction.status === 'APPROVED') {
-                await this.subscriptionService.extendSubscription(subscription.id);
+                await this.lifecycleService.extendSubscription(subscription.id);
             } else {
-                Logger.debug(`Transaction ${transaction.id} initial status: ${transaction.status} — awaiting webhook`, 'WompiResolver');
+                Logger.debug(`Transaction ${transaction.id} initial status: ${transaction.status} — awaiting webhook`, 'SubscriptionResolver');
             }
         } catch (error) {
-            Logger.error(`Initial charge failed: ${error}`, 'WompiResolver');
+            Logger.error(`Initial charge failed: ${error}`, 'SubscriptionResolver');
         }
 
-        const productLimitValue = await this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
-        const variationLimitValue = await this.subscriptionService.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS);
-        const aiAccess = await this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.AI_ACCESS);
-        const billingAccess = await this.subscriptionService.checkFeatureAccess(administratorId, FEATURE_CODES.ELECTRONIC_BILLING);
+        const productLimitValue = await this.featureCheckService.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
+        const variationLimitValue = await this.featureCheckService.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS);
+        const aiAccess = await this.featureCheckService.checkFeatureAccess(administratorId, FEATURE_CODES.AI_ACCESS);
+        const billingAccess = await this.featureCheckService.checkFeatureAccess(administratorId, FEATURE_CODES.ELECTRONIC_BILLING);
 
         return {
             id: subscription.id,
@@ -261,14 +266,14 @@ export class WompiSubscriptionShopResolver {
             throw new Error('Administrator not found or no email');
         }
 
-        const { subscription, reference } = await this.subscriptionService.createPendingSubscription(
+        const { subscription, reference } = await this.subscriptionWriteService.createPendingSubscription(
             administratorId,
             planId,
             paymentMethod,
         );
 
         const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
-        const targetPlan = await this.subscriptionService.getPlanById(planId);
+        const targetPlan = await this.planManagementService.getPlanById(planId);
         if (!targetPlan) {
             throw new Error(`Plan with id ${planId} not found`);
         }
@@ -319,12 +324,12 @@ export class WompiSubscriptionShopResolver {
             throw new Error('Not authenticated');
         }
 
-        const subscription = await this.subscriptionService.getSubscriptionById(subscriptionId);
+        const subscription = await this.subscriptionQueryService.getSubscriptionById(subscriptionId);
         if (!subscription || subscription.administratorId !== administratorId) {
             throw new Error('Subscription not found');
         }
 
-        const updated = await this.subscriptionService.stopAutoRenew(subscriptionId);
+        const updated = await this.lifecycleService.stopAutoRenew(subscriptionId);
         return {
             id: updated.id,
             status: updated.status,
@@ -333,14 +338,6 @@ export class WompiSubscriptionShopResolver {
             autoRenew: updated.autoRenew,
             plan: updated.plan,
         };
-    }
-
-    @Query('GetWompiIntegritySignature')
-    async getWompiIntegritySignature(
-        @Args('amountInCents') amountInCents: number,
-        @Args('paymentReference') paymentReference: string,
-    ) {
-        return this.wompiService.generateWidgetIntegritySignature(amountInCents, paymentReference);
     }
 
     @Mutation('cancelSubscription')
@@ -354,12 +351,12 @@ export class WompiSubscriptionShopResolver {
             throw new Error('Not authenticated');
         }
 
-        const subscription = await this.subscriptionService.getSubscriptionById(subscriptionId);
+        const subscription = await this.subscriptionQueryService.getSubscriptionById(subscriptionId);
         if (!subscription || subscription.administratorId !== administratorId) {
             throw new Error('Subscription not found');
         }
 
-        const updated = await this.subscriptionService.cancelSubscription(subscriptionId);
+        const updated = await this.lifecycleService.cancelSubscription(subscriptionId);
         return {
             id: updated.id,
             status: updated.status,

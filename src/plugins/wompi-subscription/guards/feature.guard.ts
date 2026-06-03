@@ -1,17 +1,16 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Permission, RequestContext, Administrator } from '@vendure/core';
 import { TransactionalConnection } from '@vendure/core';
-import { SubscriptionService } from '../services/subscription.service';
+import { SubscriptionQueryService } from '../services/subscription-query.service';
+import { PlanManagementService } from '../services/plan-management.service';
 import { SubscriptionStatus } from '../entities/customer-subscription.entity';
-import { FEATURE_CODE_KEY } from '../decorators/requires-feature.decorator';
-import { FEATURE_CODES } from '../constants';
 
 @Injectable()
 export class FeatureGuard implements CanActivate {
     constructor(
-        protected subscriptionService: SubscriptionService,
+        protected subscriptionQueryService: SubscriptionQueryService,
+        protected planManagementService: PlanManagementService,
         protected connection: TransactionalConnection,
     ) {}
 
@@ -25,10 +24,10 @@ export class FeatureGuard implements CanActivate {
             throw new ForbiddenException('Authentication required');
         }
 
-        let subscription = await this.subscriptionService.getSubscriptionByAdministratorId(administratorId);
+        let subscription = await this.subscriptionQueryService.getSubscriptionByAdministratorId(administratorId);
 
         if (!subscription) {
-            await this.subscriptionService.assignFreePlanToAdministrator(administratorId);
+            await this.planManagementService.assignFreePlanToAdministrator(administratorId);
             return true;
         }
 
@@ -89,109 +88,5 @@ export class FeatureGuard implements CanActivate {
         }
 
         return null;
-    }
-}
-
-@Injectable()
-export class ProductLimitGuard extends FeatureGuard {
-    constructor(
-        subscriptionService: SubscriptionService,
-        connection: TransactionalConnection,
-    ) {
-        super(subscriptionService, connection);
-    }
-
-    async canActivate(context: ExecutionContext): Promise<boolean> {
-        if (await this.isSuperAdmin(context)) {
-            return true;
-        }
-
-        const administratorId = await this.resolveAdministratorId(context);
-        if (!administratorId) {
-            throw new ForbiddenException('Authentication required');
-        }
-
-        await super.canActivate(context);
-
-        const { allowed, current, limit } = await this.subscriptionService.checkProductLimit(administratorId);
-        if (!allowed) {
-            throw new ForbiddenException(
-                `Product limit reached. You have ${current}/${limit} products. Upgrade your plan to add more.`,
-            );
-        }
-
-        return true;
-    }
-}
-
-@Injectable()
-export class ProductVariationLimitGuard extends FeatureGuard {
-    constructor(
-        subscriptionService: SubscriptionService,
-        connection: TransactionalConnection,
-    ) {
-        super(subscriptionService, connection);
-    }
-
-    async canActivate(context: ExecutionContext): Promise<boolean> {
-        if (await this.isSuperAdmin(context)) {
-            return true;
-        }
-
-        const administratorId = await this.resolveAdministratorId(context);
-        if (!administratorId) {
-            throw new ForbiddenException('Authentication required');
-        }
-
-        await super.canActivate(context);
-
-        const { allowed, current, limit } = await this.subscriptionService.checkVariationLimit(administratorId);
-        if (!allowed) {
-            throw new ForbiddenException(
-                `Variation limit reached. You have ${current}/${limit} variations. Upgrade your plan to add more.`,
-            );
-        }
-
-        return true;
-    }
-}
-
-@Injectable()
-export class FeatureAccessGuard extends FeatureGuard {
-    constructor(
-        subscriptionService: SubscriptionService,
-        connection: TransactionalConnection,
-        private reflector: Reflector,
-    ) {
-        super(subscriptionService, connection);
-    }
-
-    async canActivate(context: ExecutionContext): Promise<boolean> {
-        if (await this.isSuperAdmin(context)) {
-            return true;
-        }
-
-        const featureCode = this.reflector.get<string>(FEATURE_CODE_KEY, context.getHandler());
-        if (!featureCode) {
-            return true;
-        }
-
-        const administratorId = await this.resolveAdministratorId(context);
-        if (!administratorId) {
-            throw new ForbiddenException('Authentication required');
-        }
-
-        await super.canActivate(context);
-
-        const hasAccess = await this.subscriptionService.checkFeatureAccess(administratorId, featureCode);
-        if (!hasAccess) {
-            const messages: Record<string, string> = {
-                [FEATURE_CODES.AI_ACCESS]: 'AI features are not available on your current plan.',
-                [FEATURE_CODES.ELECTRONIC_BILLING]: 'Electronic billing is not available on your current plan.',
-            };
-            throw new ForbiddenException(messages[featureCode] || `Feature "${featureCode}" is not available on your current plan.`);
-        }
-
-        return true;
     }
 }

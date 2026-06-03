@@ -2,7 +2,7 @@ import { Args, Mutation, Resolver } from '@nestjs/graphql';
 import { Permission } from '@vendure/common/lib/generated-types';
 import { Allow, Ctx, RequestContext } from '@vendure/core';
 import { UseGuards } from '@nestjs/common';
-import { FeatureAccessGuard } from '../../wompi-subscription/guards/feature.guard';
+import { FeatureAccessGuard } from '../../wompi-subscription/guards';
 import { RequiresFeature } from '../../wompi-subscription/decorators/requires-feature.decorator';
 import { FEATURE_CODES } from '../../wompi-subscription/constants';
 import { AiChat } from '../services/ai-chat';
