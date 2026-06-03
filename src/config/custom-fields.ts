@@ -6,6 +6,88 @@ import { Asset, LanguageCode } from '@vendure/core';
  * Si cambias esto recuerda generar migración de DB.
  */
 export const customFields: VendureConfig['customFields'] = {
+  Address: [
+    {
+      name: 'latitude',
+      type: 'float',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Latitude' },
+        { languageCode: LanguageCode.es, value: 'Latitud' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Google Maps latitude for delivery calculations',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Latitud de Google Maps para calculos de domicilio',
+        },
+      ],
+    },
+    {
+      name: 'longitude',
+      type: 'float',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Longitude' },
+        { languageCode: LanguageCode.es, value: 'Longitud' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Google Maps longitude for delivery calculations',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Longitud de Google Maps para calculos de domicilio',
+        },
+      ],
+    },
+    {
+      name: 'neighborhood',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Neighborhood' },
+        { languageCode: LanguageCode.es, value: 'Barrio' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Neighborhood detected from Google Maps address components',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Barrio detectado desde los componentes de direccion de Google Maps',
+        },
+      ],
+    },
+    {
+      name: 'googlePlaceId',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Google Place ID' },
+        { languageCode: LanguageCode.es, value: 'ID de lugar de Google' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Google Maps place identifier for the selected delivery address',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Identificador de Google Maps para la direccion de entrega seleccionada',
+        },
+      ],
+    },
+  ],
   Administrator: [
     {
       name: 'storeDescription',
@@ -47,6 +129,106 @@ export const customFields: VendureConfig['customFields'] = {
         {
           languageCode: LanguageCode.es,
           value: 'Imagen de banner para la tienda pública (perfil de administrador)',
+        },
+      ],
+    },
+    {
+      name: 'storePickupAddress',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup address' },
+        { languageCode: LanguageCode.es, value: 'Direccion de recogida' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Store pickup address used as delivery origin',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Direccion de la tienda usada como origen del domicilio',
+        },
+      ],
+    },
+    {
+      name: 'storePickupLatitude',
+      type: 'float',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup latitude' },
+        { languageCode: LanguageCode.es, value: 'Latitud de recogida' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Store pickup latitude used as delivery origin',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Latitud de la tienda usada como origen del domicilio',
+        },
+      ],
+    },
+    {
+      name: 'storePickupLongitude',
+      type: 'float',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup longitude' },
+        { languageCode: LanguageCode.es, value: 'Longitud de recogida' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Store pickup longitude used as delivery origin',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Longitud de la tienda usada como origen del domicilio',
+        },
+      ],
+    },
+    {
+      name: 'storePickupNeighborhood',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup neighborhood' },
+        { languageCode: LanguageCode.es, value: 'Barrio de recogida' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Store pickup neighborhood used as delivery origin',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Barrio de la tienda usado como origen del domicilio',
+        },
+      ],
+    },
+    {
+      name: 'storePickupGooglePlaceId',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup Google Place ID' },
+        { languageCode: LanguageCode.es, value: 'ID de Google de recogida' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Google Maps place identifier for the store pickup address',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Identificador de Google Maps para la direccion de recogida de la tienda',
         },
       ],
     },

@@ -1,7 +1,12 @@
-import { defineDashboardExtension } from '@vendure/dashboard';
-
+import { defineDashboardExtension, DropdownMenuItem, useChannel } from '@vendure/dashboard';
+import { Share2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useState } from 'react';
 import { StoreBannerAssetPickerInput } from './store-banner-asset-picker-input';
 import { StoreFeaturedStarInput } from './store-featured-star-input';
+import { ShareProductButton } from './share-product-button';
+import { SlugShareDisplay } from './slug-share-display';
+import { ShareLinksWidget } from './share-links-widget';
 
 defineDashboardExtension({
     customFormComponents: {
@@ -10,24 +15,69 @@ defineDashboardExtension({
             { id: 'ecommer-store-banner-asset-picker', component: StoreBannerAssetPickerInput },
         ],
     },
-    translations: {
-        es: {
-            fieldName: {
-                storeFeatured: 'Destacado en mi tienda',
-                weight: 'Peso (gramos)',
-                height: 'Altura (cm)',
-                length: 'Largo (cm)',
-                width: 'Ancho (cm)',
-            },
+    actionBarItems: [
+        {
+            id: 'ecommer-share-product',
+            pageId: 'product-detail',
+            component: ShareProductButton,
+            type: 'button',
         },
-        en: {
-            fieldName: {
-                storeFeatured: 'Featured in my store',
-                weight: 'Weight (grams)',
-                height: 'Height (cm)',
-                length: 'Length (cm)',
-                width: 'Width (cm)',
-            },
+        {
+            id: 'ecommer-share-product-dropdown',
+            pageId: 'product-detail',
+            component: ShareProductDropdownItem,
+            type: 'dropdown',
         },
-    },
+    ],
+    dataTables: [
+        {
+            pageId: 'product-list',
+            displayComponents: [
+                {
+                    column: 'slug',
+                    component: SlugShareDisplay,
+                },
+            ],
+        },
+    ],
+    widgets: [
+        {
+            id: 'ecommer-share-links',
+            name: 'Links para compartir',
+            component: ShareLinksWidget,
+            defaultSize: { w: 6, h: 4 },
+            minSize: { w: 4, h: 3 },
+            maxSize: { w: 12, h: 6 },
+        },
+    ],
 });
+
+import type { PageContextValue } from '@vendure/dashboard';
+
+function ShareProductDropdownItem({ context }: { context: PageContextValue }) {
+    const { activeChannel } = useChannel();
+
+    const handleCopy = async () => {
+        try {
+            const slug = (context?.entity as any)?.slug;
+            const productLink = slug
+                ? `https://ecommer.shop/es/product/${slug}`
+                : window.location.href;
+            const storeLink = activeChannel?.code
+                ? `https://ecommer.shop/es/store/${activeChannel.code}`
+                : null;
+            const text = [productLink, storeLink].filter(Boolean).join("\n");
+            await navigator.clipboard.writeText(text);
+            toast.success('Links copiados al portapapeles');
+        } catch {
+            toast.error('Error al copiar los links');
+        }
+    };
+
+    return (
+        <DropdownMenuItem onClick={handleCopy}>
+            <Share2 className="mr-2 h-4 w-4" />
+            Compartir
+        </DropdownMenuItem>
+    );
+}

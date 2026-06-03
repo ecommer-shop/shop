@@ -27,6 +27,7 @@ import { shopApiExtensions } from './api/shop-api-extensions';
         schema: shopApiExtensions,
         resolvers: [AiChatShopResolver]
     },
+    dashboard: './dashboard/index.tsx',
 })
 export class AiChatPlugin {
     static options: PluginInitOptions;

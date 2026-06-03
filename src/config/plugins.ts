@@ -59,6 +59,7 @@ import {
 } from '../plugins/delivery-order';
 import { SuperadminvisibilityPlugin } from '../plugins/superadminvisibility/superadminvisibility.plugin';
 import { WompiSubscriptionPlugin } from '../plugins/wompi-subscription/wompi-subscription.plugin';
+import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -146,6 +147,8 @@ export const plugins: VendureConfig['plugins'] = [
       url: process.env.DELIVERY_ORDER_API_URL,
     }),
   }),
+
+  DynamicShippingPricePlugin,
 
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
