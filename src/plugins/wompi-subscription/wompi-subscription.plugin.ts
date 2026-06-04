@@ -40,6 +40,9 @@ import { ProductTranslationSubscriber } from './subscribers/product-translation.
     ],
     exports: [
         SubscriptionQueryService,
+        SubscriptionWriteService,
+        SubscriptionLifecycleService,
+        ProductLimitEnforcementService,
         FeatureCheckService,
         PlanManagementService,
         WompiService,

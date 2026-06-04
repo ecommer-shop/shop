@@ -332,6 +332,37 @@ export const customFields: VendureConfig['customFields'] = {
       ],
     },
   ],
+  Channel: [
+    { name: 'invoiceBillingActive', type: 'boolean', defaultValue: false },
+    { name: 'invoiceLimitRemaining', type: 'int', nullable: true },
+    { name: 'matiasAccessToken', type: 'string', nullable: true, ui: { component: 'password-form-input' } },
+    { name: 'matiasInvoicePrefix', type: 'string', nullable: true },
+    { name: 'matiasResolutionNumber', type: 'string', nullable: true },
+    { name: 'matiasGlobalPoolTotal', type: 'int', nullable: true, public: false },
+    { name: 'matiasGlobalPoolSellable', type: 'int', nullable: true, public: false },
+    { name: 'billingCertificateStatus', type: 'string', nullable: true },
+    { name: 'billingCertificatePaymentStatus', type: 'string', nullable: true },
+    { name: 'billingCertificateType', type: 'string', nullable: true },
+    { name: 'billingCertificateExpiresAt', type: 'datetime', nullable: true },
+    { name: 'billingCertificatePaidAt', type: 'datetime', nullable: true },
+    { name: 'billingCertificateDocChamber', type: 'string', nullable: true },
+    { name: 'billingCertificateDocRut', type: 'string', nullable: true },
+    { name: 'billingCertificateDocNit', type: 'string', nullable: true },
+    { name: 'billingCertificateReviewNote', type: 'string', nullable: true },
+    { name: 'billingPlanLastPurchasedAt', type: 'datetime', nullable: true },
+    {
+      name: 'billingPlanPurchaseHistory',
+      type: 'text',
+      nullable: true,
+      public: false,
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'JSON: historial de compras de paquetes de facturación Matias',
+        },
+      ],
+    },
+  ],
   Product: [
     {
       name: 'storeFeatured',
@@ -462,6 +493,20 @@ export const customFields: VendureConfig['customFields'] = {
       label: [
         { languageCode: LanguageCode.es, value: 'Oculto desde' },
         { languageCode: LanguageCode.en, value: 'Hidden since' },
+      ],
+    },
+  ],
+  Order: [
+    {
+      name: 'invoiceLastError',
+      type: 'text',
+      nullable: true,
+      public: false,
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'Último error al emitir factura electrónica (Matias) para este pedido',
+        },
       ],
     },
   ],

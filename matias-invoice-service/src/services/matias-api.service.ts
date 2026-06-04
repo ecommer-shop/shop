@@ -68,7 +68,7 @@ export class MatiasApiService {
       );
 
       // Verificar si la respuesta es HTML (error común cuando la URL está mal)
-      const contentType = response.headers['content-type'] || '';
+      const contentType = String(response.headers['content-type'] ?? '');
       if (contentType.includes('text/html')) {
         const data = response.data as unknown;
         logger.error('Received HTML instead of JSON - URL might be incorrect', {

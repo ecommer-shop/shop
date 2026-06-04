@@ -1,5 +1,6 @@
 import { PluginCommonModule, Type, VendurePlugin } from '@vendure/core';
 
+import { InvoiceClientPlugin } from '../invoice-client/invoice-client.plugin';
 import { PAYMENT_PLUGIN_OPTIONS } from './constants';
 import { PluginInitOptions } from './types';
 import { PaymentService } from './services/payment.service';
@@ -9,7 +10,7 @@ import { PaymentController } from './api/payment.controller';
 import { PaymentPaymentHandler } from './payment-method-handler';
 
 @VendurePlugin({
-    imports: [PluginCommonModule],
+    imports: [PluginCommonModule, InvoiceClientPlugin],
     controllers: [PaymentController],
     providers: [{ provide: PAYMENT_PLUGIN_OPTIONS, useFactory: () => PaymentPlugin.options }, PaymentService],
     configuration: config => {

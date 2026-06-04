@@ -1,5 +1,9 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Avoid picking a parent lockfile (e.g. ~/package-lock.json) as the workspace root
+  outputFileTracingRoot: path.join(__dirname),
   // API Routes configuration
   async headers() {
     return [

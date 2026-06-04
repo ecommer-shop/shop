@@ -119,13 +119,6 @@ function patchVendureDashboardChannelPermissions() {
                         "import { toast } from 'sonner';\nimport { usePermissions } from '@/vdb/hooks/use-permissions.js';",
                     );
                 }
-                if (!nextCode.includes("import { Field } from '@/vdb/components/ui/field.js';")) {
-                    nextCode = nextCode.replace(
-                        "import { Button } from '@/vdb/components/ui/button.js';",
-                        "import { Button } from '@/vdb/components/ui/button.js';\nimport { Field } from '@/vdb/components/ui/field.js';",
-                    );
-                }
-
                 if (!nextCode.includes('const canConfigurePaymentProcessor')) {
                     nextCode = nextCode.replace(
                         '    const { t } = useLingui();',
@@ -218,18 +211,16 @@ function patchVendureDashboardChannelPermissions() {
                     blockId="bank-certification-pdf"
                     title="Carga tu certificado bancario"
                 >
-                    <Field>
-                        <EntityAssets
-                            compact={true}
-                            multiSelect={false}
-                            onChange={value => {
-                                form.setValue('customFields.bankCertificationPdf', value.featuredAssetId ?? undefined, {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                });
-                            }}
-                        />
-                    </Field>
+                    <EntityAssets
+                        compact={true}
+                        multiSelect={false}
+                        onChange={value => {
+                            form.setValue('customFields.bankCertificationPdf', value.featuredAssetId ?? undefined, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                            });
+                        }}
+                    />
                 </PageBlock>
                 <PageBlock column="main" blockId="payment-method-bank-fields" title="Datos bancarios">
                     <DetailFormGrid>
@@ -632,64 +623,11 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
-            return nextCode === code ? null : nextCode;
+
             if (normalizedId.includes('/@vendure/dashboard/src/lib/framework/dashboard-widget/base-widget')) {
                 nextCode = nextCode.replace(
                     `'h-full w-full flex flex-col rounded-md'`,
                     `'h-full w-full flex flex-col rounded-md overflow-hidden'`
-                );
-            }
-
-            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
-            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
-                nextCode = nextCode.replace(
-                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
-                    '',
-                );
-            }
-
-            // Profile query must select Administrator customFields subfields
-            if (
-                normalizedId.includes(
-                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
-                )
-            ) {
-                nextCode = nextCode.replace(
-                    `            customFields`,
-                    `            customFields {
-                storeDescription
-                storeBannerUrl {
-                    id
-                    preview
-                }
-            }`,
-                );
-            }
-
-            return nextCode === code ? null : nextCode;
-            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
-            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
-                nextCode = nextCode.replace(
-                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
-                    '',
-                );
-            }
-
-            // Profile query must select Administrator customFields subfields
-            if (
-                normalizedId.includes(
-                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
-                )
-            ) {
-                nextCode = nextCode.replace(
-                    `            customFields`,
-                    `            customFields {
-                storeDescription
-                storeBannerUrl {
-                    id
-                    preview
-                }
-            }`,
                 );
             }
 
