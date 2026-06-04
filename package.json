@@ -14,7 +14,8 @@
         "start:worker": "node ./dist/index-worker.js",
         "start": "concurrently \"bun run start:server\" \"bun run start:worker\"",
         "seed:prod": "node ./dist/populate/seed.js",
-        "seed:dev": "ts-node ./src/populate/seed.ts"
+        "seed:dev": "ts-node ./src/populate/seed.ts",
+        "migrate": "ts-node ./src/migrate.ts"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "3.908.0",

@@ -1,6 +1,7 @@
 import { PluginCommonModule, Type, VendurePlugin } from '@vendure/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { InvoiceClientPlugin } from '../invoice-client/invoice-client.plugin';
 import { PAYMENT_PLUGIN_OPTIONS } from './constants';
 import { PluginInitOptions } from './types';
 import { PaymentService } from './services/payment.service';
@@ -19,6 +20,7 @@ import { ProcessedWebhookEvent } from './entities/processed-webhook-event.entity
     imports: [
         PluginCommonModule,
         TypeOrmModule.forFeature([SavedPaymentMethod, ProcessedWebhookEvent]),
+        InvoiceClientPlugin,
     ],
     controllers: [PaymentController],
     entities: [SavedPaymentMethod, ProcessedWebhookEvent],

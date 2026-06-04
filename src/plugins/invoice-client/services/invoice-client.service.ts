@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Order, RequestContext } from '@vendure/core';
-import { INVOICE_CLIENT_PLUGIN_OPTIONS } from '../constants';
+import { INVOICE_CLIENT_PLUGIN_OPTIONS, MATIAS_BEARER_TOKEN_HEADER } from '../constants';
 import type { PluginInitOptions } from '../types';
 import { InvoiceMicroHttpClient } from './invoice-micro-http.client';
 
@@ -59,6 +59,16 @@ export interface InvoiceCreateResponseData {
   pdfUrl?: string;
   xmlUrl?: string;
   message?: string;
+}
+
+export interface InvoiceMatiasStatusPayload {
+  status: string;
+  matiasInvoiceId?: string;
+  matiasInvoiceNumber?: string;
+  cufe?: string;
+  error?: string;
+  pdfUrl?: string;
+  xmlUrl?: string;
 }
 
 interface InvoiceResponse {
@@ -130,6 +140,7 @@ export class InvoiceClientService {
       operationTypeId?: number;
       typeDocumentId?: number;
       sendEmail?: number;
+      matiasBearerToken?: string | null;
     },
   ): Promise<InvoiceResponse> {
     try {
@@ -225,7 +236,9 @@ export class InvoiceClientService {
         `Sending POST ${this.options.invoiceServiceUrl.replace(/\/+$/, '')}/invoices for order ${order.code}`,
       );
 
-      const response = await this.microHttp.axios.post<InvoiceResponse>('/invoices', request);
+      const trimmed = config.matiasBearerToken?.trim();
+      const headers = trimmed ? { [MATIAS_BEARER_TOKEN_HEADER]: trimmed } : undefined;
+      const response = await this.microHttp.axios.post<InvoiceResponse>('/invoices', request, { headers });
       if (!response.data.success) {
         throw new Error(response.data.error || response.data.message || 'Failed to create invoice');
       }
@@ -242,5 +255,49 @@ export class InvoiceClientService {
       this.logger.error(`Error creating invoice for order ${order.code}:`, error.message);
       throw error;
     }
+  }
+
+  async fetchInvoiceMatiasStatus(
+    invoiceId: string,
+    matiasBearerToken?: string | null,
+  ): Promise<InvoiceMatiasStatusPayload> {
+    const trimmed = matiasBearerToken?.trim();
+    const headers = trimmed ? { [MATIAS_BEARER_TOKEN_HEADER]: trimmed } : undefined;
+    const res = await this.microHttp.axios.get<{
+      success: boolean;
+      data?: InvoiceMatiasStatusPayload;
+      error?: string;
+      message?: string;
+    }>(`/invoices/${encodeURIComponent(invoiceId)}/status`, { headers });
+    if (!res.data.success || !res.data.data) {
+      throw new Error(
+        res.data.error ||
+          res.data.message ||
+          'No se pudo obtener el estado de la factura en el microservicio.',
+      );
+    }
+    return res.data.data;
+  }
+
+  async resendInvoiceMatiasEmail(
+    invoiceId: string,
+    email: string | undefined,
+    matiasBearerToken?: string | null,
+  ): Promise<InvoiceCreateResponseData> {
+    const trimmed = matiasBearerToken?.trim();
+    const headers = trimmed ? { [MATIAS_BEARER_TOKEN_HEADER]: trimmed } : undefined;
+    const res = await this.microHttp.axios.post<InvoiceResponse>(
+      `/invoices/${encodeURIComponent(invoiceId)}/resend`,
+      email?.trim() ? { email: email.trim() } : {},
+      { headers },
+    );
+    if (!res.data.success || !res.data.data) {
+      throw new Error(
+        res.data.error ||
+          res.data.message ||
+          'No se pudo reenviar el correo de la factura en el microservicio.',
+      );
+    }
+    return res.data.data;
   }
 }

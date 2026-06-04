@@ -1,14 +1,30 @@
-import { Args, Query, Resolver } from '@nestjs/graphql';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
 import { UseGuards } from '@nestjs/common';
 import { FeatureAccessGuard } from '../../wompi-subscription/guards';
 import { RequiresFeature } from '../../wompi-subscription/decorators/requires-feature.decorator';
 import { FEATURE_CODES } from '../../wompi-subscription/constants';
 import { InvoiceQueryService } from '../services/invoice-query.service';
+import { MatiasBillingStoresService } from '../services/matias-billing-stores.service';
+import { MatiasGlobalPoolService } from '../services/matias-global-pool.service';
+import { BillingPlansService } from '../services/billing-plans.service';
+import { InvoiceFailureQueryService } from '../services/invoice-failure-query.service';
+import { InvoiceEmissionQueueStatusService } from '../services/invoice-emission-queue-status.service';
+import { InvoiceQuotaService } from '../services/invoice-quota.service';
+import { InvoiceMatiasActionService } from '../services/invoice-matias-action.service';
 
 @Resolver()
 export class InvoiceAdminResolver {
-  constructor(private invoiceQuery: InvoiceQueryService) {}
+  constructor(
+    private invoiceQuery: InvoiceQueryService,
+    private matiasBillingStoresService: MatiasBillingStoresService,
+    private matiasGlobalPool: MatiasGlobalPoolService,
+    private billingPlans: BillingPlansService,
+    private invoiceFailureQuery: InvoiceFailureQueryService,
+    private emissionQueueStatusService: InvoiceEmissionQueueStatusService,
+    private invoiceQuota: InvoiceQuotaService,
+    private invoiceMatiasAction: InvoiceMatiasActionService,
+  ) { }
 
   @Query()
   @Allow(Permission.ReadOrder)
@@ -30,12 +46,12 @@ export class InvoiceAdminResolver {
   ) {
     const filter = options?.filter
       ? {
-          dateFrom: options.filter.dateFrom ? new Date(options.filter.dateFrom) : undefined,
-          dateTo: options.filter.dateTo ? new Date(options.filter.dateTo) : undefined,
-          customerDni: options.filter.customerDni ?? undefined,
-          status: options.filter.status ?? undefined,
-          orderCode: options.filter.orderCode ?? undefined,
-        }
+        dateFrom: options.filter.dateFrom ? new Date(options.filter.dateFrom) : undefined,
+        dateTo: options.filter.dateTo ? new Date(options.filter.dateTo) : undefined,
+        customerDni: options.filter.customerDni ?? undefined,
+        status: options.filter.status ?? undefined,
+        orderCode: options.filter.orderCode ?? undefined,
+      }
       : {};
 
     const pagination =
@@ -72,6 +88,153 @@ export class InvoiceAdminResolver {
     @Args('dateTo') dateTo: string,
   ) {
     return this.invoiceQuery.getTotalsByMonth(ctx, new Date(dateFrom), new Date(dateTo));
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async matiasBillingStores(@Ctx() ctx: RequestContext) {
+    return this.matiasBillingStoresService.listSellerChannels(ctx);
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async matiasGlobalInvoicePool(@Ctx() ctx: RequestContext) {
+    return this.matiasGlobalPool.getPoolStatus(ctx);
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async billingCertificateReviewQueue(@Ctx() ctx: RequestContext) {
+    return this.billingPlans.listCertificateReviewQueue(ctx);
+  }
+
+  @Query()
+  @Allow(Permission.Authenticated)
+  async myBillingPlanState(@Ctx() ctx: RequestContext) {
+    return this.billingPlans.getCurrentChannelPlanState(ctx);
+  }
+
+  @Query()
+  @Allow(Permission.Authenticated)
+  async billingInvoicePlans() {
+    return this.billingPlans.getPlanCatalog();
+  }
+
+  @Query()
+  @Allow(Permission.Authenticated)
+  async billingWompiPaymentSignature(
+    @Args('amountInCents') amountInCents: number,
+    @Args('paymentReference') paymentReference: string,
+  ) {
+    return this.billingPlans.buildWompiPaymentSignature(amountInCents, paymentReference);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async invoiceCreationFailures(
+    @Ctx() ctx: RequestContext,
+    @Args('take') take?: number,
+    @Args('skip') skip?: number,
+  ) {
+    return this.invoiceFailureQuery.listFailures(ctx, { take, skip });
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async invoiceEmissionQueueStatus(@Ctx() ctx: RequestContext) {
+    return this.emissionQueueStatusService.getStatus(ctx);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async currentInvoiceQuotaStatus(@Ctx() ctx: RequestContext) {
+    return this.invoiceQuota.getCurrentChannelQuotaStatus(ctx);
+  }
+
+  @Mutation()
+  @Allow(Permission.ReadOrder)
+  async syncInvoiceFromMatias(
+    @Ctx() ctx: RequestContext,
+    @Args('invoiceId') invoiceId: string,
+    @Args('orderCode') orderCode: string,
+  ) {
+    return this.invoiceMatiasAction.syncFromMatias(ctx, invoiceId, orderCode);
+  }
+
+  @Mutation()
+  @Allow(Permission.ReadOrder)
+  async resendInvoiceMatiasEmail(
+    @Ctx() ctx: RequestContext,
+    @Args('invoiceId') invoiceId: string,
+    @Args('orderCode') orderCode: string,
+    @Args('email') email?: string,
+  ) {
+    return this.invoiceMatiasAction.resendFromMatias(ctx, invoiceId, orderCode, email);
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async submitBillingCertificate(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { chamber: string; rut: string; nit: string; certificateType: string },
+  ) {
+    const type = input.certificateType === 'MONTHLY' ? 'MONTHLY' : 'ANNUAL';
+    return this.billingPlans.submitCertificateDocuments(ctx, {
+      chamber: input.chamber,
+      rut: input.rut,
+      nit: input.nit,
+      certificateType: type as 'MONTHLY' | 'ANNUAL',
+    });
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async confirmMyBillingCertificatePayment(@Ctx() ctx: RequestContext) {
+    return this.billingPlans.confirmCertificatePayment(ctx);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateMatiasGlobalInvoicePool(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { total?: number | null; sellableRemaining?: number | null },
+  ) {
+    return this.matiasGlobalPool.updatePool(ctx, input);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateMatiasBillingStore(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: {
+      channelId: string;
+      billingActive: boolean;
+      invoiceLimitRemaining?: number | null;
+      matiasInvoicePrefix?: string | null;
+      matiasResolutionNumber?: string | null;
+      matiasAccessToken?: string | null;
+    },
+  ) {
+    return this.matiasBillingStoresService.updateStoreBilling(ctx, input);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async approveBillingCertificate(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { channelId: string; approve: boolean; note?: string | null },
+  ) {
+    return this.billingPlans.approveCertificate(ctx, input);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async confirmBillingPlanPayment(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { planCode: string; channelId?: string | null },
+  ) {
+    return this.billingPlans.confirmPlanPayment(ctx, input);
   }
 }
 
