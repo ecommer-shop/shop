@@ -12,6 +12,7 @@ import { SubscriptionResolver } from './api/subscription.resolver';
 import { WompiResolver } from './api/wompi.resolver';
 import { shopApiExtensions } from './api/api-extensions';
 import { FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAccessGuard, PlanGuard } from './guards';
+import { ProductTranslationSubscriber } from './subscribers/product-translation.subscriber';
 
 @Global()
 @Module({
@@ -35,6 +36,7 @@ import { FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAcc
         ProductVariationLimitGuard,
         FeatureAccessGuard,
         PlanGuard,
+        ProductTranslationSubscriber,
     ],
     exports: [
         SubscriptionQueryService,
