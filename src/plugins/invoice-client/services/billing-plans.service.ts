@@ -230,8 +230,16 @@ export class BillingPlansService {
     if (!channel) return;
     const state = this.toState(channel);
     if (!state.canBuyPlans) return;
-    const plan = this.getPlanByCode(planCode);
     const cf = (channel.customFields as ChannelCustomFields) ?? {};
+    if (
+      paymentReference &&
+      this.parsePurchaseHistoryRaw(cf[CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD]).some(
+        (e) => e.paymentReference === paymentReference,
+      )
+    ) {
+      return;
+    }
+    const plan = this.getPlanByCode(planCode);
     const currentRemaining = state.invoicesRemaining;
     const customFields: ChannelCustomFields = {
       ...cf,

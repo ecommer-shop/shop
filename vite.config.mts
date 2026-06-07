@@ -631,6 +631,125 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/ui/grid-layout.tsx')) {
+                nextCode = nextCode.replace(
+                    `<div className="h-full w-full">`,
+                    `<div className="h-full w-full overflow-hidden">`,
+                );
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/index.tsx')) {
+                if (!nextCode.includes('ECOMMER_RECOMMENDED_WIDGET_LAYOUT')) {
+                    nextCode = nextCode.replace(
+                        `const findNextPosition = (`,
+                        `const ECOMMER_LAYOUT_VERSION = 2;
+const ECOMMER_LAYOUT_VERSION_KEY = 'ecommer.widgetLayoutVersion';
+const ECOMMER_RECOMMENDED_WIDGET_LAYOUT: Record<string, { x: number; y: number; w: number; h: number }> = {
+    'latest-orders-widget': { x: 0, y: 0, w: 6, h: 7 },
+    'orders-summary-widget': { x: 6, y: 0, w: 6, h: 3 },
+    'ai-chat-widget': { x: 6, y: 3, w: 6, h: 4 },
+    'advanced-metrics': { x: 6, y: 7, w: 6, h: 4 },
+    'invoice-quota': { x: 0, y: 7, w: 6, h: 2 },
+    'ecommer-share-links': { x: 0, y: 9, w: 6, h: 4 },
+    'metrics-widget': { x: 0, y: 13, w: 12, h: 5 },
+};
+function ecommerLayoutsOverlap(
+    a: { x: number; y: number; w: number; h: number },
+    b: { x: number; y: number; w: number; h: number },
+): boolean {
+    return !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+}
+function ecommerHasOverlappingLayouts(
+    layout: Record<string, { x: number; y: number; w: number; h: number }>,
+): boolean {
+    const entries = Object.values(layout);
+    for (let i = 0; i < entries.length; i++) {
+        for (let j = i + 1; j < entries.length; j++) {
+            if (ecommerLayoutsOverlap(entries[i], entries[j])) return true;
+        }
+    }
+    return false;
+}
+const findNextPosition = (`,
+                    );
+                }
+
+                nextCode = nextCode.replace(
+                    `    useEffect(() => {
+        const savedLayouts = settings.widgetLayout || {};
+
+        const initialWidgets = Array.from(getDashboardWidgetRegistry().entries())`,
+                    `    useEffect(() => {
+        const savedLayouts = settings.widgetLayout || {};
+        const storedLayoutVersion =
+            typeof localStorage !== 'undefined'
+                ? Number.parseInt(localStorage.getItem(ECOMMER_LAYOUT_VERSION_KEY) ?? '0', 10)
+                : 0;
+        const layoutNeedsReset =
+            storedLayoutVersion < ECOMMER_LAYOUT_VERSION ||
+            (Object.keys(savedLayouts).length > 0 && ecommerHasOverlappingLayouts(savedLayouts));
+        const effectiveLayouts = layoutNeedsReset
+            ? { ...savedLayouts, ...ECOMMER_RECOMMENDED_WIDGET_LAYOUT }
+            : savedLayouts;
+
+        const initialWidgets = Array.from(getDashboardWidgetRegistry().entries())`,
+                );
+
+                nextCode = nextCode.replace(
+                    `                const savedLayout = savedLayouts[id];`,
+                    `                const savedLayout = effectiveLayouts[id];`,
+                );
+
+                nextCode = nextCode.replace(
+                    `                // Only find next position if we don't have a saved layout
+                if (!savedLayout) {
+                    const pos = findNextPosition(acc, {
+                        w: layout.w,
+                        h: layout.h,
+                    });
+                    layout.x = pos.x;
+                    layout.y = pos.y;
+                }`,
+                    `                const recommendedLayout = ECOMMER_RECOMMENDED_WIDGET_LAYOUT[id];
+                if (recommendedLayout && layoutNeedsReset) {
+                    layout.x = recommendedLayout.x;
+                    layout.y = recommendedLayout.y;
+                    layout.w = recommendedLayout.w;
+                    layout.h = recommendedLayout.h;
+                } else if (!savedLayout) {
+                    const pos = findNextPosition(acc, {
+                        w: layout.w,
+                        h: layout.h,
+                    });
+                    layout.x = pos.x;
+                    layout.y = pos.y;
+                }`,
+                );
+
+                nextCode = nextCode.replace(
+                    `        setWidgets(initialWidgets);
+        setIsInitialized(true);
+    }, [settings.widgetLayout, hasPermissions]);`,
+                    `        setWidgets(initialWidgets);
+        setIsInitialized(true);
+
+        if (layoutNeedsReset && typeof localStorage !== 'undefined') {
+            const layoutConfig: Record<string, { x: number; y: number; w: number; h: number }> = {};
+            initialWidgets.forEach(widget => {
+                layoutConfig[widget.widgetId] = {
+                    x: widget.layout.x,
+                    y: widget.layout.y,
+                    w: widget.layout.w,
+                    h: widget.layout.h,
+                };
+            });
+            setWidgetLayout(layoutConfig);
+            localStorage.setItem(ECOMMER_LAYOUT_VERSION_KEY, String(ECOMMER_LAYOUT_VERSION));
+        }
+    }, [settings.widgetLayout, hasPermissions, setWidgetLayout]);`,
+                );
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };
