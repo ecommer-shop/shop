@@ -102,7 +102,7 @@ export function AdvancedMetricsWidget() {
                 </div>
             }
         >
-            <div className="flex flex-col gap-3 p-1">
+            <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-1">
                 {/* Metric selector tabs */}
                 {metrics.length > 1 && (
                     <div className="flex gap-1 flex-wrap">

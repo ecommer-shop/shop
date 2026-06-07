@@ -4,7 +4,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Campos de facturación Matias en Channel + columna `asset.name` (Vendure 3.6).
  * Seguro para stage: IF NOT EXISTS + backfill antes de NOT NULL en asset.name.
  */
-export class InvoiceMatiasChannelFieldsAndAssetName1774400000000 implements MigrationInterface {
+export class InvoiceMatiasChannelFieldsAndAssetName1774400000002 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
     `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsInvoicebillingactive" boolean NOT NULL DEFAULT false`,

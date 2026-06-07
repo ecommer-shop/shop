@@ -63,9 +63,9 @@ defineDashboardExtension({
             id: 'ecommer-share-links',
             name: 'Links para compartir',
             component: ShareLinksWidget,
-            defaultSize: { w: 6, h: 4 },
+            defaultSize: { w: 6, h: 4, x: 0, y: 9 },
             minSize: { w: 4, h: 3 },
-            maxSize: { w: 12, h: 6 },
+            maxSize: { w: 6, h: 6 },
         },
     ],
 });

@@ -23,6 +23,12 @@ import { useEffect, useRef, useState } from 'react';
 import { BillingCertificateDocField } from './components/billing-certificate-doc-field';
 import { CertificateStatusSteps } from './components/certificate-status-steps';
 import { InvoicePlanCard, type InvoicePlanCardPlan } from './components/invoice-plan-card';
+import { InvoicePlanPaymentStep } from './invoice-plan-payment-step';
+import {
+    CREATE_PENDING_INVOICE_PLAN,
+    PURCHASE_INVOICE_PLAN_WITH_PAYMENT,
+    type InvoicePlanPendingResult,
+} from './invoice-plan-payment-queries';
 
 const WOMPI_PENDING_KEY = 'billing-wompi-pending-ref';
 
@@ -137,7 +143,7 @@ type BillingPlanState = {
     }[];
 };
 
-type Step = 'overview' | 'certificate' | 'plans';
+type Step = 'overview' | 'certificate' | 'plans' | 'payment';
 
 function statusBadge(status: string, payment: string) {
     if (status === 'ACTIVE' && payment === 'PAID') {
@@ -160,6 +166,12 @@ function statusBadge(status: string, payment: string) {
 
 export function BillingPlansPage() {
     const [step, setStep] = useState<Step>('overview');
+    const [selectedPlan, setSelectedPlan] = useState<InvoicePlanCardPlan | null>(null);
+    const [paymentTab, setPaymentTab] = useState('token');
+    const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
+    const [paymentProcessing, setPaymentProcessing] = useState(false);
+    const [showTokenForm, setShowTokenForm] = useState(false);
+    const [planPendingResult, setPlanPendingResult] = useState<InvoicePlanPendingResult | null>(null);
     const [chamberRef, setChamberRef] = useState('');
     const [rutRef, setRutRef] = useState('');
     const [nitRef, setNitRef] = useState('');
@@ -282,11 +294,99 @@ export function BillingPlansPage() {
         await openWompiCheckout(CERT_ANNUAL_PRICE_COP, reference);
     };
 
-    const startWompiPlanPayment = async (plan: InvoicePlanCardPlan) => {
-        if (!state?.channelCode || !canBuyPlans) return;
-        invoicesBeforePlanPayRef.current = state.invoicesRemaining;
-        const reference = `PLAN-${state.channelCode}-${plan.code}-${Date.now()}`;
-        await openWompiCheckout(plan.priceCop, reference);
+    const handleSelectPlan = (plan: InvoicePlanCardPlan) => {
+        if (!canBuyPlans) return;
+        setSelectedPlan(plan);
+        setStep('payment');
+        setPlanPendingResult(null);
+        setShowTokenForm(false);
+        setSelectedMethod(null);
+        setPaymentNotice(null);
+        invoicesBeforePlanPayRef.current = state?.invoicesRemaining ?? 0;
+    };
+
+    const handlePlanPayment = async () => {
+        if (!selectedPlan || !selectedMethod) return;
+        const isTokenFlow = ['CARD', 'NEQUI', 'DAVIPLATA', 'BANCOLOMBIA_TRANSFER'].includes(selectedMethod);
+        if (isTokenFlow) {
+            setShowTokenForm(true);
+            return;
+        }
+        setPaymentProcessing(true);
+        setPaymentNotice(null);
+        try {
+            const data = await api.mutate<{
+                createPendingInvoicePlanPurchase: InvoicePlanPendingResult;
+            }>(CREATE_PENDING_INVOICE_PLAN, {
+                planCode: selectedPlan.code,
+                paymentMethod: selectedMethod,
+            });
+            const result = data.createPendingInvoicePlanPurchase;
+            setPlanPendingResult(result);
+            setPaymentRef(result.reference);
+            if (result.reference) {
+                sessionStorage.setItem(WOMPI_PENDING_KEY, result.reference);
+            }
+            if (result.applied) {
+                setPaymentNotice('Paquete de facturas acreditado correctamente.');
+                await refetch();
+            } else if (!result.asyncPaymentUrl && !result.qrImage) {
+                setWompiPolling(true);
+                setPaymentNotice('Pago en proceso. Actualizaremos el cupo al confirmarse.');
+            }
+        } catch (e: unknown) {
+            setPaymentNotice(e instanceof Error ? e.message : 'Error al iniciar el pago.');
+        } finally {
+            setPaymentProcessing(false);
+        }
+    };
+
+    const handlePlanTokenReceived = async (token: string, sessionId?: string, deviceId?: string) => {
+        if (!selectedPlan || !selectedMethod) return;
+        setPaymentProcessing(true);
+        try {
+            const data = await api.mutate<{
+                purchaseInvoicePlanWithPayment: InvoicePlanPendingResult;
+            }>(PURCHASE_INVOICE_PLAN_WITH_PAYMENT, {
+                planCode: selectedPlan.code,
+                paymentMethod: selectedMethod,
+                token,
+                sessionId: sessionId ?? null,
+                deviceId: deviceId ?? null,
+            });
+            const result = data.purchaseInvoicePlanWithPayment;
+            setPlanPendingResult(result);
+            setPaymentRef(result.reference);
+            if (result.reference) {
+                sessionStorage.setItem(WOMPI_PENDING_KEY, result.reference);
+            }
+            if (result.applied) {
+                setPaymentNotice('Paquete de facturas acreditado correctamente.');
+                setSelectedPlan(null);
+                setStep('overview');
+                await refetch();
+            } else {
+                setWompiPolling(true);
+                setPaymentNotice('Pago en proceso. Si ya se cobró, el cupo se actualizará en unos segundos.');
+            }
+        } catch (e: unknown) {
+            setPaymentNotice(e instanceof Error ? e.message : 'Error al procesar el pago.');
+        } finally {
+            setPaymentProcessing(false);
+            setShowTokenForm(false);
+        }
+    };
+
+    const handlePlanPaymentSuccess = () => {
+        setSelectedPlan(null);
+        setStep('overview');
+        setPlanPendingResult(null);
+        setShowTokenForm(false);
+        setSelectedMethod(null);
+        setWompiPolling(true);
+        setPaymentNotice('Verificando pago con Wompi…');
+        pollCountRef.current = 0;
+        void refetch();
     };
 
     const monthlyCertAlert =
@@ -571,10 +671,39 @@ export function BillingPlansPage() {
                                     key={plan.code}
                                     plan={plan}
                                     disabled={!canBuyPlans}
-                                    onSelect={() => startWompiPlanPayment(plan)}
+                                    onSelect={() => handleSelectPlan(plan)}
                                 />
                             ))}
                         </div>
+                    </PageBlock>
+                )}
+
+                {step === 'payment' && selectedPlan && (
+                    <PageBlock column="main" blockId="plan-payment">
+                        {paymentNotice && (
+                            <p className="text-sm rounded-md border bg-muted/50 p-2 mb-4">{paymentNotice}</p>
+                        )}
+                        <InvoicePlanPaymentStep
+                            plan={selectedPlan}
+                            paymentTab={paymentTab}
+                            setPaymentTab={setPaymentTab}
+                            selectedMethod={selectedMethod}
+                            setSelectedMethod={setSelectedMethod}
+                            onPay={handlePlanPayment}
+                            paymentProcessing={paymentProcessing}
+                            showTokenForm={showTokenForm}
+                            onCloseTokenForm={() => setShowTokenForm(false)}
+                            onTokenReceived={handlePlanTokenReceived}
+                            pendingResult={planPendingResult}
+                            onSuccess={handlePlanPaymentSuccess}
+                            onBack={() => {
+                                setStep('plans');
+                                setSelectedPlan(null);
+                                setPlanPendingResult(null);
+                                setShowTokenForm(false);
+                                setSelectedMethod(null);
+                            }}
+                        />
                     </PageBlock>
                 )}
             </PageLayout>

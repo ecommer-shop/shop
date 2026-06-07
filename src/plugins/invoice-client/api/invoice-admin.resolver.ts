@@ -12,6 +12,7 @@ import { InvoiceFailureQueryService } from '../services/invoice-failure-query.se
 import { InvoiceEmissionQueueStatusService } from '../services/invoice-emission-queue-status.service';
 import { InvoiceQuotaService } from '../services/invoice-quota.service';
 import { InvoiceMatiasActionService } from '../services/invoice-matias-action.service';
+import { InvoicePlanWompiPaymentService } from '../services/invoice-plan-wompi-payment.service';
 
 @Resolver()
 export class InvoiceAdminResolver {
@@ -24,6 +25,7 @@ export class InvoiceAdminResolver {
     private emissionQueueStatusService: InvoiceEmissionQueueStatusService,
     private invoiceQuota: InvoiceQuotaService,
     private invoiceMatiasAction: InvoiceMatiasActionService,
+    private invoicePlanWompiPayment: InvoicePlanWompiPaymentService,
   ) { }
 
   @Query()
@@ -235,6 +237,36 @@ export class InvoiceAdminResolver {
     @Args('input') input: { planCode: string; channelId?: string | null },
   ) {
     return this.billingPlans.confirmPlanPayment(ctx, input);
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async createPendingInvoicePlanPurchase(
+    @Ctx() ctx: RequestContext,
+    @Args('planCode') planCode: string,
+    @Args('paymentMethod') paymentMethod: string,
+  ) {
+    return this.invoicePlanWompiPayment.createPendingPurchase(ctx, planCode, paymentMethod);
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async purchaseInvoicePlanWithPayment(
+    @Ctx() ctx: RequestContext,
+    @Args('planCode') planCode: string,
+    @Args('paymentMethod') paymentMethod: string,
+    @Args('token') token: string,
+    @Args('sessionId') sessionId?: string,
+    @Args('deviceId') deviceId?: string,
+  ) {
+    return this.invoicePlanWompiPayment.purchaseWithToken(
+      ctx,
+      planCode,
+      paymentMethod,
+      token,
+      sessionId,
+      deviceId,
+    );
   }
 }
 

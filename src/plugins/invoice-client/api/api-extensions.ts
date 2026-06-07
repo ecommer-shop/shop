@@ -147,6 +147,16 @@ const invoiceType = gql`
     channelId: ID
   }
 
+  type InvoicePlanPurchaseResult {
+    reference: String!
+    transactionStatus: String
+    asyncPaymentUrl: String
+    qrImage: String
+    transactionId: String
+    applied: Boolean!
+    billingPlanState: BillingPlanState!
+  }
+
   type InvoiceCreationFailureItem {
     orderId: ID!
     orderCode: String!
@@ -215,6 +225,14 @@ const adminMutations = gql`
     confirmMyBillingCertificatePayment: BillingPlanState!
     approveBillingCertificate(input: ApproveBillingCertificateInput!): BillingPlanState!
     confirmBillingPlanPayment(input: ConfirmBillingPlanPaymentInput!): BillingPlanState!
+    createPendingInvoicePlanPurchase(planCode: String!, paymentMethod: String!): InvoicePlanPurchaseResult!
+    purchaseInvoicePlanWithPayment(
+      planCode: String!
+      paymentMethod: String!
+      token: String!
+      sessionId: String
+      deviceId: String
+    ): InvoicePlanPurchaseResult!
     syncInvoiceFromMatias(invoiceId: ID!, orderCode: String!): InvoiceMatiasActionResult!
     resendInvoiceMatiasEmail(invoiceId: ID!, orderCode: String!, email: String): InvoiceMatiasActionResult!
   }

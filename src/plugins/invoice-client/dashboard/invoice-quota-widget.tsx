@@ -8,7 +8,7 @@ export function InvoiceQuotaWidget() {
   const quotaStatus = data?.currentInvoiceQuotaStatus;
 
   return (
-    <Card>
+    <Card className="h-full w-full overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Cupo de facturación</CardTitle>
       </CardHeader>
