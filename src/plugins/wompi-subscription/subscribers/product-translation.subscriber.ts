@@ -12,16 +12,7 @@ import {
 } from '@vendure/core';
 import { LanguageCode } from '@vendure/common/lib/generated-types';
 import { Subscription } from 'rxjs';
-
-const PLACEHOLDER_NAMES = new Set(['sin nombre', 'untitled', 'unnamed', 'product', 'variante', 'variant', '']);
-
-function hasValidTranslation(translations: Array<{ name?: string | null }> | undefined): boolean {
-    if (!translations?.length) return false;
-    return translations.some(t => {
-        const name = t.name?.trim().toLowerCase();
-        return !!name && !PLACEHOLDER_NAMES.has(name);
-    });
-}
+import { hasValidTranslation, getProductFallbackName, getVariantFallbackName } from './translation-utils';
 
 @Injectable()
 export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -48,12 +39,11 @@ export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnA
                     if (hasValidTranslation(full.translations)) return;
 
                     const channelCode = full.channels?.[0]?.code || 'default';
-                    const name = `Producto ${full.id} de ${channelCode}`;
-                    const slug = name.toLowerCase().replace(/\s+/g, '-');
+                    const { name, slug, description } = getProductFallbackName(full.id as number, channelCode);
 
                     await this.productService.update(event.ctx, {
                         id: full.id,
-                        translations: [{ languageCode: LanguageCode.es, name, slug }],
+                        translations: [{ languageCode: LanguageCode.es, name, slug, description }],
                     });
 
                     Logger.info(`Auto-created ES translation for Product ${full.id}: "${name}"`);
@@ -81,8 +71,8 @@ export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnA
                         if (full.translations?.some(t => t.name?.trim())) continue;
 
                         const channelCode = full.product?.channels?.[0]?.code || 'default';
-                        const productId = full.product?.id || 'unknown';
-                        const name = `Variante ${full.id} de ${productId} de ${channelCode}`;
+                        const productId = full.product?.id || 0;
+                        const name = getVariantFallbackName(full.id as number, productId as number, channelCode);
 
                         await this.productVariantService.update(event.ctx, [{
                             id: full.id,
