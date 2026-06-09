@@ -79,26 +79,63 @@ export class SellerOnboardingService {
         }
 
         const superAdminCtx = await this.getSuperAdminContext(ctx);
-        const channel = await this.createSellerChannelRoleAdmin(superAdminCtx, {
-            shopName: input.shopName,
-            seller: {
-                firstName: input.firstName,
-                lastName: input.lastName,
-                emailAddress: input.emailAddress,
-                password: this.generateSecurePassword(),
-            },
-        }, existingUser ?? undefined);
 
-        await this.createSellerStockLocation(superAdminCtx, input.shopName, channel);
-        await this.assignFacetsToSellerChannel(superAdminCtx, channel);
-        await this.assignCollectionsToSellerChannel(superAdminCtx, channel);
+        // Idempotency: check if Channel already exists from a previous partial registration
+        const shopCode = normalizeString(input.shopName, '-');
+        const channelRepo = this.connection.getRepository(superAdminCtx, Channel);
+        const existingChannel = await channelRepo.findOne({ where: { code: shopCode } });
+        if (existingChannel) {
+            const adminUser = await this.connection
+                .getRepository(superAdminCtx, User)
+                .findOne({ where: { identifier: input.emailAddress } });
+            if (adminUser) {
+                const existingAdmin = await this.administratorService.findOneByUserId(
+                    superAdminCtx,
+                    adminUser.id,
+                );
+                if (existingAdmin) {
+                    Logger.info(
+                        `Seller already registered (idempotent): ${input.emailAddress}`,
+                        loggerCtx,
+                    );
+                    return { success: true, email: input.emailAddress };
+                }
+            }
+            throw new InternalServerError(
+                `Ya existe un canal para "${input.shopName}" pero no se completó el registro. Contacta a soporte.`,
+            );
+        }
 
-        await this.assignFreePlanToSeller(superAdminCtx, input);
+        // Only critical operations inside the transaction
+        const channel = await this.connection.withTransaction(superAdminCtx, async (txCtx) => {
+            const ch = await this.createSellerChannelRoleAdmin(txCtx, {
+                shopName: input.shopName,
+                seller: {
+                    firstName: input.firstName,
+                    lastName: input.lastName,
+                    emailAddress: input.emailAddress,
+                    password: this.generateSecurePassword(),
+                },
+            }, existingUser ?? undefined);
 
-        Logger.info(
-            `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
-            loggerCtx,
-        );
+            await this.createSellerStockLocation(txCtx, input.shopName, ch);
+            await this.assignFreePlanToSeller(txCtx, input);
+
+            Logger.info(
+                `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
+                loggerCtx,
+            );
+
+            return ch;
+        });
+
+        // Fire-and-forget: facets and collections (slow, non-critical)
+        this.assignFacetsToSellerChannel(superAdminCtx, channel).catch((err: Error) => {
+            Logger.error(`Failed to assign facets: ${err.message}`, loggerCtx);
+        });
+        this.assignCollectionsToSellerChannel(superAdminCtx, channel).catch((err: Error) => {
+            Logger.error(`Failed to assign collections: ${err.message}`, loggerCtx);
+        });
 
         return { success: true, email: input.emailAddress };
     }
@@ -143,8 +180,8 @@ export class SellerOnboardingService {
             throw new InternalServerError(channel.message);
         }
 
-        //const superAdminRole = await this.roleService.getSuperAdminRole(ctx);
-        //await this.roleService.assignRoleToChannel(ctx, superAdminRole.id, channel.id);
+        const superAdminRole = await this.roleService.getSuperAdminRole(ctx);
+        await this.roleService.assignRoleToChannel(ctx, superAdminRole.id, channel.id);
 
         const role = await this.roleService.create(ctx, {
             code: `${shopCode}-admin`,
