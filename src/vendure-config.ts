@@ -18,6 +18,7 @@ import { catalogOptions } from './config/catalog-options';
 
 import { ExcelLoaderPlugin } from './plugins/google-sheets-loader/excel-loader.plugin';
 import './config/promotion-translations';
+import { SuperadminvisibilityPlugin } from './plugins/superadminvisibility/superadminvisibility.plugin';
 
 class TwoDecimalMoneyStrategy extends DefaultMoneyStrategy {
   readonly precision = 2;

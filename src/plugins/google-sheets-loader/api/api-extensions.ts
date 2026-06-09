@@ -77,6 +77,7 @@ const googleSheetAdminApiExtensions = gql`
     importProductsFromExcel(
       products: [ImportProductInput!]!
       channelToken: String!
+      customerEmail: String
     ): ImportProductsResult!
   }
 `;
