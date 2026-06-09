@@ -34,7 +34,6 @@ import { ProductTranslationSubscriber } from './subscribers/product-translation.
         SubscriptionResolver,
         WompiResolver,
         FixTranslationsResolver,
-        ProductLimitResolver,
         FeatureGuard,
         ProductLimitGuard,
         ProductVariationLimitGuard,
