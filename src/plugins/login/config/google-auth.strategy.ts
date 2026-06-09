@@ -9,6 +9,7 @@ import {
     User,
     TransactionalConnection,
     Logger,
+    RoleService,
 } from '@vendure/core';
 import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
 import { DocumentNode } from 'graphql';
@@ -38,6 +39,7 @@ export class GoogleAdminAuthenticationStrategy
     private sellerOnboardingService!: SellerOnboardingService;
     private facetService!: FacetService;
     private channelService!: ChannelService;
+    private roleService!: RoleService;
     constructor(private clientId: string) {
         this.client = new OAuth2Client(clientId);
     }
@@ -55,6 +57,7 @@ export class GoogleAdminAuthenticationStrategy
         this.sellerOnboardingService = injector.get(SellerOnboardingService);
         this.facetService = injector.get(FacetService);
         this.channelService = injector.get(ChannelService);
+        this.roleService = injector.get(RoleService);
     }
 
     // Extrae el email del token de Google, Primero intenta como ID token
@@ -149,18 +152,17 @@ export class GoogleAdminAuthenticationStrategy
                 );
                 return false;
             }
-            await this.sellerOnboardingService.syncAllSellerAdminPermissions(ctx).catch(err => {
-                Logger.error(
-                    `Failed to sync seller admin permissions: ${err instanceof Error ? err.message : err}`,
-                    loggerCtx,
-                );
-            });
+            // Nota: no sincronizamos por canal durante el login.
+            // El canal activo del vendedor se determina en el frontend con localStorage
+            // (vendure-selected-channel-token) y se sincroniza luego del login.
             await this.assignFacetsIfSeller(ctx, user).catch(err => {
                 Logger.error(
                     `Failed to assign facets to seller channel: ${err instanceof Error ? err.message : err}`,
                     loggerCtx,
                 );
             });
+
+
             Logger.info(`Google auth successful for: ${email}`, loggerCtx);
             return user;
         } catch (error) {
@@ -175,6 +177,7 @@ export class GoogleAdminAuthenticationStrategy
     private async assignFacetsIfSeller(
         ctx: RequestContext,
         user: User,
+        sellerChannelToken?: string,
     ): Promise<void> {
         // Verificar si el usuario tiene un rol de vendedor (contiene '-admin')
         const sellerRole = user.roles?.find(role => role.code.includes('-admin'));
@@ -183,7 +186,9 @@ export class GoogleAdminAuthenticationStrategy
         }
 
         // Obtener el canal del vendedor
-        const sellerChannel = sellerRole.channels?.[0];
+        const sellerChannel = sellerChannelToken
+            ? sellerRole.channels?.find(c => c.token === sellerChannelToken)
+            : sellerRole.channels?.[0];
         if (!sellerChannel) {
             return;
         }

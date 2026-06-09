@@ -6,7 +6,7 @@ import {
     PageLayout,
     PageTitle,
 } from '@vendure/dashboard';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { ImportFormatGuide } from './components/import-format-guide';
 
@@ -18,9 +18,17 @@ type ImportProduct = {
     stock: number;
 };
 
+const ACTIVE_ADMIN_QUERY = `
+  query ActiveAdmin {
+    activeAdministrator {
+      emailAddress
+    }
+  }
+`;
+
 const IMPORT_PRODUCTS_MUTATION = `
-  mutation ImportProductsFromExcel($products: [ImportProductInput!]!, $channelToken: String!) {
-    importProductsFromExcel(products: $products, channelToken: $channelToken) {
+  mutation ImportProductsFromExcel($products: [ImportProductInput!]!, $channelToken: String!, $customerEmail: String) {
+    importProductsFromExcel(products: $products, channelToken: $channelToken, customerEmail: $customerEmail) {
       success
       message
       importedCount
@@ -59,6 +67,19 @@ function ExcelImportPage() {
     const [status, setStatus] =
         useState<'idle' | 'ready' | 'loading' | 'success' | 'error'>('idle');
     const [message, setMessage] = useState('');
+    const [adminEmail, setAdminEmail] = useState<string | undefined>();
+
+    useEffect(() => {
+        fetch('/admin-api/graphql', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ query: ACTIVE_ADMIN_QUERY }),
+        })
+            .then(r => r.json())
+            .then(d => setAdminEmail(d.data?.activeAdministrator?.emailAddress))
+            .catch(() => { });
+    }, []);
     const handleFile = async (file: File) => {
         setStatus('loading');
 
@@ -124,6 +145,7 @@ function ExcelImportPage() {
                     variables: {
                         products,
                         channelToken,
+                        customerEmail: adminEmail || null,
                     },
                 }),
             });

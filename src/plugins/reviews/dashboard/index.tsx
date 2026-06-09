@@ -7,7 +7,6 @@ import { routeWithoutAuth } from './route-without-auth';
 defineDashboardExtension({
     routes: [reviewList, reviewDetail, routeWithoutAuth],
     widgets: [],
-
     detailForms: [
         {
             pageId: 'product-variant-detail',
@@ -47,6 +46,20 @@ defineDashboardExtension({
     dataTables: [
         {
             pageId: 'product-list',
+            transformVariables: (variables: any) => {
+                // Si el sort viene vacío o inválido, forzar updatedAt ASC
+                if (!variables?.options?.sort ||
+                    Object.keys(variables.options.sort).length === 0) {
+                    return {
+                        ...variables,
+                        options: {
+                            ...variables.options,
+                            sort: { updatedAt: 'DESC' },
+                        },
+                    };
+                }
+                return variables;
+            },
             // extendListDocument: `
             //     query {
             //         products {

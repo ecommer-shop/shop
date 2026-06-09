@@ -29,6 +29,16 @@ import crypto from 'crypto';
 
 import { loggerCtx, SELLER_ADMIN_PERMISSIONS } from '../constants';
 import { GoogleSellerRegistrationResult, SellerOnboardingInput } from '../types';
+import {
+    CustomerSubscription,
+    Plan,
+    BillingInterval,
+    Feature,
+    FeatureType,
+    PlanFeature,
+    SubscriptionStatus,
+} from '../../wompi-subscription/entities';
+import { FEATURE_CODES, DEFAULT_PLAN_NAMES } from '../../wompi-subscription/constants';
 
 @Injectable()
 export class SellerOnboardingService {
@@ -83,6 +93,8 @@ export class SellerOnboardingService {
         await this.assignFacetsToSellerChannel(superAdminCtx, channel);
         await this.assignCollectionsToSellerChannel(superAdminCtx, channel);
 
+        await this.assignFreePlanToSeller(superAdminCtx, input);
+
         Logger.info(
             `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
             loggerCtx,
@@ -131,8 +143,8 @@ export class SellerOnboardingService {
             throw new InternalServerError(channel.message);
         }
 
-        const superAdminRole = await this.roleService.getSuperAdminRole(ctx);
-        await this.roleService.assignRoleToChannel(ctx, superAdminRole.id, channel.id);
+        //const superAdminRole = await this.roleService.getSuperAdminRole(ctx);
+        //await this.roleService.assignRoleToChannel(ctx, superAdminRole.id, channel.id);
 
         const role = await this.roleService.create(ctx, {
             code: `${shopCode}-admin`,
@@ -209,6 +221,124 @@ export class SellerOnboardingService {
             user: reloadedUser,
         });
         await administratorRepository.save(administrator);
+    }
+
+    private async assignFreePlanToSeller(
+        ctx: RequestContext,
+        input: SellerOnboardingInput,
+    ): Promise<void> {
+        const planRepository = this.connection.getRepository(ctx, Plan);
+        const featureRepository = this.connection.getRepository(ctx, Feature);
+        const planFeatureRepository = this.connection.getRepository(ctx, PlanFeature);
+        const subRepository = this.connection.getRepository(ctx, CustomerSubscription);
+
+        let freePlan = await planRepository.findOne({ where: { name: DEFAULT_PLAN_NAMES.FREE } });
+        if (!freePlan) {
+            Logger.info('Free plan not found, creating default plans...', loggerCtx);
+            freePlan = await this.createDefaultPlans(ctx, planRepository, featureRepository, planFeatureRepository);
+        }
+
+        const user = await this.connection.getRepository(ctx, User).findOne({
+            where: { identifier: input.emailAddress },
+        });
+        if (!user) {
+            Logger.warn(`User not found for ${input.emailAddress}, cannot assign free plan`, loggerCtx);
+            return;
+        }
+
+        const adminRepo = this.connection.getRepository(ctx, Administrator);
+        const admin = await adminRepo.findOne({ where: { user: { id: user.id } } });
+        if (!admin) {
+            Logger.warn(`Administrator not found for ${input.emailAddress}, cannot assign free plan`, loggerCtx);
+            return;
+        }
+
+        const numericAdminId = Number(admin.id);
+        const existingSub = await subRepository.findOne({ where: { administratorId: numericAdminId } });
+        if (existingSub) {
+            Logger.info(`Seller ${input.emailAddress} already has a subscription`, loggerCtx);
+            return;
+        }
+
+        const subscription = subRepository.create({
+            administratorId: numericAdminId,
+            planId: freePlan.id,
+            status: SubscriptionStatus.ACTIVE,
+            startsAt: new Date(),
+            endsAt: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+            autoRenew: false,
+        });
+        await subRepository.save(subscription);
+
+        Logger.info(`Assigned Free plan to seller ${input.emailAddress} (administrator ${admin.id})`, loggerCtx);
+    }
+
+    private async createDefaultPlans(
+        ctx: RequestContext,
+        planRepository: any,
+        featureRepository: any,
+        planFeatureRepository: any,
+    ): Promise<Plan> {
+        const freePlan = planRepository.create({
+            name: DEFAULT_PLAN_NAMES.FREE,
+            price: 0,
+            billingInterval: BillingInterval.MONTHLY,
+            isActive: true,
+            description: 'Plan gratuito con características limitadas',
+        });
+        const savedFreePlan = await planRepository.save(freePlan);
+
+        const tiendaPlan = planRepository.create({
+            name: DEFAULT_PLAN_NAMES.TIENDA,
+            price: 29900,
+            billingInterval: BillingInterval.MONTHLY,
+            isActive: true,
+            description: 'Plan para tiendas con hasta 500 productos',
+        });
+        await planRepository.save(tiendaPlan);
+
+        const omnichannelPlan = planRepository.create({
+            name: DEFAULT_PLAN_NAMES.OMNICHANNEL,
+            price: 99900,
+            billingInterval: BillingInterval.MONTHLY,
+            isActive: true,
+            description: 'Plan multicanal con hasta 1.500 productos',
+        });
+        await planRepository.save(omnichannelPlan);
+
+        const features = [
+            { code: FEATURE_CODES.MAX_PRODUCTS, name: 'Max Products', type: FeatureType.NUMERIC },
+            { code: FEATURE_CODES.MAX_VARIATIONS, name: 'Max Variations', type: FeatureType.NUMERIC },
+            { code: FEATURE_CODES.AI_ACCESS, name: 'AI Access', type: FeatureType.BOOLEAN },
+            { code: FEATURE_CODES.ELECTRONIC_BILLING, name: 'Electronic Billing', type: FeatureType.BOOLEAN },
+        ];
+
+        const planConfigs = [
+            { planId: savedFreePlan.id, values: { max_products: '15', max_variations: '250', ai_access: 'false', electronic_billing: 'false' } },
+            { planId: tiendaPlan.id, values: { max_products: '500', max_variations: '5000', ai_access: 'true', electronic_billing: 'true' } },
+            { planId: omnichannelPlan.id, values: { max_products: '1500', max_variations: '15000', ai_access: 'true', electronic_billing: 'true' } },
+        ];
+
+        for (const featureData of features) {
+            let feature = await featureRepository.findOne({ where: { code: featureData.code } });
+            if (!feature) {
+                feature = featureRepository.create(featureData);
+                feature = await featureRepository.save(feature);
+            }
+
+            for (const config of planConfigs) {
+                await planFeatureRepository.save(
+                    planFeatureRepository.create({
+                        planId: config.planId,
+                        featureId: feature.id,
+                        value: config.values[featureData.code as keyof typeof config.values],
+                    })
+                );
+            }
+        }
+
+        Logger.info('Created default subscription plans', loggerCtx);
+        return savedFreePlan;
     }
 
     private async createSellerStockLocation(
@@ -299,23 +429,25 @@ export class SellerOnboardingService {
      * Llama a este método después de actualizar SELLER_ADMIN_PERMISSIONS para aplicar
      * los cambios a todos los vendedores existentes del canal
      */
-    public async syncAllSellerAdminPermissions(ctx: RequestContext): Promise<void> {
+    public async syncAllSellerAdminPermissionsForChannel(
+        ctx: RequestContext,
+        channelToken: string,
+    ): Promise<void> {
         const superAdminCtx = await this.getSuperAdminContext(ctx);
-        const currentChannelToken = ctx.channel.token;
 
         // Obtener todos los roles que son de vendedor (contienen '-admin')
         const roles = await this.roleService.findAll(superAdminCtx);
 
-        // Filtrar solo los roles de vendedor que pertenecen al canal actual
+        // Filtrar solo los roles de vendedor que pertenecen al canal indicado
         const sellerRoles = roles.items.filter(
             role =>
-                role.channels.some(channel => channel.token === currentChannelToken) &&
+                role.channels.some(channel => channel.token === channelToken) &&
                 role.code.includes('-admin'),
         );
 
         if (sellerRoles.length === 0) {
             Logger.info(
-                `No seller admin roles found to sync for channel: ${currentChannelToken}`,
+                `No seller admin roles found to sync for channel: ${channelToken}`,
                 loggerCtx,
             );
             return;
@@ -329,7 +461,7 @@ export class SellerOnboardingService {
                 });
 
                 Logger.info(
-                    `Updated permissions for seller admin role: ${role.code} on channel: ${currentChannelToken}`,
+                    `Updated permissions for seller admin role: ${role.code} on channel: ${channelToken}`,
                     loggerCtx,
                 );
             } catch (error) {
@@ -341,7 +473,7 @@ export class SellerOnboardingService {
         }
 
         Logger.info(
-            `Synced permissions for ${sellerRoles.length} seller admin roles on channel: ${currentChannelToken}`,
+            `Synced permissions for ${sellerRoles.length} seller admin roles on channel: ${channelToken}`,
             loggerCtx,
         );
     }
