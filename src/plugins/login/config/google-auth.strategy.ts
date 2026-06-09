@@ -6,14 +6,12 @@ import {
     TransactionalConnection,
     Logger,
 } from '@vendure/core';
+import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
 import { OAuth2Client } from 'google-auth-library';
 
-import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
-
 import { loggerCtx } from '../constants';
-import { SellerChannelSetupJobService } from '../services/seller-channel-setup-job.service';
 export interface GoogleAuthData {
     token: string;
 }
@@ -32,7 +30,6 @@ export class GoogleAdminAuthenticationStrategy
     readonly name = 'google';
     private client: OAuth2Client;
     private connection!: TransactionalConnection;
-    private sellerChannelSetupJobService!: SellerChannelSetupJobService;
     constructor(private clientId: string) {
         this.client = new OAuth2Client(clientId);
     }
@@ -47,7 +44,6 @@ export class GoogleAdminAuthenticationStrategy
 
     init(injector: Injector) {
         this.connection = injector.get(TransactionalConnection);
-        this.sellerChannelSetupJobService = injector.get(SellerChannelSetupJobService);
     }
 
     // Extrae el email del token de Google, Primero intenta como ID token
@@ -145,13 +141,6 @@ export class GoogleAdminAuthenticationStrategy
             // Nota: no sincronizamos por canal durante el login.
             // El canal activo del vendedor se determina en el frontend con localStorage
             // (vendure-selected-channel-token) y se sincroniza luego del login.
-            this.enqueueChannelSetupIfSeller(user).catch(err => {
-                Logger.error(
-                    `Failed to enqueue channel setup for seller: ${err instanceof Error ? err.message : err}`,
-                    loggerCtx,
-                );
-            });
-
 
             Logger.info(`Google auth successful for: ${email}`, loggerCtx);
             return user;
@@ -162,19 +151,5 @@ export class GoogleAdminAuthenticationStrategy
             );
             return false;
         }
-    }
-
-    private async enqueueChannelSetupIfSeller(user: User): Promise<void> {
-        const sellerRole = user.roles?.find(role => role.code.includes('-admin'));
-        if (!sellerRole) return;
-
-        const sellerChannel = sellerRole.channels?.[0];
-        if (!sellerChannel) return;
-
-        await this.sellerChannelSetupJobService.enqueue(sellerChannel.id);
-        Logger.info(
-            `Enqueued channel setup job for seller: ${user.identifier} (channel: ${sellerChannel.id})`,
-            loggerCtx,
-        );
     }
 }
