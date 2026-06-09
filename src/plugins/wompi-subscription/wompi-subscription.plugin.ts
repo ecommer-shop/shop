@@ -33,6 +33,7 @@ import { ProductTranslationSubscriber } from './subscribers/product-translation.
         SubscriptionResolver,
         WompiResolver,
         FixTranslationsResolver,
+        // ProductLimitResolver,
         FeatureGuard,
         ProductLimitGuard,
         ProductVariationLimitGuard,
@@ -55,7 +56,7 @@ import { ProductTranslationSubscriber } from './subscribers/product-translation.
         PlanGuard,
     ],
 })
-export class WompiSubscriptionModule {}
+export class WompiSubscriptionModule { }
 
 @VendurePlugin({
     imports: [PluginCommonModule, WompiSubscriptionModule],
