@@ -5,4 +5,3 @@ export * from './plan.resolver';
 export * from './subscription.resolver';
 export * from './wompi.resolver';
 export * from './fix-translations.resolver';
-export * from './product-limit.resolver';
