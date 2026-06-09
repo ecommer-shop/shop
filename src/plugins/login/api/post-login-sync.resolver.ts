@@ -22,7 +22,6 @@ export class PostLoginSyncResolver {
                 args.channelToken,
             );
 
-            console.log('Seller channel permissions synchronized successfully after login');
             return true;
         } catch (e) {
             Logger.error(
