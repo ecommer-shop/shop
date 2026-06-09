@@ -7,6 +7,7 @@ import { GoogleAuthService } from './services/google-auth.service';
 import { GoogleTokenVerificationService } from './services/google-token-verification.service';
 import { SellerOnboardingService } from './services/seller-onboarding.service';
 import { DeleteSellerAccountService } from './services/delete-seller-account.service';
+import { SellerChannelSetupJobService } from './services/seller-channel-setup-job.service';
 import { LoginResolver } from './api/login.resolver';
 import { adminApiExtensions } from './api/api-extensions';
 import { PostLoginSyncResolver } from './api/post-login-sync.resolver';
@@ -22,6 +23,7 @@ import { DeleteAccountResolver } from './api/delete-account.resolver';
         GoogleTokenVerificationService,
         SellerOnboardingService,
         DeleteSellerAccountService,
+        SellerChannelSetupJobService,
     ],
     adminApiExtensions: {
         schema: adminApiExtensions,

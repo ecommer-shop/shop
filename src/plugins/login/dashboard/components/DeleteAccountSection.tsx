@@ -23,7 +23,7 @@ export function DeleteAccountSection() {
                                 activeAdministrator {
                                     roles {
                                         channels {
-                                            name
+                                            code
                                         }
                                     }
                                 }
@@ -35,8 +35,8 @@ export function DeleteAccountSection() {
                 const roles = json?.data?.activeAdministrator?.roles ?? [];
                 for (const role of roles) {
                     for (const ch of role.channels ?? []) {
-                        if (ch.name) {
-                            setChannelName(ch.name);
+                        if (ch.code) {
+                            setChannelName(ch.code);
                             return;
                         }
                     }
@@ -50,8 +50,8 @@ export function DeleteAccountSection() {
         fetchChannelName();
     }, []);
 
-    const expectedText = channelName ? `Eliminar ${channelName}` : '';
-    const canDelete = confirmationInput === expectedText && !deleting;
+    const expectedText = channelName ? `Eliminar ${channelName}` : 'ELIMINAR';
+    const canDelete = confirmationInput === expectedText && !deleting && !loading;
 
     const handleDelete = async () => {
         if (!canDelete) return;
@@ -87,8 +87,6 @@ export function DeleteAccountSection() {
         }
     };
 
-    if (loading) return null;
-
     return (
         <div className="border border-destructive/30 rounded-lg p-6 space-y-4">
             <h3 className="text-lg font-semibold text-destructive">
@@ -104,20 +102,19 @@ export function DeleteAccountSection() {
                 <li>Tus datos personales serán anonimizados</li>
                 <li>No podrás recuperar tu cuenta</li>
             </ul>
-            {channelName && (
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                        Escribe <span className="font-bold text-destructive">{expectedText}</span> para confirmar:
-                    </label>
-                    <input
-                        type="text"
-                        value={confirmationInput}
-                        onChange={e => setConfirmationInput(e.target.value)}
-                        placeholder={expectedText}
-                        className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                </div>
-            )}
+            <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                    Escribe <span className="font-bold text-destructive">{expectedText}</span> para confirmar:
+                </label>
+                <input
+                    type="text"
+                    value={confirmationInput}
+                    onChange={e => setConfirmationInput(e.target.value)}
+                    placeholder={expectedText}
+                    disabled={loading}
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                />
+            </div>
             <button
                 disabled={!canDelete}
                 onClick={handleDelete}

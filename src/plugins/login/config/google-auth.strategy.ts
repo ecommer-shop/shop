@@ -1,23 +1,19 @@
 import {
     AuthenticationStrategy,
-    ChannelService,
-    Facet,
-    FacetService,
-    FacetValue,
     Injector,
     RequestContext,
     User,
     TransactionalConnection,
     Logger,
-    RoleService,
 } from '@vendure/core';
-import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
 import { OAuth2Client } from 'google-auth-library';
 
+import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
+
 import { loggerCtx } from '../constants';
-import { SellerOnboardingService } from '../services/seller-onboarding.service';
+import { SellerChannelSetupJobService } from '../services/seller-channel-setup-job.service';
 export interface GoogleAuthData {
     token: string;
 }
@@ -36,10 +32,7 @@ export class GoogleAdminAuthenticationStrategy
     readonly name = 'google';
     private client: OAuth2Client;
     private connection!: TransactionalConnection;
-    private sellerOnboardingService!: SellerOnboardingService;
-    private facetService!: FacetService;
-    private channelService!: ChannelService;
-    private roleService!: RoleService;
+    private sellerChannelSetupJobService!: SellerChannelSetupJobService;
     constructor(private clientId: string) {
         this.client = new OAuth2Client(clientId);
     }
@@ -54,10 +47,7 @@ export class GoogleAdminAuthenticationStrategy
 
     init(injector: Injector) {
         this.connection = injector.get(TransactionalConnection);
-        this.sellerOnboardingService = injector.get(SellerOnboardingService);
-        this.facetService = injector.get(FacetService);
-        this.channelService = injector.get(ChannelService);
-        this.roleService = injector.get(RoleService);
+        this.sellerChannelSetupJobService = injector.get(SellerChannelSetupJobService);
     }
 
     // Extrae el email del token de Google, Primero intenta como ID token
@@ -155,9 +145,9 @@ export class GoogleAdminAuthenticationStrategy
             // Nota: no sincronizamos por canal durante el login.
             // El canal activo del vendedor se determina en el frontend con localStorage
             // (vendure-selected-channel-token) y se sincroniza luego del login.
-            await this.assignFacetsIfSeller(ctx, user).catch(err => {
+            this.enqueueChannelSetupIfSeller(user).catch(err => {
                 Logger.error(
-                    `Failed to assign facets to seller channel: ${err instanceof Error ? err.message : err}`,
+                    `Failed to enqueue channel setup for seller: ${err instanceof Error ? err.message : err}`,
                     loggerCtx,
                 );
             });
@@ -174,42 +164,16 @@ export class GoogleAdminAuthenticationStrategy
         }
     }
 
-    private async assignFacetsIfSeller(
-        ctx: RequestContext,
-        user: User,
-        sellerChannelToken?: string,
-    ): Promise<void> {
-        // Verificar si el usuario tiene un rol de vendedor (contiene '-admin')
+    private async enqueueChannelSetupIfSeller(user: User): Promise<void> {
         const sellerRole = user.roles?.find(role => role.code.includes('-admin'));
-        if (!sellerRole) {
-            return; // No es vendedor
-        }
+        if (!sellerRole) return;
 
-        // Obtener el canal del vendedor
-        const sellerChannel = sellerChannelToken
-            ? sellerRole.channels?.find(c => c.token === sellerChannelToken)
-            : sellerRole.channels?.[0];
-        if (!sellerChannel) {
-            return;
-        }
+        const sellerChannel = sellerRole.channels?.[0];
+        if (!sellerChannel) return;
 
-        // Asignar facetas y sus valores al canal del vendedor
-        const { items: facets } = await this.facetService.findAll(ctx, { take: 1000 });
-        for (const facet of facets) {
-            await this.channelService.assignToChannels(ctx, Facet, facet.id, [
-                sellerChannel.id,
-            ]);
-
-            // Asignar también los valores de la faceta
-            for (const facetValue of facet.values) {
-                await this.channelService.assignToChannels(ctx, FacetValue, facetValue.id, [
-                    sellerChannel.id,
-                ]);
-            }
-        }
-
+        await this.sellerChannelSetupJobService.enqueue(sellerChannel.id);
         Logger.info(
-            `Facetas asignadas al canal del vendedor en login: ${user.identifier}`,
+            `Enqueued channel setup job for seller: ${user.identifier} (channel: ${sellerChannel.id})`,
             loggerCtx,
         );
     }

@@ -6,12 +6,7 @@ import {
     AdministratorService,
     Channel,
     ChannelService,
-    Collection,
-    CollectionService,
     ConfigService,
-    Facet,
-    FacetService,
-    FacetValue,
     InternalServerError,
     isGraphQlErrorResult,
     Logger,
@@ -25,6 +20,7 @@ import {
     TransactionalConnection,
     User,
 } from '@vendure/core';
+import { SellerChannelSetupJobService } from './seller-channel-setup-job.service';
 import crypto from 'crypto';
 
 import { loggerCtx, SELLER_ADMIN_PERMISSIONS } from '../constants';
@@ -49,10 +45,9 @@ export class SellerOnboardingService {
         private channelService: ChannelService,
         private configService: ConfigService,
         private stockLocationService: StockLocationService,
-        private facetService: FacetService,
-        private collectionService: CollectionService,
         private requestContextService: RequestContextService,
         private connection: TransactionalConnection,
+        private sellerChannelSetupJobService: SellerChannelSetupJobService,
     ) { }
 
     async registerSeller(
@@ -129,12 +124,9 @@ export class SellerOnboardingService {
             return ch;
         });
 
-        // Fire-and-forget: facets and collections (slow, non-critical)
-        this.assignFacetsToSellerChannel(superAdminCtx, channel).catch((err: Error) => {
-            Logger.error(`Failed to assign facets: ${err.message}`, loggerCtx);
-        });
-        this.assignCollectionsToSellerChannel(superAdminCtx, channel).catch((err: Error) => {
-            Logger.error(`Failed to assign collections: ${err.message}`, loggerCtx);
+        // Enqueue facet/collection assignment via JobQueue (idempotent, non-blocking)
+        this.sellerChannelSetupJobService.enqueue(channel.id).catch((err: Error) => {
+            Logger.error(`Failed to enqueue channel setup job: ${err.message}`, loggerCtx);
         });
 
         return { success: true, email: input.emailAddress };
@@ -390,31 +382,6 @@ export class SellerOnboardingService {
         await this.channelService.assignToChannels(ctx, StockLocation, stockLocation.id, [
             sellerChannel.id,
         ]);
-    }
-
-    private async assignFacetsToSellerChannel(
-        ctx: RequestContext,
-        sellerChannel: Channel,
-    ) {
-        const { items: facets } = await this.facetService.findAll(ctx, { take: 1000 });
-        for (const facet of facets) {
-            await this.channelService.assignToChannels(ctx, Facet, facet.id, [sellerChannel.id]);
-
-            for (const facetValue of facet.values) {
-                await this.channelService.assignToChannels(ctx, FacetValue, facetValue.id, [sellerChannel.id]);
-                console.log(`Assigned facet value ${facetValue.id} to channel ${sellerChannel.id}`);
-            }
-        }
-    }
-
-    private async assignCollectionsToSellerChannel(
-        ctx: RequestContext,
-        sellerChannel: Channel,
-    ) {
-        const { items: collections } = await this.collectionService.findAll(ctx, { take: 1000 });
-        for (const collection of collections) {
-            await this.channelService.assignToChannels(ctx, Collection, collection.id, [sellerChannel.id]);
-        }
     }
 
     private async getSuperAdminContext(ctx: RequestContext): Promise<RequestContext> {

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
     Administrator,
+    Channel,
     Logger,
     Product,
     ProductVariant,
@@ -28,6 +29,7 @@ export class DeleteSellerAccountService {
         const adminRepo = this.connection.getRepository(ctx, Administrator);
         const userRepo = this.connection.getRepository(ctx, User);
         const sellerRepo = this.connection.getRepository(ctx, Seller);
+        const channelRepo = this.connection.getRepository(ctx, Channel);
         const productRepo = this.connection.getRepository(ctx, Product);
         const subRepo = this.connection.getRepository(ctx, CustomerSubscription);
 
@@ -120,7 +122,24 @@ export class DeleteSellerAccountService {
             Logger.info(`Seller ${seller.id} anonimizado y marcado como eliminado`, LOG_CTX);
         }
 
-        // 4. Anonimizar y soft-delete del User
+        // 4. Renombrar canal para liberar código y token originales
+        const originalCode = sellerChannel.code;
+        let newCode = `${originalCode}-deleted`;
+        let counter = 1;
+        while (await channelRepo.findOne({ where: { code: newCode } })) {
+            counter++;
+            newCode = `${originalCode}-deleted-${counter}`;
+        }
+        sellerChannel.code = newCode;
+        sellerChannel.token = `${newCode}-token`;
+        sellerChannel.description = `Deleted channel (formerly ${originalCode})`;
+        await channelRepo.save(sellerChannel);
+        Logger.info(
+            `Canal renombrado de "${originalCode}" a "${newCode}" para liberar el código original`,
+            LOG_CTX,
+        );
+
+        // 5. Anonimizar y soft-delete del User
         if (admin.user) {
             const user = admin.user;
             user.identifier = `deleted_${user.id}@deleted.invalid`;
@@ -129,7 +148,7 @@ export class DeleteSellerAccountService {
             Logger.info(`User ${user.id} anonimizado y marcado como eliminado`, LOG_CTX);
         }
 
-        // 5. Anonimizar y soft-delete del Administrator
+        // 6. Anonimizar y soft-delete del Administrator
         admin.firstName = 'Deleted';
         admin.lastName = 'User';
         admin.emailAddress = `deleted_${admin.id}@deleted.invalid`;
