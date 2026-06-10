@@ -309,14 +309,14 @@ export function SellerRegistrationForm({
                             className="mt-0.5 h-4 w-4 shrink-0 rounded border border-input accent-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                         <label htmlFor="acceptTerms" className="text-xs text-muted-foreground leading-snug cursor-pointer select-none">
-                            He leido y acepto los{' '}
+                            He leído y acepto los{' '}
                             <a
                                 href={TERMS_URL}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-primary underline hover:text-primary/80"
                             >
-                                Terminos y Condiciones
+                                Términos y Condiciones
                             </a>{' '}
                             y la{' '}
                             <a
@@ -325,7 +325,7 @@ export function SellerRegistrationForm({
                                 rel="noopener noreferrer"
                                 className="text-primary underline hover:text-primary/80"
                             >
-                                Politica de Privacidad
+                                Política de Privacidad
                             </a>
                             , y confirmo que soy mayor de edad.
                         </label>
