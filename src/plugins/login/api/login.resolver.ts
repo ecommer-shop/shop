@@ -23,6 +23,11 @@ export class LoginResolver {
                 process.env.GOOGLE_OAUTH_CLIENT_ID ||
                 process.env.VITE_GOOGLE_OAUTH_CLIENT_ID ||
                 '',
+            googleMapsApiKey:
+                LoginPlugin.options?.googleMapsApiKey ||
+                process.env.GOOGLE_MAPS_API_KEY ||
+                process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+                '',
             defaultChannelToken: defaultChannel.token,
         };
     }
