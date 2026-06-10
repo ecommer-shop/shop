@@ -92,7 +92,7 @@ export function SellerRegistrationForm({
 
             if (!address || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
                 setPickupSelection(null);
-                setError('Selecciona una direccion valida desde Google Maps.');
+                setError('Selecciona una dirección válida desde Google Maps.');
                 return;
             }
 
@@ -158,7 +158,7 @@ export function SellerRegistrationForm({
         }
 
         if (!hasPickupCoordinates || !pickupSelection) {
-            setError('Selecciona una direccion de recogida desde Google Maps para guardar sus coordenadas.');
+            setError('Selecciona una dirección de recogida desde Google Maps para guardar sus coordenadas.');
             return;
         }
 
@@ -204,14 +204,14 @@ export function SellerRegistrationForm({
             const data = result.data?.registerSellerWithGoogle;
             if (data?.success) {
                 setSuccess(
-                    `Registro exitoso. Se creo tu tienda "${shopName}" con el email ${data.email}. Iniciando sesion automaticamente...`,
+                    `Registro exitoso. Se creó tu tienda "${shopName}" con el email ${data.email}. Iniciando sesión automáticamente...`,
                 );
                 await onRegistered(data.email, idToken);
             } else {
                 setError('Error inesperado en el registro');
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Error de conexion');
+            setError(err instanceof Error ? err.message : 'Error de conexión');
         } finally {
             setLoading(false);
         }
@@ -264,7 +264,7 @@ export function SellerRegistrationForm({
                             htmlFor="pickupAddress"
                             className="text-sm font-medium text-foreground"
                         >
-                            Direccion de recogida *
+                            Dirección de recogida *
                         </label>
                         <input
                             ref={pickupInputRef}
@@ -272,7 +272,7 @@ export function SellerRegistrationForm({
                             type="text"
                             value={pickupAddress}
                             onChange={e => handlePickupInputChange(e.target.value)}
-                            placeholder="Busca la direccion de tu tienda"
+                            placeholder="Busca la dirección de tu tienda"
                             disabled={loading || !googleMapsApiKey}
                             className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                         />
@@ -288,7 +288,7 @@ export function SellerRegistrationForm({
                         )}
                         {hasPickupCoordinates && pickupSelection && (
                             <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-                                <p className="font-medium">Direccion seleccionada desde Google Maps</p>
+                                <p className="font-medium">Dirección seleccionada desde Google Maps</p>
                                 <p className="mt-1 text-xs">
                                     {pickupSelection.neighborhood && (
                                         <span>Barrio: {pickupSelection.neighborhood}. </span>

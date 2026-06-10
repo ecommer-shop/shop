@@ -10,7 +10,7 @@ export const adminApiExtensions = gql`
         """
         googleOAuthClientId: String!
         """
-        Google Maps JavaScript API key usado para seleccionar direccion de recogida.
+        Google Maps JavaScript API key usado para seleccionar dirección de recogida.
         """
         googleMapsApiKey: String!
         """
@@ -35,27 +35,27 @@ export const adminApiExtensions = gql`
         shopName: String!
 
         """
-        Direccion de recogida de la tienda seleccionada desde Google Maps.
+        Dirección de recogida de la tienda seleccionada desde Google Maps.
         """
         pickupAddress: String!
 
         """
-        Latitud de la direccion de recogida.
+        Latitud de la dirección de recogida.
         """
         pickupLatitude: Float!
 
         """
-        Longitud de la direccion de recogida.
+        Longitud de la dirección de recogida.
         """
         pickupLongitude: Float!
 
         """
-        Barrio o sector detectado para la direccion de recogida.
+        Barrio o sector detectado para la dirección de recogida.
         """
         pickupNeighborhood: String
 
         """
-        Google Place ID de la direccion de recogida.
+        Google Place ID de la dirección de recogida.
         """
         pickupGooglePlaceId: String
     }

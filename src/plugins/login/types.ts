@@ -10,7 +10,7 @@ export interface PluginInitOptions {
     googleOAuthClientId: string;
     /**
      * Google Maps JavaScript API key. Se usa en el formulario de registro
-     * del vendedor para seleccionar la direccion de recogida.
+     * del vendedor para seleccionar la dirección de recogida.
      */
     googleMapsApiKey?: string;
 }
