@@ -1,5 +1,5 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, Logger, Permission, RequestContext, Transaction, ChannelService } from '@vendure/core';
+import { Allow, Ctx, Logger, Permission, RequestContext, ChannelService } from '@vendure/core';
 
 import { GoogleAuthService } from '../services/google-auth.service';
 import { loggerCtx } from '../constants';
@@ -28,7 +28,6 @@ export class LoginResolver {
     }
 
     @Mutation()
-    @Transaction()
     @Allow(Permission.Public)
     async registerSellerWithGoogle(
         @Ctx() ctx: RequestContext,

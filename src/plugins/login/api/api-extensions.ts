@@ -54,6 +54,14 @@ export const adminApiExtensions = gql`
         loginConfig: LoginConfig!
     }
 
+    """
+    Resultado de eliminar la cuenta del seller.
+    """
+    type DeleteSellerAccountResult {
+        success: Boolean!
+        message: String!
+    }
+
     extend type Mutation {
         """
         Registra un nuevo vendedor usando autenticación de Google.
@@ -70,5 +78,13 @@ export const adminApiExtensions = gql`
         sobre su canal correspondiente.
         """
         syncSellerChannelAfterLogin: SyncSellerChannelResult!
+
+        """
+        Elimina permanentemente la cuenta del seller autenticado.
+        Realiza un soft-delete anonimizando los datos del Administrator,
+        User y Seller. También deshabilita los productos del seller
+        y cancela la suscripción activa.
+        """
+        deleteSellerAccount: DeleteSellerAccountResult!
     }
 `;

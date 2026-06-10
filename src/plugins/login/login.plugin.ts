@@ -6,10 +6,13 @@ import { GoogleAdminAuthenticationStrategy } from './config/google-auth.strategy
 import { GoogleAuthService } from './services/google-auth.service';
 import { GoogleTokenVerificationService } from './services/google-token-verification.service';
 import { SellerOnboardingService } from './services/seller-onboarding.service';
+import { DeleteSellerAccountService } from './services/delete-seller-account.service';
+import { SellerChannelSetupJobService } from './services/seller-channel-setup-job.service';
 import { LoginResolver } from './api/login.resolver';
 import { adminApiExtensions } from './api/api-extensions';
 import { PostLoginSyncResolver } from './api/post-login-sync.resolver';
 import { postLoginSyncGraphql } from './api/post-login-sync.resolver';
+import { DeleteAccountResolver } from './api/delete-account.resolver';
 
 @VendurePlugin({
 
@@ -19,10 +22,12 @@ import { postLoginSyncGraphql } from './api/post-login-sync.resolver';
         GoogleAuthService,
         GoogleTokenVerificationService,
         SellerOnboardingService,
+        DeleteSellerAccountService,
+        SellerChannelSetupJobService,
     ],
     adminApiExtensions: {
         schema: adminApiExtensions,
-        resolvers: [LoginResolver, PostLoginSyncResolver],
+        resolvers: [LoginResolver, PostLoginSyncResolver, DeleteAccountResolver],
     },
 
     configuration: config => {
