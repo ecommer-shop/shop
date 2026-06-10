@@ -23,7 +23,7 @@ export const SELLER_ADMIN_PERMISSIONS: Permission[] = [
     Permission.ReadPromotion,
     //Permission.ReadCountry,
     //Permission.ReadZone,
-    //Permission.ReadChannel,
+    Permission.ReadChannel,
     Permission.CreateAsset,
     Permission.ReadAsset,
     Permission.UpdateAsset,
