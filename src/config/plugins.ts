@@ -185,6 +185,10 @@ export const plugins: VendureConfig['plugins'] = [
 
   LoginPlugin.init({
     googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
+    googleMapsApiKey:
+      process.env.GOOGLE_MAPS_API_KEY ||
+      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+      '',
   }),
 
   ProductVariantEnforcementPlugin,
