@@ -40,6 +40,14 @@ import {
 } from '../../wompi-subscription/entities';
 import { FEATURE_CODES, DEFAULT_PLAN_NAMES } from '../../wompi-subscription/constants';
 
+type StorePickupCustomFields = {
+    storePickupAddress: string;
+    storePickupLatitude: number;
+    storePickupLongitude: number;
+    storePickupNeighborhood?: string | null;
+    storePickupGooglePlaceId?: string | null;
+};
+
 @Injectable()
 export class SellerOnboardingService {
     constructor(
@@ -55,10 +63,32 @@ export class SellerOnboardingService {
         private connection: TransactionalConnection,
     ) { }
 
+    private buildStorePickupCustomFields(input: SellerOnboardingInput): StorePickupCustomFields {
+        return {
+            storePickupAddress: input.pickupAddress.trim(),
+            storePickupLatitude: input.pickupLatitude,
+            storePickupLongitude: input.pickupLongitude,
+            storePickupNeighborhood: input.pickupNeighborhood?.trim() || null,
+            storePickupGooglePlaceId: input.pickupGooglePlaceId?.trim() || null,
+        };
+    }
+
+    private assertValidPickupAddress(input: SellerOnboardingInput): void {
+        if (!input.pickupAddress?.trim()) {
+            throw new Error('Selecciona una direccion de recogida para tu tienda');
+        }
+
+        if (!Number.isFinite(input.pickupLatitude) || !Number.isFinite(input.pickupLongitude)) {
+            throw new Error('La direccion de recogida debe tener coordenadas de Google Maps');
+        }
+    }
+
     async registerSeller(
         ctx: RequestContext,
         input: SellerOnboardingInput,
     ): Promise<GoogleSellerRegistrationResult> {
+        this.assertValidPickupAddress(input);
+
         const existingUser = await this.connection
             .getRepository(ctx, User)
             .createQueryBuilder('user')
@@ -110,6 +140,7 @@ export class SellerOnboardingService {
         const channel = await this.connection.withTransaction(superAdminCtx, async (txCtx) => {
             const ch = await this.createSellerChannelRoleAdmin(txCtx, {
                 shopName: input.shopName,
+                pickupCustomFields: this.buildStorePickupCustomFields(input),
                 seller: {
                     firstName: input.firstName,
                     lastName: input.lastName,
@@ -140,6 +171,7 @@ export class SellerOnboardingService {
         ctx: RequestContext,
         input: {
             shopName: string;
+            pickupCustomFields: StorePickupCustomFields;
             seller: {
                 firstName: string;
                 lastName: string;
@@ -192,6 +224,7 @@ export class SellerOnboardingService {
                 existingUser,
                 role.id.toString(),
                 input.seller,
+                input.pickupCustomFields,
             );
         } else {
             await this.administratorService.create(ctx, {
@@ -200,6 +233,7 @@ export class SellerOnboardingService {
                 emailAddress: input.seller.emailAddress,
                 password: input.seller.password,
                 roleIds: [role.id],
+                customFields: input.pickupCustomFields,
             });
         }
 
@@ -215,7 +249,9 @@ export class SellerOnboardingService {
             lastName: string;
             emailAddress: string;
         },
+        pickupCustomFields: StorePickupCustomFields,
     ) {
+        const administratorRepository = this.connection.getRepository(ctx, Administrator);
         const existingAdministrator = await this.administratorService.findOneByUserId(
             ctx,
             existingUser.id,
@@ -223,6 +259,11 @@ export class SellerOnboardingService {
 
         if (existingAdministrator) {
             await this.administratorService.assignRole(ctx, existingAdministrator.id, roleId);
+            existingAdministrator.customFields = {
+                ...(existingAdministrator.customFields as Record<string, unknown> | undefined),
+                ...pickupCustomFields,
+            };
+            await administratorRepository.save(existingAdministrator);
             return;
         }
 
@@ -246,12 +287,12 @@ export class SellerOnboardingService {
             await userRepository.save(reloadedUser);
         }
 
-        const administratorRepository = this.connection.getRepository(ctx, Administrator);
         const administrator = administratorRepository.create({
             firstName: seller.firstName,
             lastName: seller.lastName,
             emailAddress: seller.emailAddress,
             user: reloadedUser,
+            customFields: pickupCustomFields,
         });
         await administratorRepository.save(administrator);
     }

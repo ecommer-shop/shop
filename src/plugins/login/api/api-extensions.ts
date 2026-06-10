@@ -10,6 +10,10 @@ export const adminApiExtensions = gql`
         """
         googleOAuthClientId: String!
         """
+        Google Maps JavaScript API key usado para seleccionar direccion de recogida.
+        """
+        googleMapsApiKey: String!
+        """
         Código del canal por defecto. El superadmin debe usar este canal
         para evitar problemas de filtrado de productos.
         """
@@ -29,6 +33,31 @@ export const adminApiExtensions = gql`
         Nombre de la tienda del vendedor.
         """
         shopName: String!
+
+        """
+        Direccion de recogida de la tienda seleccionada desde Google Maps.
+        """
+        pickupAddress: String!
+
+        """
+        Latitud de la direccion de recogida.
+        """
+        pickupLatitude: Float!
+
+        """
+        Longitud de la direccion de recogida.
+        """
+        pickupLongitude: Float!
+
+        """
+        Barrio o sector detectado para la direccion de recogida.
+        """
+        pickupNeighborhood: String
+
+        """
+        Google Place ID de la direccion de recogida.
+        """
+        pickupGooglePlaceId: String
     }
 
     """
