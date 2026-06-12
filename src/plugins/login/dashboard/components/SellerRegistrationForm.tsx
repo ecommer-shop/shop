@@ -55,6 +55,9 @@ export function SellerRegistrationForm({
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const pickupInputRef = useRef<HTMLInputElement | null>(null);
+    const pickupMapContainerRef = useRef<HTMLDivElement | null>(null);
+    const pickupMapRef = useRef<any>(null);
+    const pickupMarkerRef = useRef<any>(null);
     const autocompleteRef = useRef<any>(null);
 
     const TERMS_URL = 'https://ecommer-stg-product-images.s3.us-east-2.amazonaws.com/TemsAndConds.pdf';
@@ -144,6 +147,48 @@ export function SellerRegistrationForm({
             script?.removeEventListener('load', initializeAutocomplete);
         };
     }, [googleMapsApiKey, initializeAutocomplete]);
+
+    useEffect(() => {
+        if (!hasPickupCoordinates || !pickupSelection) {
+            pickupMarkerRef.current?.setMap?.(null);
+            pickupMarkerRef.current = null;
+            pickupMapRef.current = null;
+            return;
+        }
+
+        const maps = (window as any).google?.maps;
+        const container = pickupMapContainerRef.current;
+        if (!maps || !container) {
+            return;
+        }
+
+        const position = {
+            lat: pickupSelection.latitude,
+            lng: pickupSelection.longitude,
+        };
+
+        if (!pickupMapRef.current) {
+            pickupMapRef.current = new maps.Map(container, {
+                center: position,
+                zoom: 17,
+                clickableIcons: false,
+                fullscreenControl: false,
+                mapTypeControl: false,
+                streetViewControl: false,
+                gestureHandling: 'cooperative',
+            });
+        } else {
+            pickupMapRef.current.setCenter(position);
+            pickupMapRef.current.setZoom(17);
+        }
+
+        pickupMarkerRef.current?.setMap?.(null);
+        pickupMarkerRef.current = new maps.Marker({
+            map: pickupMapRef.current,
+            position,
+            title: pickupSelection.address,
+        });
+    }, [hasPickupCoordinates, pickupSelection]);
 
     const handlePickupInputChange = (value: string) => {
         setPickupAddress(value);
@@ -289,12 +334,28 @@ export function SellerRegistrationForm({
                         {hasPickupCoordinates && pickupSelection && (
                             <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
                                 <p className="font-medium">Dirección seleccionada desde Google Maps</p>
+                                <p className="mt-1 text-xs text-green-900">
+                                    {pickupSelection.address}
+                                </p>
                                 <p className="mt-1 text-xs">
                                     {pickupSelection.neighborhood && (
                                         <span>Barrio: {pickupSelection.neighborhood}. </span>
                                     )}
                                     Coordenadas: {pickupSelection.latitude.toFixed(6)}, {pickupSelection.longitude.toFixed(6)}
                                 </p>
+                                <div
+                                    ref={pickupMapContainerRef}
+                                    className="mt-3 h-40 w-full overflow-hidden rounded-md border border-green-200 bg-white"
+                                    aria-label="Mapa de la dirección de recogida"
+                                />
+                                <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${pickupSelection.latitude},${pickupSelection.longitude}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-2 inline-flex text-xs font-medium text-green-700 underline underline-offset-2 hover:text-green-900"
+                                >
+                                    Ver en Google Maps
+                                </a>
                             </div>
                         )}
                     </div>
