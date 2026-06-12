@@ -27,6 +27,11 @@ export class GoogleAuthService {
             emailAddress: email,
             firstName,
             lastName,
+            pickupAddress: input.pickupAddress,
+            pickupLatitude: input.pickupLatitude,
+            pickupLongitude: input.pickupLongitude,
+            pickupNeighborhood: input.pickupNeighborhood ?? null,
+            pickupGooglePlaceId: input.pickupGooglePlaceId ?? null,
         });
     }
 }

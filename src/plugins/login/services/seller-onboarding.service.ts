@@ -29,6 +29,24 @@ import crypto from 'crypto';
 
 import { loggerCtx, SELLER_ADMIN_PERMISSIONS } from '../constants';
 import { GoogleSellerRegistrationResult, SellerOnboardingInput } from '../types';
+import {
+    CustomerSubscription,
+    Plan,
+    BillingInterval,
+    Feature,
+    FeatureType,
+    PlanFeature,
+    SubscriptionStatus,
+} from '../../wompi-subscription/entities';
+import { FEATURE_CODES, DEFAULT_PLAN_NAMES } from '../../wompi-subscription/constants';
+
+type StorePickupCustomFields = {
+    storePickupAddress: string;
+    storePickupLatitude: number;
+    storePickupLongitude: number;
+    storePickupNeighborhood?: string | null;
+    storePickupGooglePlaceId?: string | null;
+};
 
 @Injectable()
 export class SellerOnboardingService {
@@ -45,10 +63,32 @@ export class SellerOnboardingService {
         private connection: TransactionalConnection,
     ) { }
 
+    private buildStorePickupCustomFields(input: SellerOnboardingInput): StorePickupCustomFields {
+        return {
+            storePickupAddress: input.pickupAddress.trim(),
+            storePickupLatitude: input.pickupLatitude,
+            storePickupLongitude: input.pickupLongitude,
+            storePickupNeighborhood: input.pickupNeighborhood?.trim() || null,
+            storePickupGooglePlaceId: input.pickupGooglePlaceId?.trim() || null,
+        };
+    }
+
+    private assertValidPickupAddress(input: SellerOnboardingInput): void {
+        if (!input.pickupAddress?.trim()) {
+            throw new Error('Selecciona una dirección de recogida para tu tienda');
+        }
+
+        if (!Number.isFinite(input.pickupLatitude) || !Number.isFinite(input.pickupLongitude)) {
+            throw new Error('La dirección de recogida debe tener coordenadas de Google Maps');
+        }
+    }
+
     async registerSeller(
         ctx: RequestContext,
         input: SellerOnboardingInput,
     ): Promise<GoogleSellerRegistrationResult> {
+        this.assertValidPickupAddress(input);
+
         const existingUser = await this.connection
             .getRepository(ctx, User)
             .createQueryBuilder('user')
@@ -69,24 +109,60 @@ export class SellerOnboardingService {
         }
 
         const superAdminCtx = await this.getSuperAdminContext(ctx);
-        const channel = await this.createSellerChannelRoleAdmin(superAdminCtx, {
-            shopName: input.shopName,
-            seller: {
-                firstName: input.firstName,
-                lastName: input.lastName,
-                emailAddress: input.emailAddress,
-                password: this.generateSecurePassword(),
-            },
-        }, existingUser ?? undefined);
 
-        await this.createSellerStockLocation(superAdminCtx, input.shopName, channel);
+        // Idempotency: check if Channel already exists from a previous partial registration
+        const shopCode = normalizeString(input.shopName, '-');
+        const channelRepo = this.connection.getRepository(superAdminCtx, Channel);
+        const existingChannel = await channelRepo.findOne({ where: { code: shopCode } });
+        if (existingChannel) {
+            const adminUser = await this.connection
+                .getRepository(superAdminCtx, User)
+                .findOne({ where: { identifier: input.emailAddress } });
+            if (adminUser) {
+                const existingAdmin = await this.administratorService.findOneByUserId(
+                    superAdminCtx,
+                    adminUser.id,
+                );
+                if (existingAdmin) {
+                    Logger.info(
+                        `Seller already registered (idempotent): ${input.emailAddress}`,
+                        loggerCtx,
+                    );
+                    return { success: true, email: input.emailAddress };
+                }
+            }
+            throw new InternalServerError(
+                `Ya existe un canal para "${input.shopName}" pero no se completó el registro. Contacta a soporte.`,
+            );
+        }
+
+        // Only critical operations inside the transaction
+        const channel = await this.connection.withTransaction(superAdminCtx, async (txCtx) => {
+            const ch = await this.createSellerChannelRoleAdmin(txCtx, {
+                shopName: input.shopName,
+                pickupCustomFields: this.buildStorePickupCustomFields(input),
+                seller: {
+                    firstName: input.firstName,
+                    lastName: input.lastName,
+                    emailAddress: input.emailAddress,
+                    password: this.generateSecurePassword(),
+                },
+            }, existingUser ?? undefined);
+
+            await this.createSellerStockLocation(txCtx, input.shopName, ch);
+            await this.assignFreePlanToSeller(txCtx, input);
+
+            Logger.info(
+                `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
+                loggerCtx,
+            );
+
+            return ch;
+        });
+
+        // Asignar facetas y colecciones (optimizado con Promise.all)
         await this.assignFacetsToSellerChannel(superAdminCtx, channel);
         await this.assignCollectionsToSellerChannel(superAdminCtx, channel);
-
-        Logger.info(
-            `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
-            loggerCtx,
-        );
 
         return { success: true, email: input.emailAddress };
     }
@@ -95,6 +171,7 @@ export class SellerOnboardingService {
         ctx: RequestContext,
         input: {
             shopName: string;
+            pickupCustomFields: StorePickupCustomFields;
             seller: {
                 firstName: string;
                 lastName: string;
@@ -147,6 +224,7 @@ export class SellerOnboardingService {
                 existingUser,
                 role.id.toString(),
                 input.seller,
+                input.pickupCustomFields,
             );
         } else {
             await this.administratorService.create(ctx, {
@@ -155,6 +233,7 @@ export class SellerOnboardingService {
                 emailAddress: input.seller.emailAddress,
                 password: input.seller.password,
                 roleIds: [role.id],
+                customFields: input.pickupCustomFields,
             });
         }
 
@@ -170,7 +249,9 @@ export class SellerOnboardingService {
             lastName: string;
             emailAddress: string;
         },
+        pickupCustomFields: StorePickupCustomFields,
     ) {
+        const administratorRepository = this.connection.getRepository(ctx, Administrator);
         const existingAdministrator = await this.administratorService.findOneByUserId(
             ctx,
             existingUser.id,
@@ -178,6 +259,11 @@ export class SellerOnboardingService {
 
         if (existingAdministrator) {
             await this.administratorService.assignRole(ctx, existingAdministrator.id, roleId);
+            existingAdministrator.customFields = {
+                ...(existingAdministrator.customFields as Record<string, unknown> | undefined),
+                ...pickupCustomFields,
+            };
+            await administratorRepository.save(existingAdministrator);
             return;
         }
 
@@ -201,14 +287,132 @@ export class SellerOnboardingService {
             await userRepository.save(reloadedUser);
         }
 
-        const administratorRepository = this.connection.getRepository(ctx, Administrator);
         const administrator = administratorRepository.create({
             firstName: seller.firstName,
             lastName: seller.lastName,
             emailAddress: seller.emailAddress,
             user: reloadedUser,
+            customFields: pickupCustomFields,
         });
         await administratorRepository.save(administrator);
+    }
+
+    private async assignFreePlanToSeller(
+        ctx: RequestContext,
+        input: SellerOnboardingInput,
+    ): Promise<void> {
+        const planRepository = this.connection.getRepository(ctx, Plan);
+        const featureRepository = this.connection.getRepository(ctx, Feature);
+        const planFeatureRepository = this.connection.getRepository(ctx, PlanFeature);
+        const subRepository = this.connection.getRepository(ctx, CustomerSubscription);
+
+        let freePlan = await planRepository.findOne({ where: { name: DEFAULT_PLAN_NAMES.FREE } });
+        if (!freePlan) {
+            Logger.info('Free plan not found, creating default plans...', loggerCtx);
+            freePlan = await this.createDefaultPlans(ctx, planRepository, featureRepository, planFeatureRepository);
+        }
+
+        const user = await this.connection.getRepository(ctx, User).findOne({
+            where: { identifier: input.emailAddress },
+        });
+        if (!user) {
+            Logger.warn(`User not found for ${input.emailAddress}, cannot assign free plan`, loggerCtx);
+            return;
+        }
+
+        const adminRepo = this.connection.getRepository(ctx, Administrator);
+        const admin = await adminRepo.findOne({ where: { user: { id: user.id } } });
+        if (!admin) {
+            Logger.warn(`Administrator not found for ${input.emailAddress}, cannot assign free plan`, loggerCtx);
+            return;
+        }
+
+        const numericAdminId = Number(admin.id);
+        const existingSub = await subRepository.findOne({ where: { administratorId: numericAdminId } });
+        if (existingSub) {
+            Logger.info(`Seller ${input.emailAddress} already has a subscription`, loggerCtx);
+            return;
+        }
+
+        const subscription = subRepository.create({
+            administratorId: numericAdminId,
+            planId: freePlan.id,
+            status: SubscriptionStatus.ACTIVE,
+            startsAt: new Date(),
+            endsAt: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+            autoRenew: false,
+        });
+        await subRepository.save(subscription);
+
+        Logger.info(`Assigned Free plan to seller ${input.emailAddress} (administrator ${admin.id})`, loggerCtx);
+    }
+
+    private async createDefaultPlans(
+        ctx: RequestContext,
+        planRepository: any,
+        featureRepository: any,
+        planFeatureRepository: any,
+    ): Promise<Plan> {
+        const freePlan = planRepository.create({
+            name: DEFAULT_PLAN_NAMES.FREE,
+            price: 0,
+            billingInterval: BillingInterval.MONTHLY,
+            isActive: true,
+            description: 'Plan gratuito con características limitadas',
+        });
+        const savedFreePlan = await planRepository.save(freePlan);
+
+        const tiendaPlan = planRepository.create({
+            name: DEFAULT_PLAN_NAMES.TIENDA,
+            price: 29900,
+            billingInterval: BillingInterval.MONTHLY,
+            isActive: true,
+            description: 'Plan para tiendas con hasta 500 productos',
+        });
+        await planRepository.save(tiendaPlan);
+
+        const omnichannelPlan = planRepository.create({
+            name: DEFAULT_PLAN_NAMES.OMNICHANNEL,
+            price: 99900,
+            billingInterval: BillingInterval.MONTHLY,
+            isActive: true,
+            description: 'Plan multicanal con hasta 1.500 productos',
+        });
+        await planRepository.save(omnichannelPlan);
+
+        const features = [
+            { code: FEATURE_CODES.MAX_PRODUCTS, name: 'Max Products', type: FeatureType.NUMERIC },
+            { code: FEATURE_CODES.MAX_VARIATIONS, name: 'Max Variations', type: FeatureType.NUMERIC },
+            { code: FEATURE_CODES.AI_ACCESS, name: 'AI Access', type: FeatureType.BOOLEAN },
+            { code: FEATURE_CODES.ELECTRONIC_BILLING, name: 'Electronic Billing', type: FeatureType.BOOLEAN },
+        ];
+
+        const planConfigs = [
+            { planId: savedFreePlan.id, values: { max_products: '15', max_variations: '250', ai_access: 'false', electronic_billing: 'false' } },
+            { planId: tiendaPlan.id, values: { max_products: '500', max_variations: '5000', ai_access: 'true', electronic_billing: 'true' } },
+            { planId: omnichannelPlan.id, values: { max_products: '1500', max_variations: '15000', ai_access: 'true', electronic_billing: 'true' } },
+        ];
+
+        for (const featureData of features) {
+            let feature = await featureRepository.findOne({ where: { code: featureData.code } });
+            if (!feature) {
+                feature = featureRepository.create(featureData);
+                feature = await featureRepository.save(feature);
+            }
+
+            for (const config of planConfigs) {
+                await planFeatureRepository.save(
+                    planFeatureRepository.create({
+                        planId: config.planId,
+                        featureId: feature.id,
+                        value: config.values[featureData.code as keyof typeof config.values],
+                    })
+                );
+            }
+        }
+
+        Logger.info('Created default subscription plans', loggerCtx);
+        return savedFreePlan;
     }
 
     private async createSellerStockLocation(
@@ -230,14 +434,14 @@ export class SellerOnboardingService {
         sellerChannel: Channel,
     ) {
         const { items: facets } = await this.facetService.findAll(ctx, { take: 1000 });
+        const assigns: Promise<any>[] = [];
         for (const facet of facets) {
-            await this.channelService.assignToChannels(ctx, Facet, facet.id, [sellerChannel.id]);
-
+            assigns.push(this.channelService.assignToChannels(ctx, Facet, facet.id, [sellerChannel.id]));
             for (const facetValue of facet.values) {
-                await this.channelService.assignToChannels(ctx, FacetValue, facetValue.id, [sellerChannel.id]);
-                console.log(`Assigned facet value ${facetValue.id} to channel ${sellerChannel.id}`);
+                assigns.push(this.channelService.assignToChannels(ctx, FacetValue, facetValue.id, [sellerChannel.id]));
             }
         }
+        await Promise.all(assigns);
     }
 
     private async assignCollectionsToSellerChannel(
@@ -245,9 +449,11 @@ export class SellerOnboardingService {
         sellerChannel: Channel,
     ) {
         const { items: collections } = await this.collectionService.findAll(ctx, { take: 1000 });
-        for (const collection of collections) {
-            await this.channelService.assignToChannels(ctx, Collection, collection.id, [sellerChannel.id]);
-        }
+        await Promise.all(
+            collections.map(c =>
+                this.channelService.assignToChannels(ctx, Collection, c.id, [sellerChannel.id])
+            ),
+        );
     }
 
     private async getSuperAdminContext(ctx: RequestContext): Promise<RequestContext> {
@@ -299,23 +505,25 @@ export class SellerOnboardingService {
      * Llama a este método después de actualizar SELLER_ADMIN_PERMISSIONS para aplicar
      * los cambios a todos los vendedores existentes del canal
      */
-    public async syncAllSellerAdminPermissions(ctx: RequestContext): Promise<void> {
+    public async syncAllSellerAdminPermissionsForChannel(
+        ctx: RequestContext,
+        channelToken: string,
+    ): Promise<void> {
         const superAdminCtx = await this.getSuperAdminContext(ctx);
-        const currentChannelToken = ctx.channel.token;
 
         // Obtener todos los roles que son de vendedor (contienen '-admin')
         const roles = await this.roleService.findAll(superAdminCtx);
 
-        // Filtrar solo los roles de vendedor que pertenecen al canal actual
+        // Filtrar solo los roles de vendedor que pertenecen al canal indicado
         const sellerRoles = roles.items.filter(
             role =>
-                role.channels.some(channel => channel.token === currentChannelToken) &&
+                role.channels.some(channel => channel.token === channelToken) &&
                 role.code.includes('-admin'),
         );
 
         if (sellerRoles.length === 0) {
             Logger.info(
-                `No seller admin roles found to sync for channel: ${currentChannelToken}`,
+                `No seller admin roles found to sync for channel: ${channelToken}`,
                 loggerCtx,
             );
             return;
@@ -329,7 +537,7 @@ export class SellerOnboardingService {
                 });
 
                 Logger.info(
-                    `Updated permissions for seller admin role: ${role.code} on channel: ${currentChannelToken}`,
+                    `Updated permissions for seller admin role: ${role.code} on channel: ${channelToken}`,
                     loggerCtx,
                 );
             } catch (error) {
@@ -341,7 +549,7 @@ export class SellerOnboardingService {
         }
 
         Logger.info(
-            `Synced permissions for ${sellerRoles.length} seller admin roles on channel: ${currentChannelToken}`,
+            `Synced permissions for ${sellerRoles.length} seller admin roles on channel: ${channelToken}`,
             loggerCtx,
         );
     }

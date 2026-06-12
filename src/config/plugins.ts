@@ -57,6 +57,9 @@ import {
   DeliveryOrderPlugin,
   MessengerDomisDeliveryOrderStrategy,
 } from '../plugins/delivery-order';
+import { SuperadminvisibilityPlugin } from '../plugins/superadminvisibility/superadminvisibility.plugin';
+import { WompiSubscriptionPlugin } from '../plugins/wompi-subscription/wompi-subscription.plugin';
+import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -145,6 +148,8 @@ export const plugins: VendureConfig['plugins'] = [
     }),
   }),
 
+  DynamicShippingPricePlugin,
+
   PaymentPlugin.init({
     secretKey: process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
@@ -180,9 +185,22 @@ export const plugins: VendureConfig['plugins'] = [
 
   LoginPlugin.init({
     googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
+    googleMapsApiKey:
+      process.env.GOOGLE_MAPS_API_KEY ||
+      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+      '',
   }),
 
   ProductVariantEnforcementPlugin,
+  SuperadminvisibilityPlugin,
 
+  WompiSubscriptionPlugin.init({
+    wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
+    wompiApiKey: process.env.WOMPI_API_KEY || '',
+    wompiEventsSecret: process.env.WOMPI_EVENTS_SECRET || '',
+    wompiIntegritySecret: process.env.WOMPI_INTEGRITY_SECRET || '',
+    currency: process.env.WOMPI_CURRENCY || 'COP',
+    wompiPublicKey: process.env.WOMPI_PUBLIC_KEY || '',
+  }),
 ];
 

@@ -113,8 +113,8 @@ export class MultivendorSellerStrategy implements OrderSellerStrategy {
                 methodChannels.set(row.id, list);
             }
             for (const [methodId, channelIds] of methodChannels) {
-                const hasSellerChannel = channelIds.some(cId => !idsAreEqual(cId, defaultChannel.id));
-                if (hasSellerChannel) {
+                const sellerChannelIds = channelIds.filter(cId => !idsAreEqual(cId, defaultChannel.id));
+                if (sellerChannelIds.length === 1) {
                     sellerShippingMethodIds.add(methodId);
                 }
             }

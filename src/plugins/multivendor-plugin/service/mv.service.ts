@@ -8,16 +8,19 @@ import {
     ConfigService,
     InternalServerError,
     isGraphQlErrorResult,
+    Logger,
     RequestContext,
     RequestContextService,
     RoleService,
     SellerService,
+    ShippingMethod,
     StockLocation,
     StockLocationService,
     TransactionalConnection,
     User,
 } from '@vendure/core';
 
+import { MESSENGER_DOMIS_SHIPPING_METHOD_CODE } from '../constants';
 import { CreateSellerInput } from '../types';
 
 @Injectable()
@@ -37,6 +40,8 @@ export class MultivendorService {
         const superAdminCtx = await this.getSuperAdminContext(ctx);
         const channel = await this.createSellerChannelRoleAdmin(superAdminCtx, input);
         await this.createSellerStockLocation(superAdminCtx, input.shopName, channel);
+        await this.removeNonMessengerShippingMethodsFromChannel(superAdminCtx, channel);
+        await this.assignMessengerShippingMethodToChannel(superAdminCtx, channel);
         return channel;
     }
 
@@ -45,6 +50,48 @@ export class MultivendorService {
             name: `${shopName} Warehouse`,
         });
         await this.channelService.assignToChannels(ctx, StockLocation, stockLocation.id, [sellerChannel.id]);
+    }
+
+    private async removeNonMessengerShippingMethodsFromChannel(ctx: RequestContext, sellerChannel: Channel) {
+        const shippingMethods = await this.connection
+            .getRepository(ctx, ShippingMethod)
+            .createQueryBuilder('shippingMethod')
+            .innerJoinAndSelect('shippingMethod.channels', 'channel', 'channel.id = :channelId', {
+                channelId: sellerChannel.id,
+            })
+            .where('shippingMethod.code != :messengerCode', {
+                messengerCode: MESSENGER_DOMIS_SHIPPING_METHOD_CODE,
+            })
+            .getMany();
+
+        for (const shippingMethod of shippingMethods) {
+            await this.channelService.removeFromChannels(ctx, ShippingMethod, shippingMethod.id, [sellerChannel.id]);
+        }
+    }
+
+    private async assignMessengerShippingMethodToChannel(ctx: RequestContext, sellerChannel: Channel) {
+        const shippingMethod = await this.connection.rawConnection.getRepository(ShippingMethod).findOne({
+            where: {
+                code: MESSENGER_DOMIS_SHIPPING_METHOD_CODE,
+            },
+            relations: ['channels'],
+        });
+
+        if (!shippingMethod) {
+            Logger.warn(
+                `Shipping method ${MESSENGER_DOMIS_SHIPPING_METHOD_CODE} was not found for seller channel ${sellerChannel.code}`,
+                'MultivendorService',
+            );
+            return;
+        }
+
+        const alreadyAssigned = (shippingMethod.channels ?? []).some(
+            channel => String(channel.id) === String(sellerChannel.id),
+        );
+
+        if (!alreadyAssigned) {
+            await this.channelService.assignToChannels(ctx, ShippingMethod, shippingMethod.id, [sellerChannel.id]);
+        }
     }
 
     private async createSellerChannelRoleAdmin(
@@ -92,9 +139,6 @@ export class MultivendorService {
                 Permission.CreatePaymentMethod,
                 Permission.UpdatePaymentMethod,
                 Permission.ReadShippingMethod,
-                Permission.CreateShippingMethod,
-                Permission.UpdateShippingMethod,
-                Permission.DeleteShippingMethod,
                 Permission.ReadPromotion,
                 Permission.ReadCountry,
                 Permission.ReadZone,

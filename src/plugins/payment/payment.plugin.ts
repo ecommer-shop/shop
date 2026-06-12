@@ -27,6 +27,7 @@ import { PaymentPaymentHandler } from './payment-method-handler';
         schema: shopApiExtensions,
         resolvers: [paymentShopResolver]
     },
+
 })
 export class PaymentPlugin {
     static options: PluginInitOptions;

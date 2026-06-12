@@ -817,6 +817,17 @@ export default defineConfig({
                 },
             },
         }),
+        // Plugin: inyecta WOMPI_PUBLIC_KEY en el HTML (corre en dev y build)
+        {
+            name: 'inject-wompi-key',
+            transformIndexHtml(html) {
+                const key = process.env.WOMPI_PUBLIC_KEY || '';
+                return html.replace(
+                    '</head>',
+                    `  <script>window.__WOMPI_PUBLIC_KEY__ = "${key}";</script>\n</head>`
+                );
+            },
+        },
         // Plugin post-dashboard-html: modifica el HTML después de que vendureDashboardPlugin lo genera
         {
             name: 'post-dashboard-html',
@@ -884,7 +895,7 @@ export default defineConfig({
             
             if (!isCollapsibleTrigger && !isDropdownTrigger) {
             setTimeout(function() {
-                const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+                const closeBtn = document.querySelector('[data-sidebar="sidebar"] button.absolute.top-4.right-4');
                 if (closeBtn) closeBtn.click();
             }, 50);
             }
@@ -900,7 +911,7 @@ export default defineConfig({
           if (!dropdownItem) return;
           
           setTimeout(function() {
-            const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+            const closeBtn = document.querySelector('[data-sidebar="sidebar"] button.absolute.top-4.right-4');
             if (closeBtn) closeBtn.click();
           }, 100);
         }, true);

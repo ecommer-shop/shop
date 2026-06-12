@@ -1,0 +1,25 @@
+{{> header title="Error en la renovación" }}
+
+<mj-section padding="20px">
+  <mj-column background-color="#ffffff" padding="30px" border-radius="12px">
+
+    <mj-text font-size="20px" font-weight="bold" color="#12123F">
+      Error en la renovación
+    </mj-text>
+
+    <mj-text>
+      No pudimos renovar tu plan <strong>{{planName}}</strong>.
+    </mj-text>
+
+    <mj-text>
+      <strong>Motivo:</strong> {{reason}}
+    </mj-text>
+
+    <mj-text>
+      Tu cuenta ha sido movida a período de gracia. Ingresa al panel para actualizar tu método de pago antes de que el plan sea suspendido.
+    </mj-text>
+
+  </mj-column>
+</mj-section>
+
+{{> footer }}

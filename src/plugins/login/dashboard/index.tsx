@@ -2,6 +2,7 @@ import { defineDashboardExtension } from '@vendure/dashboard';
 import { App } from './App';
 import { LoginLogo } from './components/LoginLogo';
 import { PostLoginReloadBlock, POST_LOGIN_RELOAD_KEY } from './components/PostLoginReloadBlock';
+import { DeleteAccountSection } from './components/DeleteAccountSection';
 
 defineDashboardExtension({
     routes: [{
@@ -47,6 +48,15 @@ defineDashboardExtension({
                 }
                 return sessionStorage.getItem(POST_LOGIN_RELOAD_KEY) === '1';
             },
+        },
+        {
+            id: 'delete-account-section',
+            location: {
+                pageId: 'profile',
+                column: 'main',
+                position: { blockId: 'custom-fields', order: 'after' },
+            },
+            component: DeleteAccountSection,
         },
     ],
 });
