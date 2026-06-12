@@ -217,6 +217,7 @@ export const customFields: VendureConfig['customFields'] = {
       type: 'string',
       nullable: true,
       public: true,
+      ui: { component: 'ecommer-store-pickup-map-preview', fullWidth: true },
       label: [
         { languageCode: LanguageCode.en, value: 'Pickup Google Place ID' },
         { languageCode: LanguageCode.es, value: 'ID de Google de recogida' },

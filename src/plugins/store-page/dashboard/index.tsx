@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useState } from 'react';
 import { StoreBannerAssetPickerInput } from './store-banner-asset-picker-input';
 import { StoreFeaturedStarInput } from './store-featured-star-input';
+import { StorePickupMapPreviewInput } from './store-pickup-map-preview-input';
 import { ShareProductButton } from './share-product-button';
 import { SlugShareDisplay } from './slug-share-display';
 import { ShareLinksWidget } from './share-links-widget';
@@ -13,6 +14,7 @@ defineDashboardExtension({
         customFields: [
             { id: 'ecommer-store-featured-star', component: StoreFeaturedStarInput },
             { id: 'ecommer-store-banner-asset-picker', component: StoreBannerAssetPickerInput },
+            { id: 'ecommer-store-pickup-map-preview', component: StorePickupMapPreviewInput },
         ],
     },
     actionBarItems: [
