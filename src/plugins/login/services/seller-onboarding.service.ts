@@ -75,11 +75,11 @@ export class SellerOnboardingService {
 
     private assertValidPickupAddress(input: SellerOnboardingInput): void {
         if (!input.pickupAddress?.trim()) {
-            throw new Error('Selecciona una direccion de recogida para tu tienda');
+            throw new Error('Selecciona una dirección de recogida para tu tienda');
         }
 
         if (!Number.isFinite(input.pickupLatitude) || !Number.isFinite(input.pickupLongitude)) {
-            throw new Error('La direccion de recogida debe tener coordenadas de Google Maps');
+            throw new Error('La dirección de recogida debe tener coordenadas de Google Maps');
         }
     }
 
