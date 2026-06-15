@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import { Permission, RequestContext, Administrator } from '@vendure/core';
+import { Permission, Administrator } from '@vendure/core';
 import { TransactionalConnection } from '@vendure/core';
 import { SubscriptionQueryService } from '../services/subscription-query.service';
 import { PlanManagementService } from '../services/plan-management.service';
@@ -53,29 +53,32 @@ export class FeatureGuard implements CanActivate {
     protected async isSuperAdmin(context: ExecutionContext): Promise<boolean> {
         try {
             const gqlCtx = GqlExecutionContext.create(context);
-            const ctx = gqlCtx.getContext() as unknown as RequestContext;
-            return ctx?.userHasPermissions?.([Permission.SuperAdmin]) ?? false;
+            const req = gqlCtx.getContext().req;
+            const store = req?.['vendureRequestContext'];
+            const requestContext = store?.withTransactionManager || store?.default;
+            return requestContext?.userHasPermissions?.([Permission.SuperAdmin]) ?? false;
         } catch {
             return false;
         }
     }
 
     protected async resolveAdministratorId(context: ExecutionContext): Promise<number | null> {
-        let ctx: any;
         let customerEmail: string | undefined;
+        let req: any;
         try {
             const gqlCtx = GqlExecutionContext.create(context);
-            ctx = gqlCtx.getContext();
+            req = gqlCtx.getContext().req;
             customerEmail = gqlCtx.getArgs()?.customerEmail;
         } catch {
-            ctx = context.switchToHttp().getRequest() as any;
-            customerEmail = ctx?.body?.variables?.customerEmail;
+            req = context.switchToHttp().getRequest();
+            customerEmail = req?.body?.variables?.customerEmail;
         }
 
-        const userId = ctx?.activeUserId || ctx?.req?.activeUserId || ctx?.req?.raw?.activeUserId || ctx?.session?.activeUserId;
-        if (userId) {
+        const store = req?.['vendureRequestContext'];
+        const requestContext = store?.withTransactionManager || store?.default;
+        if (requestContext?.activeUserId) {
             const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
-                where: { user: { id: Number(userId) } },
+                where: { user: { id: Number(requestContext.activeUserId) } },
             });
             if (admin) return Number(admin.id);
         }
