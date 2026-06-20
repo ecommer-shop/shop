@@ -16,6 +16,9 @@ import {
   CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD,
   CHANNEL_INVOICE_BILLING_ACTIVE_FIELD,
   CHANNEL_INVOICE_LIMIT_REMAINING_FIELD,
+  CHANNEL_MATIAS_ACCESS_TOKEN_FIELD,
+  CHANNEL_MATIAS_INVOICE_PREFIX_FIELD,
+  CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD,
 } from '../constants';
 import { BillingCertificateNotificationService } from './billing-certificate-notification.service';
 
@@ -44,6 +47,10 @@ export interface BillingPlanState {
   documents: { chamber: string | null; rut: string | null; nit: string | null };
   invoicesRemaining: number;
   canBuyPlans: boolean;
+  matiasTokenConfigured: boolean;
+  matiasPrefixConfigured: boolean;
+  matiasResolutionConfigured: boolean;
+  matiasProfileComplete: boolean;
   purchaseHistory: BillingPlanPurchaseEntry[];
 }
 
@@ -88,6 +95,15 @@ export class BillingPlansService {
   assertCertificateAllowsInvoiceEmission(channel: Channel): void {
     const state = this.toState(channel);
     if (state.canBuyPlans) return;
+    if (
+      state.certificateStatus === 'ACTIVE' &&
+      state.certificatePaymentStatus === 'PAID' &&
+      !state.matiasProfileComplete
+    ) {
+      throw new Error(
+        `La tienda «${channel.code}» tiene certificado activo, pero falta configurar token, prefijo o resolución Matias.`,
+      );
+    }
     if (state.certificateStatus === 'EXPIRED') {
       throw new Error(
         `El certificado de facturación de la tienda «${channel.code}» está vencido. Renueva el certificado en Planes de facturación.`,
@@ -375,6 +391,12 @@ export class BillingPlansService {
     const isExpired = certStatus === 'ACTIVE' && expiresAt != null && expiresAt.getTime() < Date.now();
     const normalizedStatus: BillingCertificateStatus = isExpired ? 'EXPIRED' : certStatus;
     const remaining = Number(cf[CHANNEL_INVOICE_LIMIT_REMAINING_FIELD] ?? 0);
+    const matiasTokenConfigured = this.hasText(cf[CHANNEL_MATIAS_ACCESS_TOKEN_FIELD]);
+    const matiasPrefixConfigured = this.hasText(cf[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD]);
+    const matiasResolutionConfigured = this.hasText(cf[CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD]);
+    const matiasProfileComplete =
+      matiasTokenConfigured && matiasPrefixConfigured && matiasResolutionConfigured;
+    const certificateReady = normalizedStatus === 'ACTIVE' && certPayment === 'PAID';
     return {
       channelId: String(channel.id),
       channelCode: channel.code,
@@ -393,9 +415,17 @@ export class BillingPlansService {
         nit: (cf[CHANNEL_BILLING_CERT_DOC_NIT_FIELD] as string | null) ?? null,
       },
       invoicesRemaining: Number.isFinite(remaining) ? remaining : 0,
-      canBuyPlans: normalizedStatus === 'ACTIVE' && certPayment === 'PAID',
+      canBuyPlans: certificateReady && matiasProfileComplete,
+      matiasTokenConfigured,
+      matiasPrefixConfigured,
+      matiasResolutionConfigured,
+      matiasProfileComplete,
       purchaseHistory: this.parsePurchaseHistory(cf[CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD]),
     };
+  }
+
+  private hasText(value: unknown): boolean {
+    return typeof value === 'string' && value.trim().length > 0;
   }
 
   private parsePurchaseHistoryRaw(raw: unknown): BillingPlanPurchaseEntry[] {

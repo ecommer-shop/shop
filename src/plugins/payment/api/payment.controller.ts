@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Req, HttpException, HttpStatus, Inject, HttpCode } from '@nestjs/common';
+import { Controller, Post, Body, HttpException, HttpStatus, HttpCode } from '@nestjs/common';
 import {
    RequestContextService,
    LanguageCode,
@@ -8,35 +8,32 @@ import {
    ChannelService,
    Channel,
 } from '@vendure/core';
-import { PluginInitOptions } from '../types';
-import { loggerCtx, PAYMENT_METHOD, PAYMENT_PLUGIN_OPTIONS } from '../constants';
+import { loggerCtx, PAYMENT_METHOD } from '../constants';
 import {
    CHANNEL_BILLING_CERT_PAID_AT_FIELD,
    CHANNEL_BILLING_CERT_PAYMENT_STATUS_FIELD,
    CHANNEL_BILLING_CERT_STATUS_FIELD,
 } from '../../invoice-client/constants';
 import { BillingPlansService } from '../../invoice-client/services/billing-plans.service';
+import { WompiService } from '../../wompi-subscription/services/wompi.service';
 
 @Controller('api/payment')
 export class PaymentController {
    constructor(
-      @Inject(PAYMENT_PLUGIN_OPTIONS) private options: PluginInitOptions,
       private requestContextService: RequestContextService,
       private orderService: OrderService,
       private connection: TransactionalConnection,
       private channelService: ChannelService,
       private billingPlans: BillingPlansService,
+      private wompiService: WompiService,
    ) { }
 
    @Post('confirm')
    @HttpCode(200)
-   async paymentConfirm(@Body() payload: any, @Req() req: any) {
+   async paymentConfirm(@Body() payload: any) {
       Logger.debug('Received payment confirmation webhook', loggerCtx);
-      const { event, data, signature } = payload;
-      if (!this.options.secretKey) {
-         throw new Error('WOMPI_INTEGRITY_SECRET_KEY environment variable is not set');
-      }
-      if (!this.validateSignature(payload, this.options.secretKey)) {
+      const { data } = payload;
+      if (!this.wompiService.validateWebhookSignature(payload)) {
          throw new HttpException('Invalid webhook signature', HttpStatus.UNAUTHORIZED);
       }
       const transaction = data.transaction;
@@ -56,9 +53,11 @@ export class PaymentController {
          return HttpStatus.OK;
       }
       if (transaction.status === 'APPROVED' && reference.startsWith('PLAN-')) {
-         const parts = reference.split('-');
-         const channelCode = parts[1];
-         const planCode = parts[2];
+         const parsed = this.parsePlanReference(reference);
+         if (!parsed) {
+            throw new HttpException('Invalid invoice plan reference', HttpStatus.BAD_REQUEST);
+         }
+         const { channelCode, planCode } = parsed;
          await this.billingPlans.applyPlanPurchaseFromWebhook(ctx, channelCode, planCode, reference);
          return HttpStatus.OK;
       }
@@ -93,20 +92,16 @@ export class PaymentController {
       await this.channelService.update(ctx, { id: channel.id, customFields });
    }
 
-   private validateSignature(payload: any, secret: string): boolean {
-      //    try {
-      //    const props = payload.signature?.properties ?? [];
-      //    const flat: Record<string, any> = this.flatten(payload.data?.transaction ?? {});
-      //    const toSign = props.map((p: string) => this.getByPath(flat, p)).join('');
-      //    const signed = crypto.createHmac('sha256', secret).update(toSign).digest('hex');
-      //    return signed === payload.signature?.checksum;
-      //  } catch {
-      //    return false;
-      //  }
-      // Todo: Implement payload signature validation using SHA256:
-      // 1. Concatenate specific payload values (e.g., transaction.id, transaction.status, etc.)
-      // 2. Append the secret
-      // 3. Generate a SHA256 hash and compare with the provided checksum.
-      return true;
+   private parsePlanReference(reference: string): { channelCode: string; planCode: string } | null {
+      const parts = reference.split('-');
+      if (parts.length < 4 || parts[0] !== 'PLAN') {
+         return null;
+      }
+      const planCode = parts[parts.length - 2];
+      const channelCode = parts.slice(1, -2).join('-');
+      if (!channelCode || !planCode) {
+         return null;
+      }
+      return { channelCode, planCode };
    }
 }

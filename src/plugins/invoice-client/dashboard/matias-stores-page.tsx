@@ -109,8 +109,8 @@ export function MatiasStoresPage() {
                     <p className="text-muted-foreground text-sm max-w-3xl">
                         El <strong>prefijo</strong> y la <strong>resolución</strong> los defines{' '}
                         <strong>manualmente</strong> según lo que entregue Matias al dar de alta cada tienda (no
-                        vienen solos en el token). Al <strong>vender cupo</strong> a una tienda se descuenta del pool
-                        global de Ecommer. La emisión al pagar un pedido solo baja el cupo de esa tienda.
+                        vienen solos en el token). El cupo de facturas se acredita automáticamente cuando la tienda
+                        paga un paquete en Planes de facturación.
                     </p>
                 </PageBlock>
 
@@ -145,7 +145,6 @@ export function MatiasStoresPage() {
                                         <StoreEditorRow
                                             key={row.channelId}
                                             row={row}
-                                            poolSellable={pool?.sellableRemaining ?? null}
                                             onSaved={() => void refetch()}
                                         />
                                     ))}
@@ -227,22 +226,16 @@ function GlobalPoolCard({ pool, onSaved }: { pool: GlobalPool | undefined; onSav
 
 function StoreEditorRow({
     row,
-    poolSellable,
     onSaved,
 }: {
     row: StoreRow;
-    poolSellable: number | null;
     onSaved: () => void;
 }) {
-    const [billingActive, setBillingActive] = useState(row.billingActive);
-    const [remaining, setRemaining] = useState(row.remaining != null ? String(row.remaining) : '');
     const [prefix, setPrefix] = useState(row.matiasInvoicePrefix ?? '');
     const [resolution, setResolution] = useState(row.matiasResolutionNumber ?? '');
     const [newToken, setNewToken] = useState('');
 
     useEffect(() => {
-        setBillingActive(row.billingActive);
-        setRemaining(row.remaining != null ? String(row.remaining) : '');
         setPrefix(row.matiasInvoicePrefix ?? '');
         setResolution(row.matiasResolutionNumber ?? '');
         setNewToken('');
@@ -256,44 +249,24 @@ function StoreEditorRow({
     ]);
 
     const dirty = useMemo(() => {
-        const rem = remaining.trim() === '' ? null : Number(remaining);
-        const remChanged = (rem ?? null) !== (row.remaining ?? null);
-        const activeChanged = billingActive !== row.billingActive;
         const tokenTyped = newToken.trim().length > 0;
         const prefixChanged = prefix.trim().toUpperCase() !== (row.matiasInvoicePrefix ?? '').toUpperCase();
         const resolutionChanged = resolution.trim() !== (row.matiasResolutionNumber ?? '');
-        return remChanged || activeChanged || tokenTyped || prefixChanged || resolutionChanged;
+        return tokenTyped || prefixChanged || resolutionChanged;
     }, [
-        billingActive,
-        remaining,
         newToken,
         prefix,
         resolution,
-        row.billingActive,
-        row.remaining,
         row.matiasInvoicePrefix,
         row.matiasResolutionNumber,
     ]);
 
-    const cupoIncrease = useMemo(() => {
-        const newRem = remaining.trim() === '' ? 0 : Number(remaining);
-        const oldRem = row.billingActive ? (row.remaining ?? 0) : 0;
-        const newEff = billingActive ? (Number.isFinite(newRem) ? newRem : oldRem) : 0;
-        return newEff - oldRem;
-    }, [billingActive, remaining, row.billingActive, row.remaining]);
-
     const saveMutation = useMutation({
         mutationFn: async () => {
-            const remParsed = remaining.trim() === '' ? null : Number(remaining);
-            if (remaining.trim() !== '' && !Number.isFinite(remParsed as number)) {
-                throw new Error('Cupo inválido.');
-            }
-
             await api.mutate(UPDATE_STORE, {
                 input: {
                     channelId: row.channelId,
-                    billingActive,
-                    invoiceLimitRemaining: remParsed,
+                    billingActive: row.billingActive,
                     matiasInvoicePrefix: prefix.trim() || null,
                     matiasResolutionNumber: resolution.trim() || null,
                     ...(newToken.trim() ? { matiasAccessToken: newToken.trim() } : {}),
@@ -318,33 +291,14 @@ function StoreEditorRow({
                 </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex items-center gap-2">
-                    <input
-                        id={`active-${row.channelId}`}
-                        type="checkbox"
-                        checked={billingActive}
-                        onChange={(e) => setBillingActive(e.target.checked)}
-                    />
-                    <Label htmlFor={`active-${row.channelId}`}>Facturación activa</Label>
-                </div>
-                <div className="space-y-1">
-                    <Label htmlFor={`rem-${row.channelId}`}>Cupo restante (vendido a esta tienda)</Label>
-                    <Input
-                        id={`rem-${row.channelId}`}
-                        inputMode="numeric"
-                        value={remaining}
-                        onChange={(e) => setRemaining(e.target.value)}
-                    />
-                    {cupoIncrease > 0 ? (
-                        <p className="text-xs text-amber-600">
-                            Al guardar se restan {cupoIncrease} del pool global
-                            {poolSellable != null ? ` (quedan ${poolSellable} vendibles)` : ''}.
-                        </p>
-                    ) : cupoIncrease < 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                            Al guardar se devuelven {-cupoIncrease} al pool global.
-                        </p>
-                    ) : null}
+                <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs uppercase text-muted-foreground">Estado actual</p>
+                    <p className="text-sm">
+                        {row.billingActive ? 'Facturación activa' : 'Sin paquete activo comprado'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                        Cupo restante: {row.remaining ?? 0} facturas
+                    </p>
                 </div>
                 <div className="space-y-1">
                     <Label htmlFor={`pfx-${row.channelId}`}>Prefijo (manual, único)</Label>

@@ -25,6 +25,7 @@ const matiasStoresRoute: DashboardRouteDefinition = {
         sectionId: 'sales',
         title: 'Matias por tienda',
         url: '/matias-tiendas',
+        requiresPermission: ['SuperAdmin'],
     },
     component: () => <MatiasStoresPage />,
 };
@@ -49,6 +50,7 @@ const billingCertificatesReviewRoute: DashboardRouteDefinition = {
         sectionId: 'settings',
         title: 'Validación de certificados',
         url: '/certificados-facturacion',
+        requiresPermission: ['SuperAdmin'],
     },
     component: () => <BillingCertificatesReviewPage />,
 };

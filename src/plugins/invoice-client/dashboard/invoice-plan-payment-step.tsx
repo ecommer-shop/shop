@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { Button, Card, CardContent, Tabs, TabsList, TabsTrigger } from '@vendure/dashboard';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { WompiTokenizationForm } from '../../wompi-subscription/dashboard/WompiPaymentWidget';
+import { CONTRACT_CONTENT } from '../../wompi-subscription/contract-constants';
 import type { InvoicePlanCardPlan } from './components/invoice-plan-card';
 import { PAYMENT_METHODS, isManual, isRecurrent } from './invoice-plan-payment-queries';
+
+const TOKENIZABLE_PAYMENT_METHODS = new Set(['CARD', 'NEQUI', 'DAVIPLATA']);
 
 export function InvoicePlanPaymentStep({
     plan,
@@ -126,6 +129,51 @@ export function InvoicePlanPaymentStep({
         );
     }
 
+    return <InvoicePlanPaymentForm
+        plan={plan}
+        paymentTab={paymentTab}
+        setPaymentTab={setPaymentTab}
+        selectedMethod={selectedMethod}
+        setSelectedMethod={setSelectedMethod}
+        onPay={onPay}
+        paymentProcessing={paymentProcessing}
+        onBack={onBack}
+    />;
+}
+
+// ─── Main payment form with Clickwrap Agreement ───────────────────
+
+function InvoicePlanPaymentForm({
+    plan,
+    paymentTab,
+    setPaymentTab,
+    selectedMethod,
+    setSelectedMethod,
+    onPay,
+    paymentProcessing,
+    onBack,
+}: {
+    plan: InvoicePlanCardPlan;
+    paymentTab: string;
+    setPaymentTab: (tab: string) => void;
+    selectedMethod: string | null;
+    setSelectedMethod: (method: string | null) => void;
+    onPay: () => void;
+    paymentProcessing: boolean;
+    onBack: () => void;
+}) {
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [showFullContract, setShowFullContract] = useState(false);
+
+    const handleAcceptChange = (checked: boolean) => {
+        setTermsAccepted(checked);
+    };
+
+    const handlePay = () => {
+        if (!termsAccepted) return;
+        onPay();
+    };
+
     return (
         <Card>
             <CardContent className="py-6 space-y-6">
@@ -170,7 +218,7 @@ export function InvoicePlanPaymentStep({
 
                 <div className="grid grid-cols-2 gap-2">
                     {(paymentTab === 'token'
-                        ? PAYMENT_METHODS.filter((m) => m.flow === 'recurrent')
+                        ? PAYMENT_METHODS.filter((m) => TOKENIZABLE_PAYMENT_METHODS.has(m.type))
                         : PAYMENT_METHODS.filter((m) => m.flow === 'manual')
                     ).map((method) => (
                         <Button
@@ -192,8 +240,74 @@ export function InvoicePlanPaymentStep({
                     ))}
                 </div>
 
+                {/* ── Clickwrap Agreement ── */}
+                <div className="rounded-lg border border-border bg-muted/30 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
+                        <span className="text-sm font-semibold">
+                            Contrato de compra — Certificado de Facturación
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setShowFullContract(!showFullContract)}
+                            className="text-xs text-primary underline underline-offset-2 hover:opacity-70 transition-opacity"
+                        >
+                            {showFullContract ? 'Ocultar contrato' : 'Ver contrato completo'}
+                        </button>
+                    </div>
+
+                    {showFullContract && (
+                        <div
+                            className="px-4 py-4 max-h-64 overflow-y-auto"
+                            style={{ scrollbarWidth: 'thin' }}
+                        >
+                            <pre
+                                className="text-xs text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed"
+                            >
+                                {CONTRACT_CONTENT}
+                            </pre>
+                        </div>
+                    )}
+
+                    <div className="px-4 py-3 flex items-start gap-3">
+                        <input
+                            id="invoice-plan-terms-checkbox"
+                            type="checkbox"
+                            checked={termsAccepted}
+                            onChange={(e) => handleAcceptChange(e.target.checked)}
+                            disabled={paymentProcessing}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-primary cursor-pointer"
+                        />
+                        <label
+                            htmlFor="invoice-plan-terms-checkbox"
+                            className="text-sm leading-snug cursor-pointer select-none"
+                        >
+                            He leído y acepto íntegramente los{' '}
+                            <button
+                                type="button"
+                                onClick={() => setShowFullContract(true)}
+                                className="text-primary underline underline-offset-2 hover:opacity-70 transition-opacity"
+                            >
+                                términos y condiciones del contrato de compra
+                            </button>
+                            {' '}del Certificado de Facturación ECOMMER S.A.S. Esta aceptación tiene plena validez jurídica conforme a la{' '}
+                            <span className="font-medium">Ley 527 de 1999</span>.
+                        </label>
+                    </div>
+
+                    {!termsAccepted && selectedMethod && (
+                        <p className="px-4 pb-3 text-xs text-amber-700 dark:text-amber-400">
+                            Debes aceptar el contrato para continuar con el pago.
+                        </p>
+                    )}
+                </div>
+
                 {selectedMethod && isRecurrent(selectedMethod) && (
-                    <Button variant="default" onClick={onPay} disabled={paymentProcessing}>
+                    <Button
+                        variant="default"
+                        onClick={handlePay}
+                        disabled={paymentProcessing || !termsAccepted}
+                        title={!termsAccepted ? 'Acepta los términos y condiciones para continuar' : undefined}
+                    >
                         {paymentProcessing ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -206,7 +320,12 @@ export function InvoicePlanPaymentStep({
                 )}
 
                 {selectedMethod && isManual(selectedMethod) && (
-                    <Button variant="default" onClick={onPay} disabled={paymentProcessing}>
+                    <Button
+                        variant="default"
+                        onClick={handlePay}
+                        disabled={paymentProcessing || !termsAccepted}
+                        title={!termsAccepted ? 'Acepta los términos y condiciones para continuar' : undefined}
+                    >
                         {paymentProcessing ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

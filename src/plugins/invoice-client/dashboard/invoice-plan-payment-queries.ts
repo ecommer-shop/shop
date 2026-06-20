@@ -5,8 +5,18 @@ export {
 } from '../../wompi-subscription/dashboard/graphql-queries';
 
 export const CREATE_PENDING_INVOICE_PLAN = `
-  mutation CreatePendingInvoicePlanPurchase($planCode: String!, $paymentMethod: String!) {
-    createPendingInvoicePlanPurchase(planCode: $planCode, paymentMethod: $paymentMethod) {
+  mutation CreatePendingInvoicePlanPurchase(
+    $planCode: String!
+    $paymentMethod: String!
+    $clickwrapAccepted: Boolean!
+    $contractVersion: String!
+  ) {
+    createPendingInvoicePlanPurchase(
+      planCode: $planCode
+      paymentMethod: $paymentMethod
+      clickwrapAccepted: $clickwrapAccepted
+      contractVersion: $contractVersion
+    ) {
       reference
       transactionStatus
       asyncPaymentUrl
@@ -34,6 +44,8 @@ export const PURCHASE_INVOICE_PLAN_WITH_PAYMENT = `
     $planCode: String!
     $paymentMethod: String!
     $token: String!
+    $clickwrapAccepted: Boolean!
+    $contractVersion: String!
     $sessionId: String
     $deviceId: String
   ) {
@@ -41,6 +53,8 @@ export const PURCHASE_INVOICE_PLAN_WITH_PAYMENT = `
       planCode: $planCode
       paymentMethod: $paymentMethod
       token: $token
+      clickwrapAccepted: $clickwrapAccepted
+      contractVersion: $contractVersion
       sessionId: $sessionId
       deviceId: $deviceId
     ) {

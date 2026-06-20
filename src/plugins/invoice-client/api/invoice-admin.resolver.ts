@@ -1,6 +1,7 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
 import { UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import { FeatureAccessGuard } from '../../wompi-subscription/guards';
 import { RequiresFeature } from '../../wompi-subscription/decorators/requires-feature.decorator';
 import { FEATURE_CODES } from '../../wompi-subscription/constants';
@@ -13,6 +14,7 @@ import { InvoiceEmissionQueueStatusService } from '../services/invoice-emission-
 import { InvoiceQuotaService } from '../services/invoice-quota.service';
 import { InvoiceMatiasActionService } from '../services/invoice-matias-action.service';
 import { InvoicePlanWompiPaymentService } from '../services/invoice-plan-wompi-payment.service';
+import { ClickwrapAcceptanceService } from '../services/clickwrap-acceptance.service';
 
 @Resolver()
 export class InvoiceAdminResolver {
@@ -26,6 +28,7 @@ export class InvoiceAdminResolver {
     private invoiceQuota: InvoiceQuotaService,
     private invoiceMatiasAction: InvoiceMatiasActionService,
     private invoicePlanWompiPayment: InvoicePlanWompiPaymentService,
+    private clickwrapAcceptance: ClickwrapAcceptanceService,
   ) { }
 
   @Query()
@@ -243,19 +246,31 @@ export class InvoiceAdminResolver {
   @Allow(Permission.Authenticated)
   async createPendingInvoicePlanPurchase(
     @Ctx() ctx: RequestContext,
+    @Context('req') req: Request,
     @Args('planCode') planCode: string,
     @Args('paymentMethod') paymentMethod: string,
+    @Args('clickwrapAccepted') clickwrapAccepted: boolean,
+    @Args('contractVersion') contractVersion: string,
   ) {
-    return this.invoicePlanWompiPayment.createPendingPurchase(ctx, planCode, paymentMethod);
+    return this.invoicePlanWompiPayment.createPendingPurchase(
+      ctx,
+      planCode,
+      paymentMethod,
+      { accepted: clickwrapAccepted, contractVersion },
+      req,
+    );
   }
 
   @Mutation()
   @Allow(Permission.Authenticated)
   async purchaseInvoicePlanWithPayment(
     @Ctx() ctx: RequestContext,
+    @Context('req') req: Request,
     @Args('planCode') planCode: string,
     @Args('paymentMethod') paymentMethod: string,
     @Args('token') token: string,
+    @Args('clickwrapAccepted') clickwrapAccepted: boolean,
+    @Args('contractVersion') contractVersion: string,
     @Args('sessionId') sessionId?: string,
     @Args('deviceId') deviceId?: string,
   ) {
@@ -264,9 +279,21 @@ export class InvoiceAdminResolver {
       planCode,
       paymentMethod,
       token,
+      { accepted: clickwrapAccepted, contractVersion },
+      req,
       sessionId,
       deviceId,
     );
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async recordClickwrapAcceptance(
+    @Ctx() ctx: RequestContext,
+    @Context('req') req: Request,
+    @Args('input') input: { contractVersion: string; contractContext: string; planName: string },
+  ) {
+    return this.clickwrapAcceptance.recordAcceptance(ctx, { ...input, accepted: true }, req);
   }
 }
 
