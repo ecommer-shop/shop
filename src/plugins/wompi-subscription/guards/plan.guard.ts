@@ -19,7 +19,9 @@ export class PlanGuard implements CanActivate {
     async canActivate(context: ExecutionContext): Promise<boolean> {
         try {
             const gqlCtx = GqlExecutionContext.create(context);
-            const ctx = gqlCtx.getContext() as unknown as RequestContext;
+            const req = gqlCtx.getContext().req;
+            const store = req?.['vendureRequestContext'];
+            const ctx = (store?.withTransactionManager || store?.default) as RequestContext | undefined;
 
             if (ctx?.userHasPermissions?.([Permission.SuperAdmin])) {
                 return true;
@@ -71,21 +73,22 @@ export class PlanGuard implements CanActivate {
     }
 
     private async resolveAdministratorId(context: ExecutionContext): Promise<number | null> {
-        let ctx: any;
         let customerEmail: string | undefined;
+        let req: any;
         try {
             const gqlCtx = GqlExecutionContext.create(context);
-            ctx = gqlCtx.getContext();
+            req = gqlCtx.getContext().req;
             customerEmail = gqlCtx.getArgs()?.customerEmail;
         } catch {
-            ctx = context.switchToHttp().getRequest() as any;
-            customerEmail = ctx?.body?.variables?.customerEmail;
+            req = context.switchToHttp().getRequest();
+            customerEmail = req?.body?.variables?.customerEmail;
         }
 
-        const userId = ctx?.activeUserId || ctx?.req?.activeUserId || ctx?.req?.raw?.activeUserId || ctx?.session?.activeUserId;
-        if (userId) {
+        const store = req?.['vendureRequestContext'];
+        const requestContext = store?.withTransactionManager || store?.default;
+        if (requestContext?.activeUserId) {
             const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
-                where: { user: { id: Number(userId) } },
+                where: { user: { id: Number(requestContext.activeUserId) } },
             });
             if (admin) return Number(admin.id);
         }

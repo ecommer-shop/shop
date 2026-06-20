@@ -952,7 +952,7 @@ export default defineConfig({
             
             if (!isCollapsibleTrigger && !isDropdownTrigger) {
             setTimeout(function() {
-                const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+                const closeBtn = document.querySelector('[data-sidebar="sidebar"] button.absolute.top-4.right-4');
                 if (closeBtn) closeBtn.click();
             }, 50);
             }
@@ -968,7 +968,7 @@ export default defineConfig({
           if (!dropdownItem) return;
           
           setTimeout(function() {
-            const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+            const closeBtn = document.querySelector('[data-sidebar="sidebar"] button.absolute.top-4.right-4');
             if (closeBtn) closeBtn.click();
           }, 100);
         }, true);

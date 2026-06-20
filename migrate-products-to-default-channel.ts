@@ -76,9 +76,6 @@ async function migrateProducts() {
             continue;
         }
 
-        console.log(
-            `Asignando ${productIds.length} productos del canal "${channel.code}" al default channel...`,
-        );
 
         await productService.assignProductsToChannel(ctx, {
             productIds,

@@ -63,7 +63,7 @@ export const customFields: VendureConfig['customFields'] = {
         },
         {
           languageCode: LanguageCode.es,
-          value: 'Barrio detectado desde los componentes de direccion de Google Maps',
+          value: 'Barrio detectado desde los componentes de dirección de Google Maps',
         },
       ],
     },
@@ -83,7 +83,7 @@ export const customFields: VendureConfig['customFields'] = {
         },
         {
           languageCode: LanguageCode.es,
-          value: 'Identificador de Google Maps para la direccion de entrega seleccionada',
+          value: 'Identificador de Google Maps para la dirección de entrega seleccionada',
         },
       ],
     },
@@ -96,7 +96,7 @@ export const customFields: VendureConfig['customFields'] = {
       public: true,
       label: [
         { languageCode: LanguageCode.en, value: 'Store description' },
-        { languageCode: LanguageCode.es, value: 'Descripcion de la tienda' },
+        { languageCode: LanguageCode.es, value: 'Descripción de la tienda' },
       ],
       description: [
         {
@@ -105,7 +105,7 @@ export const customFields: VendureConfig['customFields'] = {
         },
         {
           languageCode: LanguageCode.es,
-          value: 'Descripcion publica mostrada en la pagina de la tienda',
+          value: 'Descripción pública mostrada en la página de la tienda',
         },
       ],
     },
@@ -139,7 +139,7 @@ export const customFields: VendureConfig['customFields'] = {
       public: true,
       label: [
         { languageCode: LanguageCode.en, value: 'Pickup address' },
-        { languageCode: LanguageCode.es, value: 'Direccion de recogida' },
+        { languageCode: LanguageCode.es, value: 'Dirección de recogida' },
       ],
       description: [
         {
@@ -148,7 +148,7 @@ export const customFields: VendureConfig['customFields'] = {
         },
         {
           languageCode: LanguageCode.es,
-          value: 'Direccion de la tienda usada como origen del domicilio',
+          value: 'Dirección de la tienda usada como origen del domicilio',
         },
       ],
     },
@@ -217,6 +217,7 @@ export const customFields: VendureConfig['customFields'] = {
       type: 'string',
       nullable: true,
       public: true,
+      ui: { component: 'ecommer-store-pickup-map-preview', fullWidth: true },
       label: [
         { languageCode: LanguageCode.en, value: 'Pickup Google Place ID' },
         { languageCode: LanguageCode.es, value: 'ID de Google de recogida' },
@@ -228,7 +229,7 @@ export const customFields: VendureConfig['customFields'] = {
         },
         {
           languageCode: LanguageCode.es,
-          value: 'Identificador de Google Maps para la direccion de recogida de la tienda',
+          value: 'Identificador de Google Maps para la dirección de recogida de la tienda',
         },
       ],
     },

@@ -1,5 +1,5 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, Logger, Permission, RequestContext, Transaction, ChannelService } from '@vendure/core';
+import { Allow, Ctx, Logger, Permission, RequestContext, ChannelService } from '@vendure/core';
 
 import { GoogleAuthService } from '../services/google-auth.service';
 import { loggerCtx } from '../constants';
@@ -23,12 +23,16 @@ export class LoginResolver {
                 process.env.GOOGLE_OAUTH_CLIENT_ID ||
                 process.env.VITE_GOOGLE_OAUTH_CLIENT_ID ||
                 '',
+            googleMapsApiKey:
+                LoginPlugin.options?.googleMapsApiKey ||
+                process.env.GOOGLE_MAPS_API_KEY ||
+                process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+                '',
             defaultChannelToken: defaultChannel.token,
         };
     }
 
     @Mutation()
-    @Transaction()
     @Allow(Permission.Public)
     async registerSellerWithGoogle(
         @Ctx() ctx: RequestContext,

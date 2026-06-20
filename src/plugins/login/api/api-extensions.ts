@@ -10,6 +10,10 @@ export const adminApiExtensions = gql`
         """
         googleOAuthClientId: String!
         """
+        Google Maps JavaScript API key usado para seleccionar dirección de recogida.
+        """
+        googleMapsApiKey: String!
+        """
         Código del canal por defecto. El superadmin debe usar este canal
         para evitar problemas de filtrado de productos.
         """
@@ -29,6 +33,31 @@ export const adminApiExtensions = gql`
         Nombre de la tienda del vendedor.
         """
         shopName: String!
+
+        """
+        Dirección de recogida de la tienda seleccionada desde Google Maps.
+        """
+        pickupAddress: String!
+
+        """
+        Latitud de la dirección de recogida.
+        """
+        pickupLatitude: Float!
+
+        """
+        Longitud de la dirección de recogida.
+        """
+        pickupLongitude: Float!
+
+        """
+        Barrio o sector detectado para la dirección de recogida.
+        """
+        pickupNeighborhood: String
+
+        """
+        Google Place ID de la dirección de recogida.
+        """
+        pickupGooglePlaceId: String
     }
 
     """
@@ -54,6 +83,14 @@ export const adminApiExtensions = gql`
         loginConfig: LoginConfig!
     }
 
+    """
+    Resultado de eliminar la cuenta del seller.
+    """
+    type DeleteSellerAccountResult {
+        success: Boolean!
+        message: String!
+    }
+
     extend type Mutation {
         """
         Registra un nuevo vendedor usando autenticación de Google.
@@ -70,5 +107,13 @@ export const adminApiExtensions = gql`
         sobre su canal correspondiente.
         """
         syncSellerChannelAfterLogin: SyncSellerChannelResult!
+
+        """
+        Elimina permanentemente la cuenta del seller autenticado.
+        Realiza un soft-delete anonimizando los datos del Administrator,
+        User y Seller. También deshabilita los productos del seller
+        y cancela la suscripción activa.
+        """
+        deleteSellerAccount: DeleteSellerAccountResult!
     }
 `;

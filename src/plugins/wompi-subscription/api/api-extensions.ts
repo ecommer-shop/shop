@@ -116,6 +116,14 @@ export const wompiSubscriptionShopApiExtensions = gql`
     ): PendingSubscriptionResult
     stopAutoRenew(subscriptionId: Int!, customerEmail: String): CustomerSubscription
     cancelSubscription(subscriptionId: Int!, customerEmail: String): CustomerSubscription
+    fixProductTranslations(dryRun: Boolean! = false): FixTranslationsResult!
+  }
+
+  type FixTranslationsResult {
+    productsScanned: Int!
+    productsFixed: Int!
+    variantsScanned: Int!
+    variantsFixed: Int!
   }
 `;
 

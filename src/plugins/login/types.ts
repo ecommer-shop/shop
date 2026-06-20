@@ -8,11 +8,21 @@ export interface PluginInitOptions {
      * Obtenido desde Google Cloud Console.
      */
     googleOAuthClientId: string;
+    /**
+     * Google Maps JavaScript API key. Se usa en el formulario de registro
+     * del vendedor para seleccionar la dirección de recogida.
+     */
+    googleMapsApiKey?: string;
 }
 
 export interface RegisterSellerWithGoogleInput {
     token: string;
     shopName: string;
+    pickupAddress: string;
+    pickupLatitude: number;
+    pickupLongitude: number;
+    pickupNeighborhood?: string | null;
+    pickupGooglePlaceId?: string | null;
 }
 
 export interface GoogleSellerRegistrationResult {
@@ -25,4 +35,9 @@ export interface SellerOnboardingInput {
     emailAddress: string;
     firstName: string;
     lastName: string;
+    pickupAddress: string;
+    pickupLatitude: number;
+    pickupLongitude: number;
+    pickupNeighborhood?: string | null;
+    pickupGooglePlaceId?: string | null;
 }

@@ -50,9 +50,9 @@ export class SubscriptionResolver {
             return null;
         }
 
-        const subscription = await this.subscriptionQueryService.getSubscriptionByAdministratorId(administratorId);
+        let subscription = await this.subscriptionQueryService.getSubscriptionByAdministratorId(administratorId);
         if (!subscription) {
-            return null;
+            subscription = await this.planManagementService.assignFreePlanToAdministrator(administratorId);
         }
 
         const [plan, productLimitValue, variationLimitValue, aiAccess, billingAccess] = await Promise.all([

@@ -40,6 +40,14 @@ import {
 } from '../../wompi-subscription/entities';
 import { FEATURE_CODES, DEFAULT_PLAN_NAMES } from '../../wompi-subscription/constants';
 
+type StorePickupCustomFields = {
+    storePickupAddress: string;
+    storePickupLatitude: number;
+    storePickupLongitude: number;
+    storePickupNeighborhood?: string | null;
+    storePickupGooglePlaceId?: string | null;
+};
+
 @Injectable()
 export class SellerOnboardingService {
     constructor(
@@ -55,10 +63,32 @@ export class SellerOnboardingService {
         private connection: TransactionalConnection,
     ) { }
 
+    private buildStorePickupCustomFields(input: SellerOnboardingInput): StorePickupCustomFields {
+        return {
+            storePickupAddress: input.pickupAddress.trim(),
+            storePickupLatitude: input.pickupLatitude,
+            storePickupLongitude: input.pickupLongitude,
+            storePickupNeighborhood: input.pickupNeighborhood?.trim() || null,
+            storePickupGooglePlaceId: input.pickupGooglePlaceId?.trim() || null,
+        };
+    }
+
+    private assertValidPickupAddress(input: SellerOnboardingInput): void {
+        if (!input.pickupAddress?.trim()) {
+            throw new Error('Selecciona una dirección de recogida para tu tienda');
+        }
+
+        if (!Number.isFinite(input.pickupLatitude) || !Number.isFinite(input.pickupLongitude)) {
+            throw new Error('La dirección de recogida debe tener coordenadas de Google Maps');
+        }
+    }
+
     async registerSeller(
         ctx: RequestContext,
         input: SellerOnboardingInput,
     ): Promise<GoogleSellerRegistrationResult> {
+        this.assertValidPickupAddress(input);
+
         const existingUser = await this.connection
             .getRepository(ctx, User)
             .createQueryBuilder('user')
@@ -79,26 +109,60 @@ export class SellerOnboardingService {
         }
 
         const superAdminCtx = await this.getSuperAdminContext(ctx);
-        const channel = await this.createSellerChannelRoleAdmin(superAdminCtx, {
-            shopName: input.shopName,
-            seller: {
-                firstName: input.firstName,
-                lastName: input.lastName,
-                emailAddress: input.emailAddress,
-                password: this.generateSecurePassword(),
-            },
-        }, existingUser ?? undefined);
 
-        await this.createSellerStockLocation(superAdminCtx, input.shopName, channel);
+        // Idempotency: check if Channel already exists from a previous partial registration
+        const shopCode = normalizeString(input.shopName, '-');
+        const channelRepo = this.connection.getRepository(superAdminCtx, Channel);
+        const existingChannel = await channelRepo.findOne({ where: { code: shopCode } });
+        if (existingChannel) {
+            const adminUser = await this.connection
+                .getRepository(superAdminCtx, User)
+                .findOne({ where: { identifier: input.emailAddress } });
+            if (adminUser) {
+                const existingAdmin = await this.administratorService.findOneByUserId(
+                    superAdminCtx,
+                    adminUser.id,
+                );
+                if (existingAdmin) {
+                    Logger.info(
+                        `Seller already registered (idempotent): ${input.emailAddress}`,
+                        loggerCtx,
+                    );
+                    return { success: true, email: input.emailAddress };
+                }
+            }
+            throw new InternalServerError(
+                `Ya existe un canal para "${input.shopName}" pero no se completó el registro. Contacta a soporte.`,
+            );
+        }
+
+        // Only critical operations inside the transaction
+        const channel = await this.connection.withTransaction(superAdminCtx, async (txCtx) => {
+            const ch = await this.createSellerChannelRoleAdmin(txCtx, {
+                shopName: input.shopName,
+                pickupCustomFields: this.buildStorePickupCustomFields(input),
+                seller: {
+                    firstName: input.firstName,
+                    lastName: input.lastName,
+                    emailAddress: input.emailAddress,
+                    password: this.generateSecurePassword(),
+                },
+            }, existingUser ?? undefined);
+
+            await this.createSellerStockLocation(txCtx, input.shopName, ch);
+            await this.assignFreePlanToSeller(txCtx, input);
+
+            Logger.info(
+                `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
+                loggerCtx,
+            );
+
+            return ch;
+        });
+
+        // Asignar facetas y colecciones (optimizado con Promise.all)
         await this.assignFacetsToSellerChannel(superAdminCtx, channel);
         await this.assignCollectionsToSellerChannel(superAdminCtx, channel);
-
-        await this.assignFreePlanToSeller(superAdminCtx, input);
-
-        Logger.info(
-            `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
-            loggerCtx,
-        );
 
         return { success: true, email: input.emailAddress };
     }
@@ -107,6 +171,7 @@ export class SellerOnboardingService {
         ctx: RequestContext,
         input: {
             shopName: string;
+            pickupCustomFields: StorePickupCustomFields;
             seller: {
                 firstName: string;
                 lastName: string;
@@ -143,8 +208,8 @@ export class SellerOnboardingService {
             throw new InternalServerError(channel.message);
         }
 
-        //const superAdminRole = await this.roleService.getSuperAdminRole(ctx);
-        //await this.roleService.assignRoleToChannel(ctx, superAdminRole.id, channel.id);
+        const superAdminRole = await this.roleService.getSuperAdminRole(ctx);
+        await this.roleService.assignRoleToChannel(ctx, superAdminRole.id, channel.id);
 
         const role = await this.roleService.create(ctx, {
             code: `${shopCode}-admin`,
@@ -159,6 +224,7 @@ export class SellerOnboardingService {
                 existingUser,
                 role.id.toString(),
                 input.seller,
+                input.pickupCustomFields,
             );
         } else {
             await this.administratorService.create(ctx, {
@@ -167,6 +233,7 @@ export class SellerOnboardingService {
                 emailAddress: input.seller.emailAddress,
                 password: input.seller.password,
                 roleIds: [role.id],
+                customFields: input.pickupCustomFields,
             });
         }
 
@@ -182,7 +249,9 @@ export class SellerOnboardingService {
             lastName: string;
             emailAddress: string;
         },
+        pickupCustomFields: StorePickupCustomFields,
     ) {
+        const administratorRepository = this.connection.getRepository(ctx, Administrator);
         const existingAdministrator = await this.administratorService.findOneByUserId(
             ctx,
             existingUser.id,
@@ -190,6 +259,11 @@ export class SellerOnboardingService {
 
         if (existingAdministrator) {
             await this.administratorService.assignRole(ctx, existingAdministrator.id, roleId);
+            existingAdministrator.customFields = {
+                ...(existingAdministrator.customFields as Record<string, unknown> | undefined),
+                ...pickupCustomFields,
+            };
+            await administratorRepository.save(existingAdministrator);
             return;
         }
 
@@ -213,12 +287,12 @@ export class SellerOnboardingService {
             await userRepository.save(reloadedUser);
         }
 
-        const administratorRepository = this.connection.getRepository(ctx, Administrator);
         const administrator = administratorRepository.create({
             firstName: seller.firstName,
             lastName: seller.lastName,
             emailAddress: seller.emailAddress,
             user: reloadedUser,
+            customFields: pickupCustomFields,
         });
         await administratorRepository.save(administrator);
     }
@@ -360,14 +434,14 @@ export class SellerOnboardingService {
         sellerChannel: Channel,
     ) {
         const { items: facets } = await this.facetService.findAll(ctx, { take: 1000 });
+        const assigns: Promise<any>[] = [];
         for (const facet of facets) {
-            await this.channelService.assignToChannels(ctx, Facet, facet.id, [sellerChannel.id]);
-
+            assigns.push(this.channelService.assignToChannels(ctx, Facet, facet.id, [sellerChannel.id]));
             for (const facetValue of facet.values) {
-                await this.channelService.assignToChannels(ctx, FacetValue, facetValue.id, [sellerChannel.id]);
-                console.log(`Assigned facet value ${facetValue.id} to channel ${sellerChannel.id}`);
+                assigns.push(this.channelService.assignToChannels(ctx, FacetValue, facetValue.id, [sellerChannel.id]));
             }
         }
+        await Promise.all(assigns);
     }
 
     private async assignCollectionsToSellerChannel(
@@ -375,9 +449,11 @@ export class SellerOnboardingService {
         sellerChannel: Channel,
     ) {
         const { items: collections } = await this.collectionService.findAll(ctx, { take: 1000 });
-        for (const collection of collections) {
-            await this.channelService.assignToChannels(ctx, Collection, collection.id, [sellerChannel.id]);
-        }
+        await Promise.all(
+            collections.map(c =>
+                this.channelService.assignToChannels(ctx, Collection, c.id, [sellerChannel.id])
+            ),
+        );
     }
 
     private async getSuperAdminContext(ctx: RequestContext): Promise<RequestContext> {
