@@ -5,6 +5,7 @@ const STEPS = [
     { key: 'pay', label: 'Pago certificado' },
     { key: 'review', label: 'Revisión super admin' },
     { key: 'active', label: 'Certificado activo' },
+    { key: 'matias', label: 'Perfil Matias' },
     { key: 'plans', label: 'Comprar paquetes' },
 ] as const;
 
@@ -13,22 +14,27 @@ export function CertificateStatusSteps({
     certificatePaymentStatus,
     canBuyPlans,
     docsComplete,
+    matiasProfileComplete = canBuyPlans,
 }: {
     certificateStatus: string;
     certificatePaymentStatus: string;
     canBuyPlans: boolean;
     docsComplete: boolean;
+    matiasProfileComplete?: boolean;
 }) {
+    const certificateReady = certificateStatus === 'ACTIVE' && certificatePaymentStatus === 'PAID';
     const stepDone: Record<string, boolean> = {
         docs: docsComplete,
         pay: certificatePaymentStatus === 'PAID',
         review: ['UNDER_REVIEW', 'ACTIVE', 'REJECTED'].includes(certificateStatus) && certificatePaymentStatus === 'PAID',
-        active: canBuyPlans,
+        active: certificateReady,
+        matias: matiasProfileComplete,
         plans: canBuyPlans,
     };
 
     const stepCurrent = (() => {
         if (canBuyPlans) return 'plans';
+        if (certificateReady && !matiasProfileComplete) return 'matias';
         if (certificateStatus === 'UNDER_REVIEW') return 'review';
         if (certificatePaymentStatus === 'PAID') return 'review';
         if (docsComplete) return 'pay';
@@ -40,6 +46,9 @@ export function CertificateStatusSteps({
             return 'Renueva: sube documentos de nuevo y paga el certificado.';
         }
         if (canBuyPlans) return 'Puedes comprar paquetes de facturas.';
+        if (certificateReady && !matiasProfileComplete) {
+            return 'Esperando que el superadmin configure token, prefijo y resolución Matias.';
+        }
         if (certificateStatus === 'UNDER_REVIEW') {
             return 'Esperando que el super admin apruebe tu certificado.';
         }

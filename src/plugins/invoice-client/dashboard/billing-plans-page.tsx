@@ -20,6 +20,7 @@ import {
 import { ArrowLeft, Info, Wallet } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { CONTRACT_VERSION } from '../../wompi-subscription/contract-constants';
 import { BillingCertificateDocField } from './components/billing-certificate-doc-field';
 import { CertificateStatusSteps } from './components/certificate-status-steps';
 import { InvoicePlanCard, type InvoicePlanCardPlan } from './components/invoice-plan-card';
@@ -72,6 +73,10 @@ query BillingPlansDashboardData {
     documents { chamber rut nit }
     invoicesRemaining
     canBuyPlans
+    matiasTokenConfigured
+    matiasPrefixConfigured
+    matiasResolutionConfigured
+    matiasProfileComplete
     purchaseHistory {
       purchasedAt
       planCode
@@ -132,6 +137,10 @@ type BillingPlanState = {
     documents: { chamber: string | null; rut: string | null; nit: string | null };
     invoicesRemaining: number;
     canBuyPlans: boolean;
+    matiasTokenConfigured: boolean;
+    matiasPrefixConfigured: boolean;
+    matiasResolutionConfigured: boolean;
+    matiasProfileComplete: boolean;
     purchaseHistory: {
         purchasedAt: string;
         planCode: string;
@@ -189,6 +198,8 @@ export function BillingPlansPage() {
     const state = data?.myBillingPlanState;
     const plans = data?.billingInvoicePlans ?? [];
     const canBuyPlans = !!state?.canBuyPlans;
+    const certificateReady = state?.certificateStatus === 'ACTIVE' && state.certificatePaymentStatus === 'PAID';
+    const waitingMatiasProfile = !!certificateReady && !state?.matiasProfileComplete;
     const docsComplete = !!(chamberRef.trim() && rutRef.trim() && nitRef.trim());
     const docsSavedOnServer =
         !!state?.documents?.chamber?.trim() &&
@@ -320,6 +331,8 @@ export function BillingPlansPage() {
             }>(CREATE_PENDING_INVOICE_PLAN, {
                 planCode: selectedPlan.code,
                 paymentMethod: selectedMethod,
+                clickwrapAccepted: true,
+                contractVersion: CONTRACT_VERSION,
             });
             const result = data.createPendingInvoicePlanPurchase;
             setPlanPendingResult(result);
@@ -351,6 +364,8 @@ export function BillingPlansPage() {
                 planCode: selectedPlan.code,
                 paymentMethod: selectedMethod,
                 token,
+                clickwrapAccepted: true,
+                contractVersion: CONTRACT_VERSION,
                 sessionId: sessionId ?? null,
                 deviceId: deviceId ?? null,
             });
@@ -435,6 +450,7 @@ export function BillingPlansPage() {
                                     certificatePaymentStatus={state?.certificatePaymentStatus ?? 'UNPAID'}
                                     canBuyPlans={canBuyPlans}
                                     docsComplete={docsComplete}
+                                    matiasProfileComplete={state?.matiasProfileComplete ?? false}
                                 />
                                 {paymentNotice && (
                                     <p className="text-sm rounded-md border bg-muted/50 p-2">{paymentNotice}</p>
@@ -466,7 +482,7 @@ export function BillingPlansPage() {
 
                 {step === 'overview' && (
                     <>
-                        {!canBuyPlans && (
+                        {!certificateReady && (
                             <PageBlock column="main" blockId="cert-required">
                                 <Card className="border-amber-500/30 bg-amber-500/5">
                                     <CardHeader>
@@ -482,6 +498,25 @@ export function BillingPlansPage() {
                                     </CardHeader>
                                     <CardContent>
                                         <Button onClick={() => setStep('certificate')}>Iniciar certificado</Button>
+                                    </CardContent>
+                                </Card>
+                            </PageBlock>
+                        )}
+
+                        {waitingMatiasProfile && (
+                            <PageBlock column="main" blockId="matias-profile-pending">
+                                <Card className="border-blue-500/30 bg-blue-500/5">
+                                    <CardHeader>
+                                        <CardTitle>En espera de asignación Matias</CardTitle>
+                                        <CardDescription>
+                                            Tu certificado ya está aprobado. Falta que el superadmin configure el token,
+                                            prefijo y resolución Matias para habilitar la compra de paquetes.
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2 text-sm">
+                                        <p>Token: {state?.matiasTokenConfigured ? 'configurado' : 'pendiente'}</p>
+                                        <p>Prefijo: {state?.matiasPrefixConfigured ? 'configurado' : 'pendiente'}</p>
+                                        <p>Resolución: {state?.matiasResolutionConfigured ? 'configurada' : 'pendiente'}</p>
                                     </CardContent>
                                 </Card>
                             </PageBlock>
@@ -569,6 +604,7 @@ export function BillingPlansPage() {
                                     certificatePaymentStatus={state?.certificatePaymentStatus ?? 'UNPAID'}
                                     canBuyPlans={canBuyPlans}
                                     docsComplete={docsComplete}
+                                    matiasProfileComplete={state?.matiasProfileComplete ?? false}
                                 />
 
                                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">

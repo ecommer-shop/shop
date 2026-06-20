@@ -16,6 +16,8 @@ import { BillingPlansService } from './services/billing-plans.service';
 import { BillingCertificateNotificationService } from './services/billing-certificate-notification.service';
 import { BillingCertificateJobService } from './services/billing-certificate-job.service';
 import { InvoicePlanWompiPaymentService } from './services/invoice-plan-wompi-payment.service';
+import { ClickwrapAcceptanceService } from './services/clickwrap-acceptance.service';
+import { ClickwrapAcceptance } from './entities/clickwrap-acceptance.entity';
 import { adminApiExtensions, shopApiExtensions } from './api/api-extensions';
 import { InvoiceAdminResolver } from './api/invoice-admin.resolver';
 import { InvoiceShopResolver } from './api/invoice-shop.resolver';
@@ -25,6 +27,7 @@ import { InvoiceShopResolver } from './api/invoice-shop.resolver';
  */
 @VendurePlugin({
   imports: [PluginCommonModule, WompiSubscriptionModule],
+  entities: [ClickwrapAcceptance],
   providers: [
     { provide: INVOICE_CLIENT_PLUGIN_OPTIONS, useFactory: () => InvoiceClientPlugin.options },
     InvoiceMicroHttpClient,
@@ -40,6 +43,7 @@ import { InvoiceShopResolver } from './api/invoice-shop.resolver';
     BillingCertificateNotificationService,
     BillingCertificateJobService,
     InvoicePlanWompiPaymentService,
+    ClickwrapAcceptanceService,
     InvoiceSubscriber,
   ],
   adminApiExtensions: {

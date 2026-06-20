@@ -119,9 +119,6 @@ export class MatiasBillingStoresService {
       if (!willHaveToken) {
         throw new UserInputError('El token Matias es obligatorio al activar facturación.');
       }
-      if (newRemaining == null || newRemaining <= 0) {
-        throw new UserInputError('Indica un cupo restante mayor que 0 al activar facturación.');
-      }
     }
 
     if (prefixTrim) {

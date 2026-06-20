@@ -109,6 +109,10 @@ const invoiceType = gql`
     documents: BillingCertificateDocs!
     invoicesRemaining: Int!
     canBuyPlans: Boolean!
+    matiasTokenConfigured: Boolean!
+    matiasPrefixConfigured: Boolean!
+    matiasResolutionConfigured: Boolean!
+    matiasProfileComplete: Boolean!
     purchaseHistory: [BillingPlanPurchaseEntry!]!
   }
 
@@ -140,6 +144,12 @@ const invoiceType = gql`
     channelId: ID!
     approve: Boolean!
     note: String
+  }
+
+  input RecordClickwrapAcceptanceInput {
+    contractVersion: String!
+    contractContext: String!
+    planName: String!
   }
 
   input ConfirmBillingPlanPaymentInput {
@@ -225,16 +235,24 @@ const adminMutations = gql`
     confirmMyBillingCertificatePayment: BillingPlanState!
     approveBillingCertificate(input: ApproveBillingCertificateInput!): BillingPlanState!
     confirmBillingPlanPayment(input: ConfirmBillingPlanPaymentInput!): BillingPlanState!
-    createPendingInvoicePlanPurchase(planCode: String!, paymentMethod: String!): InvoicePlanPurchaseResult!
+    createPendingInvoicePlanPurchase(
+      planCode: String!
+      paymentMethod: String!
+      clickwrapAccepted: Boolean!
+      contractVersion: String!
+    ): InvoicePlanPurchaseResult!
     purchaseInvoicePlanWithPayment(
       planCode: String!
       paymentMethod: String!
       token: String!
+      clickwrapAccepted: Boolean!
+      contractVersion: String!
       sessionId: String
       deviceId: String
     ): InvoicePlanPurchaseResult!
     syncInvoiceFromMatias(invoiceId: ID!, orderCode: String!): InvoiceMatiasActionResult!
     resendInvoiceMatiasEmail(invoiceId: ID!, orderCode: String!, email: String): InvoiceMatiasActionResult!
+    recordClickwrapAcceptance(input: RecordClickwrapAcceptanceInput!): Boolean!
   }
 `;
 

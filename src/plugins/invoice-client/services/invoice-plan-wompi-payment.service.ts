@@ -9,6 +9,8 @@ import {
 import { WompiService } from '../../wompi-subscription/services/wompi.service';
 import { PAYMENT_METHOD_FLOW, PaymentFlowType } from '../../wompi-subscription/payment-methods';
 import { BillingPlansService, BillingPlanState } from './billing-plans.service';
+import { ClickwrapAcceptanceService } from './clickwrap-acceptance.service';
+import { Request } from 'express';
 
 export interface InvoicePlanPurchaseResult {
   reference: string;
@@ -26,6 +28,7 @@ export class InvoicePlanWompiPaymentService {
     private readonly wompiService: WompiService,
     private readonly billingPlans: BillingPlansService,
     private readonly connection: TransactionalConnection,
+    private readonly clickwrapAcceptance: ClickwrapAcceptanceService,
   ) {}
 
   buildPlanReference(channelCode: string, planCode: string): string {
@@ -36,6 +39,8 @@ export class InvoicePlanWompiPaymentService {
     ctx: RequestContext,
     planCode: string,
     paymentMethod: string,
+    clickwrap: { accepted: boolean; contractVersion: string },
+    req?: Request,
   ): Promise<InvoicePlanPurchaseResult> {
     const flowType = PAYMENT_METHOD_FLOW[paymentMethod as keyof typeof PAYMENT_METHOD_FLOW];
     if (!flowType) {
@@ -47,15 +52,25 @@ export class InvoicePlanWompiPaymentService {
 
     const state = await this.billingPlans.getCurrentChannelPlanState(ctx);
     if (!state.canBuyPlans) {
-      throw new UserInputError(
-        'Debes tener certificado activo y pago confirmado para comprar paquetes de facturación.',
-      );
+      throw new UserInputError(this.blockedPurchaseMessage(state));
     }
 
     const plan = this.billingPlans.getPlanCatalog().find((p) => p.code === planCode);
     if (!plan) {
       throw new UserInputError(`Plan no válido: ${planCode}`);
     }
+
+    await this.clickwrapAcceptance.recordAcceptance(
+      ctx,
+      {
+        accepted: clickwrap.accepted,
+        contractVersion: clickwrap.contractVersion,
+        contractContext: 'INVOICE_PLAN',
+        planName: plan.name,
+        planCode: plan.code,
+      },
+      req,
+    );
 
     const adminEmail = await this.resolveAdminEmail(ctx);
     const reference = this.buildPlanReference(state.channelCode, plan.code);
@@ -105,6 +120,8 @@ export class InvoicePlanWompiPaymentService {
     planCode: string,
     paymentMethod: string,
     token: string,
+    clickwrap: { accepted: boolean; contractVersion: string },
+    req?: Request,
     sessionId?: string,
     deviceId?: string,
   ): Promise<InvoicePlanPurchaseResult> {
@@ -118,15 +135,25 @@ export class InvoicePlanWompiPaymentService {
 
     const state = await this.billingPlans.getCurrentChannelPlanState(ctx);
     if (!state.canBuyPlans) {
-      throw new UserInputError(
-        'Debes tener certificado activo y pago confirmado para comprar paquetes de facturación.',
-      );
+      throw new UserInputError(this.blockedPurchaseMessage(state));
     }
 
     const plan = this.billingPlans.getPlanCatalog().find((p) => p.code === planCode);
     if (!plan) {
       throw new UserInputError(`Plan no válido: ${planCode}`);
     }
+
+    await this.clickwrapAcceptance.recordAcceptance(
+      ctx,
+      {
+        accepted: clickwrap.accepted,
+        contractVersion: clickwrap.contractVersion,
+        contractContext: 'INVOICE_PLAN',
+        planName: plan.name,
+        planCode: plan.code,
+      },
+      req,
+    );
 
     const adminEmail = await this.resolveAdminEmail(ctx);
     const reference = this.buildPlanReference(state.channelCode, plan.code);
@@ -180,6 +207,8 @@ export class InvoicePlanWompiPaymentService {
     } catch (error) {
       Logger.error(`Invoice plan charge failed: ${error}`, 'InvoicePlanWompiPaymentService');
       throw error;
+    } finally {
+      await this.wompiService.deletePaymentSource(paymentSource.id);
     }
 
     const billingPlanState = await this.billingPlans.getCurrentChannelPlanState(ctx);
@@ -208,5 +237,12 @@ export class InvoicePlanWompiPaymentService {
       throw new UserInputError('Administrador no encontrado o sin correo.');
     }
     return admin.emailAddress;
+  }
+
+  private blockedPurchaseMessage(state: BillingPlanState): string {
+    if (state.certificateStatus === 'ACTIVE' && state.certificatePaymentStatus === 'PAID') {
+      return 'Tu certificado ya fue aprobado, pero aún falta que el superadmin configure token, prefijo y resolución Matias para habilitar la compra de paquetes.';
+    }
+    return 'Debes tener certificado activo y pago confirmado para comprar paquetes de facturación.';
   }
 }
