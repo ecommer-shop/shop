@@ -8,10 +8,13 @@ Shop API module for creating delivery orders without exposing provider credentia
 DELIVERY_ORDER_API_KEY=your-provider-key
 DELIVERY_ORDER_API_URL=https://us-central1-messengerdomis-19924.cloudfunctions.net/crearDomicilio
 DELIVERY_ORDER_TIMEOUT_MS=10000
+DELIVERY_ORDER_WEBHOOK_SECRET=your-webhook-secret
 ```
 
 `DELIVERY_ORDER_API_URL` is optional because the Messenger Domis strategy has the current URL as its default.
 If `DELIVERY_ORDER_API_KEY` is not set, the strategy also checks `MESSENGER_DOMIS_API_KEY` and `DELIVERY_COST_API_KEY`.
+`DELIVERY_ORDER_WEBHOOK_SECRET` is used by the status webhook. Messenger Domis should send it as `x-api-key`,
+`x-webhook-secret`, or `Authorization: Bearer <secret>`.
 
 ## Shop API mutation
 
@@ -34,6 +37,10 @@ Variables:
 ```json
 {
   "input": {
+    "orderId": "1",
+    "orderCode": "ABCD1234",
+    "sellerChannelCode": "mateo01",
+    "sellerName": "Mateo01",
     "barrio_origen": "El Poblado",
     "barrio_destino": "Laureles",
     "origen_lat_lng": "6.2442,-75.5812",
@@ -51,6 +58,9 @@ Variables:
 }
 ```
 
+`orderId`, `orderCode`, `sellerChannelCode`, and `sellerName` are optional for the provider, but required if
+Ecommer needs to show the delivery status later for the buyer and seller.
+
 Required fields:
 
 ```txt
@@ -63,6 +73,49 @@ Optional fields:
 
 ```txt
 observacion, imagen, tiempo_aproximado
+```
+
+## Status webhook
+
+Messenger Domis can update the delivery status with:
+
+```http
+POST /api/delivery-order/status
+Content-Type: application/json
+x-api-key: your-webhook-secret
+```
+
+Payload:
+
+```json
+{
+  "id_documento": "provider-document-id",
+  "estado": "EN_CAMINO",
+  "mensaje": "El domiciliario va hacia el destino",
+  "tracking_url": "https://tracking.example.com/..."
+}
+```
+
+The webhook also accepts common aliases such as `providerDocumentId`, `deliveryId`, `status`, `state`,
+`message`, `trackingUrl`, `orderCode`, and `sellerChannelCode`.
+
+## Query delivery status
+
+```graphql
+query DeliveryOrdersByOrderCode($orderCode: String!) {
+  deliveryOrdersByOrderCode(orderCode: $orderCode) {
+    id
+    orderCode
+    sellerChannelCode
+    sellerName
+    provider
+    providerDocumentId
+    status
+    statusLabel
+    trackingUrl
+    statusUpdatedAt
+  }
+}
 ```
 
 ## Swap the provider
