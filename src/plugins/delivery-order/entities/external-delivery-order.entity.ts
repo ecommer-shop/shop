@@ -11,31 +11,31 @@ export class ExternalDeliveryOrder extends VendureEntity {
         super(input);
     }
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     orderId: string | null;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     orderCode: string | null;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     sellerChannelCode: string | null;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     sellerName: string | null;
 
-    @Column({ default: MESSENGER_DOMIS_PROVIDER_CODE })
+    @Column({ type: 'varchar', default: MESSENGER_DOMIS_PROVIDER_CODE })
     provider: string;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     providerDocumentId: string | null;
 
-    @Column({ default: 'CREATED' })
+    @Column({ type: 'varchar', default: 'CREATED' })
     status: string;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     statusLabel: string | null;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     trackingUrl: string | null;
 
     @Column({ type: 'timestamp', nullable: true })
