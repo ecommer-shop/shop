@@ -21,6 +21,7 @@ import {
   CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD,
 } from '../constants';
 import { BillingCertificateNotificationService } from './billing-certificate-notification.service';
+import { MatiasGlobalPoolService } from './matias-global-pool.service';
 
 type ChannelCustomFields = Record<string, unknown>;
 
@@ -89,6 +90,7 @@ export class BillingPlansService {
     private readonly connection: TransactionalConnection,
     private readonly channelService: ChannelService,
     private readonly certificateNotifications: BillingCertificateNotificationService,
+    private readonly globalPool: MatiasGlobalPoolService,
   ) { }
 
   /** Valida certificado vigente antes de emitir facturas (Matias). */
@@ -126,6 +128,21 @@ export class BillingPlansService {
 
   getPlanCatalog(): InvoicePlanDefinition[] {
     return INVOICE_PLANS;
+  }
+
+  async assertGlobalPoolCanCoverPlan(ctx: RequestContext, planCode: string): Promise<void> {
+    const plan = this.getPlanByCode(planCode);
+    const pool = await this.globalPool.getPoolStatus(ctx);
+    if (pool.sellableRemaining == null) {
+      throw new UserInputError(
+        'El superadmin debe configurar primero el pool global de facturas antes de vender paquetes.',
+      );
+    }
+    if (pool.sellableRemaining < plan.invoices) {
+      throw new UserInputError(
+        `No hay suficientes facturas en el pool global para vender este paquete. Disponible: ${pool.sellableRemaining}, requerido: ${plan.invoices}.`,
+      );
+    }
   }
 
   /** Firma de integridad Wompi (misma fórmula que PaymentPlugin). */
@@ -239,43 +256,37 @@ export class BillingPlansService {
     planCode: string,
     paymentReference?: string,
   ): Promise<void> {
-    const channel = await this.connection.getRepository(ctx, Channel).findOne({
-      where: { code: channelCode, sellerId: Not(IsNull()) },
-      relations: ['seller'],
-    });
-    if (!channel) return;
-    const state = this.toState(channel);
-    if (!state.canBuyPlans) return;
-    const cf = (channel.customFields as ChannelCustomFields) ?? {};
-    if (
-      paymentReference &&
-      this.parsePurchaseHistoryRaw(cf[CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD]).some(
-        (e) => e.paymentReference === paymentReference,
-      )
-    ) {
-      return;
-    }
     const plan = this.getPlanByCode(planCode);
-    const currentRemaining = state.invoicesRemaining;
-    const customFields: ChannelCustomFields = {
-      ...cf,
-      [CHANNEL_INVOICE_LIMIT_REMAINING_FIELD]: currentRemaining + plan.invoices,
-      [CHANNEL_INVOICE_BILLING_ACTIVE_FIELD]: true,
-      [CHANNEL_BILLING_PLAN_LAST_PURCHASED_AT_FIELD]: new Date(),
-      [CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD]: this.appendPurchaseHistoryJson(
-        cf[CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD],
-        {
-          purchasedAt: new Date().toISOString(),
-          planCode: plan.code,
-          planName: plan.name,
-          invoicesAdded: plan.invoices,
-          priceCop: plan.priceCop,
-          paymentReference: paymentReference ?? null,
-          source: 'wompi',
-        },
-      ),
-    };
-    await this.channelService.update(ctx, { id: channel.id, customFields });
+    await this.connection.withTransaction(ctx, async (txCtx) => {
+      const channel = await this.connection.getRepository(txCtx, Channel).findOne({
+        where: { code: channelCode, sellerId: Not(IsNull()) },
+        relations: ['seller'],
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!channel) return;
+      const state = this.toState(channel);
+      if (!state.canBuyPlans) return;
+      const cf = (channel.customFields as ChannelCustomFields) ?? {};
+      if (
+        paymentReference &&
+        this.parsePurchaseHistoryRaw(cf[CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD]).some(
+          (e) => e.paymentReference === paymentReference,
+        )
+      ) {
+        return;
+      }
+
+      await this.globalPool.applySellableDelta(txCtx, plan.invoices);
+      const currentRemaining = state.invoicesRemaining;
+      const customFields = this.buildPlanPurchaseCustomFields(
+        cf,
+        currentRemaining,
+        plan,
+        paymentReference ?? null,
+        'wompi',
+      );
+      await this.channelService.update(txCtx, { id: channel.id, customFields });
+    });
   }
 
   async confirmPlanPayment(
@@ -283,45 +294,47 @@ export class BillingPlansService {
     input: { planCode: string; channelId?: string | null },
   ): Promise<BillingPlanState> {
     const plan = this.getPlanByCode(input.planCode);
-    const channel =
-      input.channelId != null
-        ? await this.connection.getRepository(ctx, Channel).findOne({
-          where: { id: input.channelId, sellerId: Not(IsNull()) },
-          relations: ['seller'],
-        })
-        : await this.getCurrentSellerChannel(ctx);
-    if (!channel) {
-      throw new UserInputError('Canal vendedor no encontrado.');
-    }
-    const state = this.toState(channel);
-    if (!state.canBuyPlans) {
-      throw new UserInputError(
-        'Debes tener certificado activo y pago confirmado para comprar planes de facturación.',
+    let updatedChannelId: string | null = null;
+    await this.connection.withTransaction(ctx, async (txCtx) => {
+      const channel =
+        input.channelId != null
+          ? await this.connection.getRepository(txCtx, Channel).findOne({
+            where: { id: input.channelId, sellerId: Not(IsNull()) },
+            relations: ['seller'],
+            lock: { mode: 'pessimistic_write' },
+          })
+          : await this.connection.getRepository(txCtx, Channel).findOne({
+            where: { id: txCtx.channelId, sellerId: Not(IsNull()) },
+            relations: ['seller'],
+            lock: { mode: 'pessimistic_write' },
+          });
+      if (!channel) {
+        throw new UserInputError('Canal vendedor no encontrado.');
+      }
+      const state = this.toState(channel);
+      if (!state.canBuyPlans) {
+        throw new UserInputError(
+          'Debes tener certificado activo y pago confirmado para comprar planes de facturación.',
+        );
+      }
+
+      await this.globalPool.applySellableDelta(txCtx, plan.invoices);
+      const cf = (channel.customFields as ChannelCustomFields) ?? {};
+      const customFields = this.buildPlanPurchaseCustomFields(
+        cf,
+        state.invoicesRemaining,
+        plan,
+        null,
+        'admin',
       );
+      await this.channelService.update(txCtx, { id: channel.id, customFields });
+      updatedChannelId = String(channel.id);
+    });
+    if (!updatedChannelId) {
+      throw new Error('No se pudo actualizar el cupo del canal.');
     }
-    const currentRemaining = state.invoicesRemaining;
-    const cf = (channel.customFields as ChannelCustomFields) ?? {};
-    const customFields: ChannelCustomFields = {
-      ...cf,
-      [CHANNEL_INVOICE_LIMIT_REMAINING_FIELD]: currentRemaining + plan.invoices,
-      [CHANNEL_INVOICE_BILLING_ACTIVE_FIELD]: true,
-      [CHANNEL_BILLING_PLAN_LAST_PURCHASED_AT_FIELD]: new Date(),
-      [CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD]: this.appendPurchaseHistoryJson(
-        cf[CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD],
-        {
-          purchasedAt: new Date().toISOString(),
-          planCode: plan.code,
-          planName: plan.name,
-          invoicesAdded: plan.invoices,
-          priceCop: plan.priceCop,
-          paymentReference: null,
-          source: 'admin',
-        },
-      ),
-    };
-    await this.channelService.update(ctx, { id: channel.id, customFields });
     const fresh = await this.connection.getRepository(ctx, Channel).findOne({
-      where: { id: channel.id },
+      where: { id: updatedChannelId },
       relations: ['seller'],
     });
     if (!fresh) throw new Error('No se pudo recargar canal.');
@@ -446,5 +459,32 @@ export class BillingPlansService {
     const list = this.parsePurchaseHistoryRaw(raw);
     list.push(entry);
     return JSON.stringify(list.slice(-50));
+  }
+
+  private buildPlanPurchaseCustomFields(
+    cf: ChannelCustomFields,
+    currentRemaining: number,
+    plan: InvoicePlanDefinition,
+    paymentReference: string | null,
+    source: string,
+  ): ChannelCustomFields {
+    return {
+      ...cf,
+      [CHANNEL_INVOICE_LIMIT_REMAINING_FIELD]: currentRemaining + plan.invoices,
+      [CHANNEL_INVOICE_BILLING_ACTIVE_FIELD]: true,
+      [CHANNEL_BILLING_PLAN_LAST_PURCHASED_AT_FIELD]: new Date(),
+      [CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD]: this.appendPurchaseHistoryJson(
+        cf[CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD],
+        {
+          purchasedAt: new Date().toISOString(),
+          planCode: plan.code,
+          planName: plan.name,
+          invoicesAdded: plan.invoices,
+          priceCop: plan.priceCop,
+          paymentReference,
+          source,
+        },
+      ),
+    };
   }
 }

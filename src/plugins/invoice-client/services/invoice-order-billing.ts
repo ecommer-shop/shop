@@ -2,6 +2,7 @@ import type { Order } from '@vendure/core';
 import {
   ADDRESS_MATIAS_CITY_ID_FIELD,
   CUSTOMER_DNI_FIELD,
+  CUSTOMER_IDENTITY_DOCUMENT_ID_FIELD,
 } from '../constants';
 
 export interface InvoiceBillingCustomerData {
@@ -12,6 +13,7 @@ export interface InvoiceBillingCustomerData {
   address: string;
   postalCode?: string;
   cityId: string;
+  identityDocumentId: string;
 }
 
 /** Normaliza documento para Matias/DIAN (alfanumérico, mayúsculas). */
@@ -82,6 +84,18 @@ export function resolveInvoiceBillingCustomer(order: Order): InvoiceBillingCusto
     );
   }
 
+  const identityDocumentId =
+    readCustomFieldString(
+      customer.customFields as Record<string, unknown> | undefined,
+      CUSTOMER_IDENTITY_DOCUMENT_ID_FIELD,
+    ) || '1';
+
+  if (!['1', '2', '3', '4', '5'].includes(identityDocumentId)) {
+    throw new Error(
+      'Tipo de documento inválido para facturación electrónica. Usa CC, CE, NIT, TI o Pasaporte.',
+    );
+  }
+
   return {
     companyName: customerName,
     dni,
@@ -90,5 +104,6 @@ export function resolveInvoiceBillingCustomer(order: Order): InvoiceBillingCusto
     address,
     postalCode: billingAddress?.postalCode?.trim() || undefined,
     cityId,
+    identityDocumentId,
   };
 }

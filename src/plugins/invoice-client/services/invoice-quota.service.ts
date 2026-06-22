@@ -110,12 +110,11 @@ export class InvoiceQuotaService {
   }
 
   /**
-   * Valida cupo + perfil Matias (sin descontar). El cupo se descuenta solo tras emisión exitosa
-   * ({@link decrementQuotaAfterSuccessfulEmit}).
+   * Reserva 1 factura del cupo del vendedor de forma atómica y devuelve el perfil Matias.
+   * Si no hay cupo al momento exacto del UPDATE, no emite.
    */
-  async assertQuotaForOrder(ctx: RequestContext, order: Order): Promise<SellerMatiasEmitConfig> {
+  async reserveQuotaForOrder(ctx: RequestContext, order: Order): Promise<SellerMatiasEmitConfig> {
     const emitConfig = await this.getSellerEmitConfigForOrderEntity(ctx, order);
-
     const defaultChannel = await this.channelService.getDefaultChannel(ctx);
     const sellerChannel = this.resolveSellerChannelFromOrder(order, String(defaultChannel.id));
     if (!sellerChannel) {
@@ -131,43 +130,7 @@ export class InvoiceQuotaService {
       throw new Error(`No se encontró el canal vendedor ${sellerChannel.id}.`);
     }
 
-    const cf = fullChannel.customFields as ChannelCustomFields | undefined;
-    const billingActive = !!cf?.[CHANNEL_INVOICE_BILLING_ACTIVE_FIELD];
-    const remainingRaw = cf?.[CHANNEL_INVOICE_LIMIT_REMAINING_FIELD];
-    const remaining = remainingRaw == null ? null : Number(remainingRaw);
-
     this.billingPlans.assertCertificateAllowsInvoiceEmission(fullChannel);
-
-    if (!billingActive) {
-      throw new Error(
-        `La tienda «${fullChannel.code}» tiene la facturación electrónica desactivada. Actívala en Ventas → Matias por tienda.`,
-      );
-    }
-    if (remaining == null || remaining <= 0) {
-      throw new Error(
-        `La tienda «${fullChannel.code}» no tiene cupo de facturas disponible (restante: ${remaining ?? '—'}).`,
-      );
-    }
-
-    return emitConfig;
-  }
-
-  /**
-   * Descuenta 1 del cupo del canal vendedor. Llamar solo después de crear la factura en Matias con éxito.
-   */
-  async decrementQuotaAfterSuccessfulEmit(ctx: RequestContext, order: Order): Promise<void> {
-    const defaultChannel = await this.channelService.getDefaultChannel(ctx);
-    const sellerChannel = this.resolveSellerChannelFromOrder(order, String(defaultChannel.id));
-    if (!sellerChannel) {
-      throw new Error(`La orden ${order.code} no tiene canal vendedor para descontar cupo.`);
-    }
-
-    const fullChannel = await this.connection.getRepository(ctx, Channel).findOne({
-      where: { id: sellerChannel.id },
-    });
-    if (!fullChannel) {
-      throw new Error(`No se encontró el canal vendedor ${sellerChannel.id}.`);
-    }
 
     const ds = this.connection.rawConnection;
     const { escapedTable, escapedId } = this.getChannelTableParts(ds);
@@ -195,30 +158,42 @@ export class InvoiceQuotaService {
       [sellerChannel.id],
     )) as Array<{ remaining: number }>;
 
-    if (updatedRows.length > 0) {
-      const rem = updatedRows[0].remaining;
-      this.logger.log(
-        `Invoice quota decremented after successful emit for channel ${fullChannel.code}. Remaining: ${rem}${rem <= 0 ? '; billing switch turned off' : ''}`,
+    if (updatedRows.length === 0) {
+      throw new Error(
+        `La tienda «${fullChannel.code}» no tiene cupo de facturas disponible o la facturación está desactivada.`,
       );
+    }
+
+    this.logger.log(
+      `Invoice quota reserved for channel ${fullChannel.code}. Remaining: ${updatedRows[0].remaining}`,
+    );
+    return emitConfig;
+  }
+
+  async releaseReservedQuotaForOrder(ctx: RequestContext, order: Order): Promise<void> {
+    const defaultChannel = await this.channelService.getDefaultChannel(ctx);
+    const sellerChannel = this.resolveSellerChannelFromOrder(order, String(defaultChannel.id));
+    if (!sellerChannel) {
       return;
     }
 
-    const currentRows = (await ds.query(
-      `SELECT ${escapedRemaining} AS remaining, ${escapedActive} AS "billingActive"
-       FROM ${escapedTable}
+    const ds = this.connection.rawConnection;
+    const { escapedTable, escapedId } = this.getChannelTableParts(ds);
+    const escapedRemaining = this.getEscapedChannelCustomFieldColumn(
+      ds,
+      CHANNEL_INVOICE_LIMIT_REMAINING_FIELD,
+    );
+    const escapedActive = this.getEscapedChannelCustomFieldColumn(
+      ds,
+      CHANNEL_INVOICE_BILLING_ACTIVE_FIELD,
+    );
+
+    await ds.query(
+      `UPDATE ${escapedTable}
+       SET ${escapedRemaining} = COALESCE(${escapedRemaining}, 0) + 1,
+           ${escapedActive} = true
        WHERE ${escapedId} = $1`,
       [sellerChannel.id],
-    )) as Array<{ remaining: number | null; billingActive: boolean }>;
-
-    const row = currentRows[0];
-    if (!row) {
-      throw new Error(
-        `Factura emitida para ${order.code} pero no se pudo descontar cupo del canal «${fullChannel.code}». Revisa el cupo manualmente.`,
-      );
-    }
-
-    throw new Error(
-      `Factura emitida para ${order.code} pero el cupo de «${fullChannel.code}» ya no estaba disponible (restante: ${row.remaining ?? '—'}). Revisa el cupo manualmente.`,
     );
   }
 

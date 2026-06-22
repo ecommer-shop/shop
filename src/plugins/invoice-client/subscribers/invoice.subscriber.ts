@@ -1,15 +1,17 @@
-import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import {
+  Order,
   EventBus,
   LanguageCode,
   Logger,
   OrderService,
   OrderStateTransitionEvent,
   RequestContextService,
+  RequestContext,
+  TransactionalConnection,
 } from '@vendure/core';
 import { InvoiceClientService } from '../services/invoice-client.service';
-import { INVOICE_CLIENT_PLUGIN_OPTIONS } from '../constants';
-import { PluginInitOptions } from '../types';
+import { InvoiceQuotaService } from '../services/invoice-quota.service';
 
 const loggerCtx = 'InvoiceSubscriber';
 
@@ -18,9 +20,10 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
   constructor(
     private eventBus: EventBus,
     private invoiceClientService: InvoiceClientService,
+    private invoiceQuotaService: InvoiceQuotaService,
     private orderService: OrderService,
     private requestContextService: RequestContextService,
-    @Inject(INVOICE_CLIENT_PLUGIN_OPTIONS) private options: PluginInitOptions,
+    private connection: TransactionalConnection,
   ) {}
 
   async onApplicationBootstrap() {
@@ -32,6 +35,8 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
   }
 
   private async handleOrderCompleted(orderId: string) {
+    let reservedOrder: Order | null = null;
+    let reservedCtx: RequestContext | null = null;
     try {
       Logger.info(`Order ${orderId} completed, creating invoice...`, loggerCtx);
 
@@ -39,6 +44,7 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
         apiType: 'admin',
         languageCode: LanguageCode.es,
       });
+      reservedCtx = ctx;
 
       const order = await this.orderService.findOne(ctx, orderId, [
         'customer',
@@ -46,6 +52,9 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
         'lines.productVariant',
         'lines.productVariant.product',
         'payments',
+        'shippingLines',
+        'shippingLines.shippingMethod',
+        'channels',
       ]);
 
       if (!order) {
@@ -60,30 +69,77 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
         return;
       }
 
-      const prefix = this.options.prefix ?? process.env.MATIAS_PREFIX ?? 'LZT';
-      const resolutionNumber =
-        this.options.resolutionNumber ??
-        process.env.MATIAS_RESOLUTION_NUMBER ??
-        '18764074347312';
+      const emitConfig = await this.invoiceQuotaService.reserveQuotaForOrder(ctx, order);
+      reservedOrder = order;
 
-      const documentNumber = await this.invoiceClientService.fetchNextDocumentNumber(prefix);
+      const documentNumber = await this.invoiceClientService.fetchNextDocumentNumber(emitConfig.prefix);
       Logger.info(
-        `Generated document number ${documentNumber} for order ${order.code} (prefix ${prefix})`,
+        `Generated document number ${documentNumber} for order ${order.code} (prefix ${emitConfig.prefix})`,
         loggerCtx,
       );
 
       await this.invoiceClientService.createInvoiceFromOrder(ctx, order, {
-        resolutionNumber,
-        prefix,
+        resolutionNumber: emitConfig.resolutionNumber,
+        prefix: emitConfig.prefix,
         documentNumber,
         operationTypeId: 1,
         typeDocumentId: 7,
         sendEmail: 1,
+        matiasBearerToken: emitConfig.matiasBearerToken,
       });
 
+      reservedOrder = null;
+      await this.persistInvoiceLastError(ctx, order, null);
       Logger.info(`Invoice created successfully for order ${order.code}`, loggerCtx);
     } catch (error: any) {
       Logger.error(`Error creating invoice for order ${orderId}: ${error.message}`, loggerCtx);
+      if (reservedOrder && reservedCtx) {
+        try {
+          await this.invoiceQuotaService.releaseReservedQuotaForOrder(reservedCtx, reservedOrder);
+        } catch (releaseError: any) {
+          Logger.error(
+            `Error releasing reserved invoice quota for order ${orderId}: ${releaseError.message}`,
+            loggerCtx,
+          );
+        }
+      }
+      const ctx = await this.requestContextService.create({
+        apiType: 'admin',
+        languageCode: LanguageCode.es,
+      });
+      await this.persistInvoiceLastErrorById(ctx, orderId, error.message);
     }
+  }
+
+  private async persistInvoiceLastError(
+    ctx: RequestContext,
+    order: Order,
+    error: string | null,
+  ): Promise<void> {
+    await this.persistInvoiceLastErrorById(ctx, String(order.id), error);
+  }
+
+  private async persistInvoiceLastErrorById(
+    ctx: RequestContext,
+    orderId: string,
+    error: string | null,
+  ): Promise<void> {
+    const ds = this.connection.rawConnection;
+    const orderMeta = ds.getMetadata(Order);
+    const invoiceErrorColumn = orderMeta.columns.find(
+      (c) => c.propertyName === 'invoiceLastError' && c.embeddedMetadata?.propertyName === 'customFields',
+    );
+    if (!invoiceErrorColumn) {
+      Logger.warn('Order.customFields.invoiceLastError column not found; invoice error not persisted.', loggerCtx);
+      return;
+    }
+    const table = orderMeta.tablePath
+      .split('.')
+      .map((part) => ds.driver.escape(part))
+      .join('.');
+    await ds.query(
+      `UPDATE ${table} SET ${ds.driver.escape(invoiceErrorColumn.databaseName)} = $1 WHERE ${ds.driver.escape(orderMeta.primaryColumns[0].databaseName)} = $2`,
+      [error, orderId],
+    );
   }
 }

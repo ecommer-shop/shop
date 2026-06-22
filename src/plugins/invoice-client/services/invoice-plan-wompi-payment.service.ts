@@ -59,6 +59,7 @@ export class InvoicePlanWompiPaymentService {
     if (!plan) {
       throw new UserInputError(`Plan no válido: ${planCode}`);
     }
+    await this.billingPlans.assertGlobalPoolCanCoverPlan(ctx, plan.code);
 
     await this.clickwrapAcceptance.recordAcceptance(
       ctx,
@@ -142,6 +143,7 @@ export class InvoicePlanWompiPaymentService {
     if (!plan) {
       throw new UserInputError(`Plan no válido: ${planCode}`);
     }
+    await this.billingPlans.assertGlobalPoolCanCoverPlan(ctx, plan.code);
 
     await this.clickwrapAcceptance.recordAcceptance(
       ctx,
