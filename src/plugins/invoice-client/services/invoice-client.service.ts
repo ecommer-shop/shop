@@ -3,6 +3,7 @@ import { Order, RequestContext } from '@vendure/core';
 import { INVOICE_CLIENT_PLUGIN_OPTIONS, MATIAS_BEARER_TOKEN_HEADER } from '../constants';
 import type { PluginInitOptions } from '../types';
 import { InvoiceMicroHttpClient } from './invoice-micro-http.client';
+import { resolveInvoiceBillingCustomer } from './invoice-order-billing';
 
 interface CreateInvoiceRequest {
   orderCode: string;
@@ -123,10 +124,6 @@ export class InvoiceClientService {
     }
   }
 
-  private mapCityToMatiasId(_cityName?: string): string {
-    return '836';
-  }
-
   /**
    * Crea una factura vía microservicio Matias. No persiste nada en la BD de Vendure.
    */
@@ -146,25 +143,16 @@ export class InvoiceClientService {
     try {
       this.logger.log(`Creating invoice for order ${order.code}`);
 
-      const customer = order.customer;
-      if (!customer) {
-        throw new Error('Order does not have a customer');
-      }
-
-      const billingAddress = order.billingAddress || order.shippingAddress;
-      const customerName =
-        (customer.firstName && customer.lastName
-          ? `${customer.firstName} ${customer.lastName}`
-          : customer.firstName || customer.lastName) || 'Cliente';
-      const customerDni =
-        (customer.customFields as Record<string, string> | undefined)?.dni ||
-        customer.phoneNumber ||
-        '0000000000';
+      const billingCustomer = resolveInvoiceBillingCustomer(order);
 
       const items = order.lines.map((line) => {
         const productVariant = line.productVariant;
-        const taxRate = line.taxRate || 19;
-        const unitPrice = line.unitPriceWithTax / (1 + taxRate / 100);
+        const taxRate = line.taxRate ?? 19;
+        const discountedLinePrice =
+          typeof line.discountedLinePrice === 'number'
+            ? line.discountedLinePrice
+            : line.unitPrice * line.quantity;
+        const unitPrice = line.quantity > 0 ? discountedLinePrice / line.quantity : 0;
         const description =
           productVariant?.name ||
           line.productVariant?.product?.name ||
@@ -182,6 +170,32 @@ export class InvoiceClientService {
           referencePriceId: '1',
         };
       });
+
+      const shippingLines = (order.shippingLines ?? [])
+        .map((line, index) => {
+          const price =
+            typeof line.discountedPrice === 'number'
+              ? line.discountedPrice
+              : typeof line.price === 'number'
+                ? line.price
+                : 0;
+          if (price <= 0) {
+            return null;
+          }
+          return {
+            description: line.shippingMethod?.name || 'Domicilio',
+            code: line.shippingMethod?.code || `SHIPPING-${index + 1}`,
+            quantity: 1,
+            unitPrice: Number(price.toFixed(2)),
+            taxPercent: 0,
+            quantityUnitsId: '1093',
+            typeItemIdentificationsId: '4',
+            referencePriceId: '1',
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item != null);
+
+      items.push(...shippingLines);
 
       // Totales coherentes con las líneas enviadas al micro/Matias
       const subtotal = items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
@@ -215,15 +229,15 @@ export class InvoiceClientService {
         reportTotal: total.toFixed(2),
         currencyCode: order.currencyCode || 'COP',
         customer: {
-          companyName: customerName,
-          dni: customerDni,
-          email: customer.emailAddress,
-          mobile: customer.phoneNumber,
-          address: billingAddress?.streetLine1 || '',
-          postalCode: billingAddress?.postalCode || '',
+          companyName: billingCustomer.companyName,
+          dni: billingCustomer.dni,
+          email: billingCustomer.email,
+          mobile: billingCustomer.mobile,
+          address: billingCustomer.address,
+          postalCode: billingCustomer.postalCode,
           countryId: '45',
-          cityId: this.mapCityToMatiasId(billingAddress?.city),
-          identityDocumentId: '1',
+          cityId: billingCustomer.cityId,
+          identityDocumentId: billingCustomer.identityDocumentId,
           typeOrganizationId: 2,
           taxRegimeId: 2,
           taxLevelId: 5,

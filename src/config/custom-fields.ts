@@ -87,6 +87,22 @@ export const customFields: VendureConfig['customFields'] = {
         },
       ],
     },
+    {
+      name: 'matiasCityId',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Matias/DANE city code' },
+        { languageCode: LanguageCode.es, value: 'Código ciudad Matias/DANE' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'Código DANE/Matias del municipio usado para facturación electrónica.',
+        },
+      ],
+    },
   ],
   Administrator: [
     {
@@ -290,6 +306,45 @@ export const customFields: VendureConfig['customFields'] = {
         {
           languageCode: LanguageCode.es,
           value: 'Identificador externo de Clerk vinculado a este cliente',
+        },
+      ],
+    },
+    {
+      name: 'dni',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Document ID / NIT' },
+        { languageCode: LanguageCode.es, value: 'Documento / NIT' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'Documento de identificación o NIT usado para facturación electrónica.',
+        },
+      ],
+    },
+    {
+      name: 'identityDocumentId',
+      type: 'string',
+      nullable: true,
+      public: true,
+      options: [
+        { value: '1', label: [{ languageCode: LanguageCode.es, value: 'Cédula Ciudadanía' }] },
+        { value: '2', label: [{ languageCode: LanguageCode.es, value: 'Cédula Extranjería' }] },
+        { value: '3', label: [{ languageCode: LanguageCode.es, value: 'NIT' }] },
+        { value: '4', label: [{ languageCode: LanguageCode.es, value: 'Tarjeta Identidad' }] },
+        { value: '5', label: [{ languageCode: LanguageCode.es, value: 'Pasaporte' }] },
+      ],
+      label: [
+        { languageCode: LanguageCode.en, value: 'Identity document type' },
+        { languageCode: LanguageCode.es, value: 'Tipo de documento' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'Tipo de documento Matias/DIAN usado para facturación electrónica.',
         },
       ],
     },

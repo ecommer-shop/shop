@@ -22,6 +22,7 @@ export const CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD = 'billingPlanPurchaseH
 
 // Additional shared keys
 export const CUSTOMER_DNI_FIELD = 'dni';
+export const CUSTOMER_IDENTITY_DOCUMENT_ID_FIELD = 'identityDocumentId';
 export const ADDRESS_MATIAS_CITY_ID_FIELD = 'matiasCityId';
 export const INVOICE_JOB_QUEUE_NAME = 'invoice-create';
 export const MATIAS_BEARER_TOKEN_HEADER = 'X-Matias-Bearer-Token';

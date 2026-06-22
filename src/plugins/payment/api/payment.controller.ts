@@ -47,8 +47,11 @@ export class PaymentController {
       });
 
       if (transaction.status === 'APPROVED' && reference.startsWith('CERT-')) {
-         const channelCode = reference.split('-')[1];
-         await this.applyCertificatePayment(ctx, channelCode);
+         const parsed = this.parseCertificateReference(reference);
+         if (!parsed) {
+            throw new HttpException('Invalid certificate payment reference', HttpStatus.BAD_REQUEST);
+         }
+         await this.applyCertificatePayment(ctx, parsed.channelCode);
          return HttpStatus.OK;
       }
       if (transaction.status === 'APPROVED' && reference.startsWith('PLAN-')) {
@@ -107,5 +110,13 @@ export class PaymentController {
       }
       return { channelCode, planCode };
    }
+
+   private parseCertificateReference(reference: string): { channelCode: string } | null {
+      const parts = reference.split('-');
+      if (parts.length < 3 || parts[0] !== 'CERT') {
+         return null;
+      }
+      const channelCode = parts.slice(1, -1).join('-');
+      return channelCode ? { channelCode } : null;
    }
 }

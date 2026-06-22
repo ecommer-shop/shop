@@ -268,7 +268,6 @@ const shopMutations = gql`
   extend type Mutation {
     submitBillingCertificate(input: SubmitBillingCertificateInput!): BillingPlanState!
     confirmMyBillingCertificatePayment: BillingPlanState!
-    confirmMyBillingPlanPayment(planCode: String!): BillingPlanState!
   }
 `;
 

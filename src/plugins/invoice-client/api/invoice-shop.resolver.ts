@@ -91,11 +91,5 @@ export class InvoiceShopResolver {
   async confirmMyBillingCertificatePayment(@Ctx() ctx: RequestContext) {
     return this.billingPlans.confirmCertificatePayment(ctx);
   }
-
-  @Mutation()
-  @Allow(Permission.Authenticated)
-  async confirmMyBillingPlanPayment(@Ctx() ctx: RequestContext, @Args('planCode') planCode: string) {
-    return this.billingPlans.confirmPlanPayment(ctx, { planCode });
-  }
 }
 
