@@ -142,6 +142,7 @@ export const plugins: VendureConfig['plugins'] = [
   }),
 
   DeliveryOrderPlugin.init({
+    webhookSecret: process.env.DELIVERY_ORDER_WEBHOOK_SECRET,
     strategy: new MessengerDomisDeliveryOrderStrategy({
       apiKey: process.env.DELIVERY_ORDER_API_KEY,
       url: process.env.DELIVERY_ORDER_API_URL,
