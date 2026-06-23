@@ -138,6 +138,7 @@ export class MultivendorService {
                 Permission.ReadPaymentMethod,
                 Permission.CreatePaymentMethod,
                 Permission.UpdatePaymentMethod,
+                Permission.DeletePaymentMethod,
                 Permission.ReadShippingMethod,
                 Permission.ReadPromotion,
                 Permission.ReadCountry,

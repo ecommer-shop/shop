@@ -16,6 +16,7 @@ export const SELLER_ADMIN_PERMISSIONS: Permission[] = [
     Permission.ReadPaymentMethod,
     Permission.CreatePaymentMethod,
     Permission.UpdatePaymentMethod,
+    Permission.DeletePaymentMethod,
     Permission.ReadShippingMethod,
     Permission.CreateShippingMethod,
     Permission.UpdateShippingMethod,
