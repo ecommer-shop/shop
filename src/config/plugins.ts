@@ -151,7 +151,7 @@ export const plugins: VendureConfig['plugins'] = [
   DynamicShippingPricePlugin,
 
   PaymentPlugin.init({
-    secretKey: process.env.PAYMENT_SECRET_KEY,
+    secretKey: process.env.WOMPI_INTEGRITY_SECRET || process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
   }),
 
