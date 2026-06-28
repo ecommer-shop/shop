@@ -23,7 +23,7 @@ import { ROUTE, ROUTE_STORE } from '../constants';
 import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
 import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
-import { CURRENCY, METRICS_DISPLAY_PAST_MONTHS } from '../plugins/payment/constants';
+import { CURRENCY } from '../plugins/payment/constants';
 import { ClerkPlugin } from '../plugins/clerk/clerk.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
 
@@ -40,8 +40,6 @@ import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
 import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.plugin';
-import { MetricsPlugin } from '@pinelab/vendure-plugin-metrics';
-import { IngresosPorProducto, ValorPromedioDeOrden, UnidadesVendidas } from './metrics-es';
 import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
 import { LoginPlugin } from '../plugins/login/login.plugin';
 import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
@@ -174,15 +172,6 @@ export const plugins: VendureConfig['plugins'] = [
     apiKey: process.env.INVOICE_SERVICE_API_KEY || '',
     prefix: process.env.MATIAS_PREFIX,
     resolutionNumber: process.env.MATIAS_RESOLUTION_NUMBER,
-  }),
-
-  MetricsPlugin.init({
-    displayPastMonths: METRICS_DISPLAY_PAST_MONTHS,
-    metrics: [
-      new IngresosPorProducto(),
-      new ValorPromedioDeOrden(),
-      new UnidadesVendidas(),
-    ],
   }),
 
   MetricsDashboardPlugin.init(),

@@ -1,12 +1,13 @@
 import { OnApplicationBootstrap } from '@nestjs/common';
 import {
+    Logger,
     PluginCommonModule,
-    RequestContext,
-    ShippingLine,
     ShippingMethod,
     TransactionalConnection,
     VendurePlugin,
 } from '@vendure/core';
+
+const loggerCtx = 'SafeShippingPlugin';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
@@ -16,18 +17,23 @@ export class SafeShippingPlugin implements OnApplicationBootstrap {
     constructor(private connection: TransactionalConnection) {}
 
     async onApplicationBootstrap() {
-        // @ts-ignore - internal vendure module
-        const { ShippingLineEntityResolver } = require('@vendure/core/dist/api/resolvers/entity/shipping-line-entity.resolver');
-        const connection = this.connection;
-        ShippingLineEntityResolver.prototype.shippingMethod = async function (
-            ctx: RequestContext,
-            shippingLine: ShippingLine,
-        ) {
-            if (!shippingLine.shippingMethodId) return null;
-            const method = await connection
-                .getRepository(ctx, ShippingMethod)
-                .findOne({ where: { id: shippingLine.shippingMethodId as any } });
-            return method ?? null;
-        };
+        try {
+            // @ts-ignore - internal vendure module
+            const { ShippingMethodService } = require('@vendure/core/dist/service/services/shipping-method.service');
+            const connection = this.connection;
+            const orig = ShippingMethodService.prototype.findOne;
+            ShippingMethodService.prototype.findOne = async function (this: any, ctx: any, id: any, ...rest: any[]) {
+                const result = await orig.call(this, ctx, id, ...rest);
+                if (result == null && id != null) {
+                    return connection
+                        .getRepository(ctx, ShippingMethod)
+                        .findOne({ where: { id: id as any } });
+                }
+                return result;
+            };
+            Logger.info(`ShippingMethodService.findOne patched with channel-aware fallback`, loggerCtx);
+        } catch (e: any) {
+            Logger.error(`Failed to patch ShippingMethodService: ${e.message}`, loggerCtx, e.stack);
+        }
     }
 }
