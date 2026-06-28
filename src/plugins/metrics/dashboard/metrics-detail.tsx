@@ -3,17 +3,18 @@ import {
     Card,
     CardContent,
     Page,
+    PageBlock,
     PageLayout,
     PageTitle,
-    PageBlock,
 } from '@vendure/dashboard';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { DatePicker } from './components/date-picker';
-import { VariantSelector } from './components/variant-selector';
-import { SummaryCard } from './components/summary-card';
+import { SummaryCardsGrid } from './components/summary-cards-grid';
+import { TopProductsTable } from './components/top-products-table';
+import { OrderStatusBars } from './components/order-status-bars';
+import { ChannelSummaryCard } from './components/channel-summary-card';
 import { MetricsAreaChart, MetricsLineChart } from './components/metrics-charts';
 import { MetricsTable } from './components/metrics-table';
 import { FiltersSection } from './components/filters-section';
@@ -42,6 +43,28 @@ const PRODUCT_VARIANTS_QUERY = `
   }
 `;
 
+const TOP_PRODUCTS_QUERY = `
+  query TopProducts($input: TopProductsInput) {
+    topProducts(input: $input) {
+      productVariantId
+      productName
+      sku
+      quantity
+      revenue
+    }
+  }
+`;
+
+const ORDER_STATUS_QUERY = `
+  query OrderStatusDistribution {
+    orderStatusDistribution {
+      state
+      count
+      percentage
+    }
+  }
+`;
+
 interface ProductVariant {
     id: string;
     name: string;
@@ -57,6 +80,28 @@ interface ProductVariantsResponse {
         items: ProductVariant[];
         totalItems: number;
     };
+}
+
+interface TopProduct {
+    productVariantId: string;
+    productName: string;
+    sku: string;
+    quantity: number;
+    revenue: number;
+}
+
+interface TopProductsResponse {
+    topProducts: TopProduct[];
+}
+
+interface OrderStatusItem {
+    state: string;
+    count: number;
+    percentage: number;
+}
+
+interface OrderStatusResponse {
+    orderStatusDistribution: OrderStatusItem[];
 }
 
 export function MetricsDetailPage() {
@@ -85,7 +130,38 @@ export function MetricsDetailPage() {
 
     const allMetrics = metricsData?.advancedMetricSummaries ?? [];
 
-    console.log('Metrics loaded:', { count: allMetrics.length, allMetrics });
+    // Fetch top products
+    const { data: topProductsData, isLoading: topProductsLoading } = useQuery({
+        queryKey: ['top-products'],
+        queryFn: () => api.query<TopProductsResponse>(TOP_PRODUCTS_QUERY, {}),
+    });
+
+    const topProducts = topProductsData?.topProducts ?? [];
+
+    // Fetch order status distribution
+    const { data: orderStatusData } = useQuery({
+        queryKey: ['order-status'],
+        queryFn: () => api.query<OrderStatusResponse>(ORDER_STATUS_QUERY, {}),
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const orderStatusItems = orderStatusData?.orderStatusDistribution ?? [];
+
+    // Calculate growth vs previous month
+    const growthByCode = useMemo(() => {
+        const growth: Record<string, number | null> = {};
+        for (const metric of allMetrics) {
+            for (const series of metric.series) {
+                const values = series.values.filter((v) => typeof v === 'number');
+                if (values.length >= 2) {
+                    const last = values[values.length - 1];
+                    const prev = values[values.length - 2];
+                    growth[metric.code] = prev !== 0 ? Math.round(((last - prev) / prev) * 100) : null;
+                }
+            }
+        }
+        return growth;
+    }, [allMetrics]);
 
     // Filter metrics based on selection
     const visibleMetrics =
@@ -94,65 +170,20 @@ export function MetricsDetailPage() {
             : allMetrics;
 
     // Transform data for charts
-    const chartData = useMemo(
-        () => buildMetricsComparisonChartData(visibleMetrics),
+    
+
+    const multiMonthMetrics = useMemo(
+        () => visibleMetrics.filter(m => (m.labels?.length ?? 0) > 1),
         [visibleMetrics]
     );
 
-    // Calculate summary statistics
-    const summary = useMemo(() => {
-        const stats: Record<string, { total: number; average: number; type: string }> = {};
-        for (const metric of visibleMetrics) {
-            for (const series of metric.series) {
-                const key = `${metric.code}-${series.name}`;
-                const values = series.values.filter((v) => typeof v === 'number');
-                stats[key] = {
-                    total: values.reduce((a, b) => a + b, 0),
-                    average: values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0,
-                    type: metric.type,
-                };
-            }
-        }
-        return stats;
-    }, [visibleMetrics]);
-
-    const selectedVariantLabels = useMemo(() => {
-        if (selectedVariantIds.length === 0) return [];
-        const lookup = new Map(
-            allVariants.map((variant) => [
-                variant.id,
-                `${variant.product.name} - ${variant.sku}`,
-            ])
-        );
-        return selectedVariantIds
-            .map((id) => lookup.get(id))
-            .filter((label): label is string => Boolean(label));
-    }, [allVariants, selectedVariantIds]);
-
-    const getSummaryCardLabel = (key: string): string => {
-        // Format: "revenue-per-product" or similar
-        const [metricCode, ...seriesParts] = key.split('-');
-        const seriesName = seriesParts.join('-');
-
-        // If variantes are selected, show the variante names
-        if (selectedVariantLabels.length > 0) {
-            if (selectedVariantLabels.length === 1) {
-                return selectedVariantLabels[0];
-            }
-            // For multiple variants, show all names (or truncated if too many)
-            if (selectedVariantLabels.length <= 3) {
-                return selectedVariantLabels.join(' + ');
-            }
-            return `${selectedVariantLabels.slice(0, 2).join(' + ')} + ${selectedVariantLabels.length - 2} más`;
-        }
-
-        // Otherwise show metric details
-        const metricTitle = visibleMetrics.find((m) => m.code === metricCode)?.title ?? metricCode;
-        return `${metricTitle} - ${seriesName}`;
-    };
+    const multiMonthChartData = useMemo(
+        () => buildMetricsComparisonChartData(multiMonthMetrics),
+        [multiMonthMetrics]
+    );
 
     const handleDownload = () => {
-        if (metricsLoading || visibleMetrics.length === 0 || chartData.length === 0) {
+        if (metricsLoading || multiMonthMetrics.length === 0 || multiMonthChartData.length === 0) {
             return;
         }
 
@@ -184,22 +215,14 @@ export function MetricsDetailPage() {
         addLines(
             `Metricas: ${visibleMetrics.map((metric) => metric.title).join(', ')}`
         );
-        addLines(
-            selectedVariantLabels.length > 0
-                ? `Variantes: ${selectedVariantLabels.slice(0, 5).join(', ')}${selectedVariantLabels.length > 5
-                    ? ` (+${selectedVariantLabels.length - 5} mas)`
-                    : ''
-                }`
-                : 'Variantes: Todas'
-        );
         addLines('');
 
         doc.setFontSize(12);
         addLines('Resumen', 16);
         doc.setFontSize(10);
-        for (const [key, stats] of Object.entries(summary)) {
-            const label = getSummaryCardLabel(key);
-            addLines(`${label}: ${formatPdfValue(stats.total, stats.type)}`);
+        for (const metric of visibleMetrics) {
+            const total = metric.series[0]?.values.reduce((a, b) => a + b, 0) ?? 0;
+            addLines(`${metric.title}: ${formatPdfValue(total, metric.type)}`);
         }
 
         addLines('');
@@ -208,13 +231,13 @@ export function MetricsDetailPage() {
 
         const tableHeader = [
             'Periodo',
-            ...visibleMetrics.flatMap((metric) =>
+            ...multiMonthMetrics.flatMap((metric) =>
                 metric.series.map((series) => `${metric.title} - ${series.name}`)
             ),
         ];
-        const tableBody = chartData.map((row) => {
+        const tableBody = multiMonthChartData.map((row) => {
             const cells: Array<string | number> = [row.name];
-            for (const metric of visibleMetrics) {
+            for (const metric of multiMonthMetrics) {
                 for (const series of metric.series) {
                     const value = row[`${metric.code}-${series.name}`] as number;
                     cells.push(formatPdfValue(value, metric.type));
@@ -247,7 +270,6 @@ export function MetricsDetailPage() {
                         </p>
                     </div>
 
-                    {/* Filters Section */}
                     <FiltersSection
                         allVariants={allVariants}
                         selectedVariantIds={selectedVariantIds}
@@ -262,42 +284,13 @@ export function MetricsDetailPage() {
                         onRefresh={() => refetch()}
                         isRefetching={isRefetching}
                         onDownload={handleDownload}
-                        isDownloadDisabled={
-                            metricsLoading ||
-                            visibleMetrics.length === 0 ||
-                            chartData.length === 0
-                        }
+                        isDownloadDisabled={metricsLoading || multiMonthMetrics.length === 0 || multiMonthChartData.length === 0}
                     />
 
-                    {/* Summary Cards */}
-                    {Object.entries(summary).length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                            {Object.entries(summary).map(
-                                ([key, stats]) =>
-                                    stats.type === 'currency' && (
-                                        <SummaryCard
-                                            key={key}
-                                            label={getSummaryCardLabel(key)}
-                                            value={stats.total}
-                                            type="currency"
-                                        />
-                                    )
-                            )}
-                            {Object.entries(summary).map(
-                                ([key, stats]) =>
-                                    stats.type === 'number' && (
-                                        <SummaryCard
-                                            key={key}
-                                            label={getSummaryCardLabel(key)}
-                                            value={stats.total}
-                                            type="number"
-                                        />
-                                    )
-                            )}
-                        </div>
+                    {visibleMetrics.length > 0 && (
+                        <SummaryCardsGrid metrics={visibleMetrics} growthByCode={growthByCode} />
                     )}
 
-                    {/* Charts Section */}
                     {metricsLoading && (
                         <Card>
                             <CardContent className="flex items-center justify-center h-96">
@@ -306,11 +299,10 @@ export function MetricsDetailPage() {
                         </Card>
                     )}
 
-                    {!metricsLoading && visibleMetrics.length > 0 && chartData.length > 0 && (
+                    {!metricsLoading && multiMonthMetrics.length > 0 && multiMonthChartData.length > 0 && (
                         <div className="space-y-6">
-                            <MetricsAreaChart data={chartData} metrics={visibleMetrics} />
-                            <MetricsLineChart data={chartData} metrics={visibleMetrics} />
-                            <MetricsTable data={chartData} metrics={visibleMetrics} />
+                            <MetricsAreaChart data={multiMonthChartData} metrics={multiMonthMetrics} />
+                            <MetricsLineChart data={multiMonthChartData} metrics={multiMonthMetrics} />
                         </div>
                     )}
 
@@ -322,6 +314,14 @@ export function MetricsDetailPage() {
                                 </div>
                             </CardContent>
                         </Card>
+                    )}
+
+                    <TopProductsTable products={topProducts} />
+                    <OrderStatusBars items={orderStatusItems} />
+                    <ChannelSummaryCard dateFrom={dateFrom} dateTo={dateTo} />
+
+                    {!metricsLoading && multiMonthMetrics.length > 0 && multiMonthChartData.length > 0 && (
+                        <MetricsTable data={multiMonthChartData} metrics={multiMonthMetrics} />
                     )}
                 </PageBlock>
             </PageLayout>

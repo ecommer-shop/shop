@@ -24,7 +24,27 @@ export const adminSchema = gql`
         variantIds: [ID!]
     }
 
+    type TopProduct {
+        productVariantId: ID!
+        productName: String!
+        sku: String!
+        quantity: Int!
+        revenue: Int!
+    }
+
+    input TopProductsInput {
+        variantIds: [ID!]
+    }
+
+    type OrderStatusBreakdown {
+        state: String!
+        count: Int!
+        percentage: Float!
+    }
+
     extend type Query {
         advancedMetricSummaries(input: AdvancedMetricSummaryInput): [AdvancedMetricSummary!]!
+        topProducts(input: TopProductsInput): [TopProduct!]!
+        orderStatusDistribution: [OrderStatusBreakdown!]!
     }
 `;
