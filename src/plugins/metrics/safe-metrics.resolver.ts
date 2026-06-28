@@ -2,6 +2,31 @@ import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Order, Permission, RequestContext, TransactionalConnection } from '@vendure/core';
 import { endOfDay, startOfMonth, sub } from 'date-fns';
 
+interface CacheEntry {
+    data: SummaryItem[];
+    expires: number;
+}
+
+interface QueryRow {
+    month: Date;
+    order_count?: string;
+    revenue?: string;
+    aov?: string;
+    units?: string;
+}
+
+interface SummaryItem {
+    code: string;
+    title: string;
+    type: string;
+    allowProductSelection: boolean;
+    labels: string[];
+    series: { name: string; values: number[] }[];
+}
+
+const cache = new Map<string, CacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000;
+
 @Resolver()
 export class SafeMetricsResolver {
     constructor(private connection: TransactionalConnection) {}
@@ -16,65 +41,68 @@ export class SafeMetricsResolver {
         const startDate = startOfMonth(sub(today, { months: 13 }));
         const months = this.getMonthLabels(startDate, today);
         const channelId = ctx.channelId;
+        const cacheKey = `${channelId}:${startDate.getTime()}:${today.getTime()}`;
+
+        const cached = cache.get(cacheKey);
+        if (cached && cached.expires > Date.now()) {
+            return cached.data;
+        }
 
         const repo = this.connection.rawConnection.getRepository(Order);
 
-        const revenue = await repo
-            .createQueryBuilder('o')
-            .innerJoin('o.channels', 'ch')
-            .select(`DATE_TRUNC('month', o.orderPlacedAt)`, 'month')
-            .addSelect('SUM(o.subTotalWithTax + o.shippingWithTax) / 100.0', 'value')
-            .where('ch.id = :channelId', { channelId })
-            .andWhere('o.orderPlacedAt BETWEEN :from AND :to', { from: startDate, to: today })
-            .andWhere('o.state = :state', { state: 'PaymentSettled' })
-            .groupBy(`DATE_TRUNC('month', o.orderPlacedAt)`)
-            .orderBy(`DATE_TRUNC('month', o.orderPlacedAt)`, 'ASC')
-            .getRawMany();
+        const [orderRows, unitRows] = await Promise.all([
+            repo
+                .createQueryBuilder('o')
+                .innerJoin('o.channels', 'ch')
+                .select(`DATE_TRUNC('month', o."orderPlacedAt")`, 'month')
+                .addSelect('COUNT(o.id)', 'order_count')
+                .addSelect('SUM(o."subTotalWithTax" + o."shippingWithTax") / 100.0', 'revenue')
+                .addSelect('AVG(o."subTotalWithTax" + o."shippingWithTax") / 100.0', 'aov')
+                .where('ch.id = :channelId', { channelId })
+                .andWhere('o."orderPlacedAt" BETWEEN :from AND :to', { from: startDate, to: today })
+                .andWhere('o.state = :state', { state: 'PaymentSettled' })
+                .groupBy(`DATE_TRUNC('month', o."orderPlacedAt")`)
+                .orderBy(`DATE_TRUNC('month', o."orderPlacedAt")`, 'ASC')
+                .getRawMany<QueryRow>(),
+            repo
+                .createQueryBuilder('o')
+                .innerJoin('o.channels', 'ch')
+                .leftJoin('o.lines', 'ol')
+                .select(`DATE_TRUNC('month', o."orderPlacedAt")`, 'month')
+                .addSelect('SUM(ol.quantity)', 'units')
+                .where('ch.id = :channelId', { channelId })
+                .andWhere('o."orderPlacedAt" BETWEEN :from AND :to', { from: startDate, to: today })
+                .andWhere('o.state = :state', { state: 'PaymentSettled' })
+                .groupBy(`DATE_TRUNC('month', o."orderPlacedAt")`)
+                .orderBy(`DATE_TRUNC('month', o."orderPlacedAt")`, 'ASC')
+                .getRawMany<QueryRow>(),
+        ]);
 
-        const aov = await repo
-            .createQueryBuilder('o')
-            .innerJoin('o.channels', 'ch')
-            .select(`DATE_TRUNC('month', o.orderPlacedAt)`, 'month')
-            .addSelect('AVG(o.subTotalWithTax + o.shippingWithTax) / 100.0', 'value')
-            .where('ch.id = :channelId', { channelId })
-            .andWhere('o.orderPlacedAt BETWEEN :from AND :to', { from: startDate, to: today })
-            .andWhere('o.state = :state', { state: 'PaymentSettled' })
-            .groupBy(`DATE_TRUNC('month', o.orderPlacedAt)`)
-            .orderBy(`DATE_TRUNC('month', o.orderPlacedAt)`, 'ASC')
-            .getRawMany();
-
-        const units = await repo
-            .createQueryBuilder('o')
-            .innerJoin('o.channels', 'ch')
-            .innerJoin('o.lines', 'ol')
-            .select(`DATE_TRUNC('month', o.orderPlacedAt)`, 'month')
-            .addSelect('SUM(ol.quantity)', 'value')
-            .where('ch.id = :channelId', { channelId })
-            .andWhere('o.orderPlacedAt BETWEEN :from AND :to', { from: startDate, to: today })
-            .andWhere('o.state = :state', { state: 'PaymentSettled' })
-            .groupBy(`DATE_TRUNC('month', o.orderPlacedAt)`)
-            .orderBy(`DATE_TRUNC('month', o.orderPlacedAt)`, 'ASC')
-            .getRawMany();
-
-        const toSeries = (rows: { month: Date; value: number }[], label: string) => [{
-            name: label,
-            values: months.map(m => {
+        const pickValue = (rows: QueryRow[], field: keyof Omit<QueryRow, 'month'>) =>
+            months.map(m => {
                 const row = rows.find(r => {
                     const d = new Date(r.month);
                     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === m;
                 });
-                return row ? Number(row.value) : 0;
-            }),
-        }];
+                return row ? Number(row[field] ?? 0) : 0;
+            });
 
-        return [
+        const result: SummaryItem[] = [
+            {
+                code: 'order-count',
+                title: 'Órdenes',
+                type: 'number',
+                allowProductSelection: false,
+                labels: months,
+                series: [{ name: 'Órdenes', values: pickValue(orderRows, 'order_count') }],
+            },
             {
                 code: 'revenue-per-product',
                 title: 'Ingresos',
                 type: 'currency',
                 allowProductSelection: true,
                 labels: months,
-                series: toSeries(revenue, 'Ingresos'),
+                series: [{ name: 'Ingresos', values: pickValue(orderRows, 'revenue') }],
             },
             {
                 code: 'aov',
@@ -82,7 +110,7 @@ export class SafeMetricsResolver {
                 type: 'currency',
                 allowProductSelection: false,
                 labels: months,
-                series: toSeries(aov, 'AOV incl. tax'),
+                series: [{ name: 'AOV incl. tax', values: pickValue(orderRows, 'aov') }],
             },
             {
                 code: 'units-sold',
@@ -90,9 +118,13 @@ export class SafeMetricsResolver {
                 type: 'number',
                 allowProductSelection: true,
                 labels: months,
-                series: toSeries(units, 'Unidades'),
+                series: [{ name: 'Unidades', values: pickValue(unitRows, 'units') }],
             },
         ];
+
+        cache.set(cacheKey, { data: result, expires: Date.now() + CACHE_TTL });
+
+        return result;
     }
 
     private getMonthLabels(from: Date, to: Date): string[] {
