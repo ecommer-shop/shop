@@ -59,6 +59,8 @@ import { SuperadminvisibilityPlugin } from '../plugins/superadminvisibility/supe
 import { WompiSubscriptionPlugin } from '../plugins/wompi-subscription/wompi-subscription.plugin';
 import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
 import { SafeShippingPlugin } from '../plugins/safe-shipping/safe-shipping.plugin';
+import { SuperadminSellersManagementPlugin } from '../plugins/superadmin-sellers-management/superadmin-sellers-management.plugin';
+import { SellerSettingsVisibilityPlugin } from '../plugins/seller-settings-visibility/seller-settings-visibility.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -186,6 +188,10 @@ export const plugins: VendureConfig['plugins'] = [
 
   ProductVariantEnforcementPlugin,
   SuperadminvisibilityPlugin,
+
+  SuperadminSellersManagementPlugin.init({}),
+
+  SellerSettingsVisibilityPlugin,
 
   WompiSubscriptionPlugin.init({
     wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
