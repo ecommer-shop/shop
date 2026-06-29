@@ -25,6 +25,7 @@ const RESTRICTED_NAV_IDS = [
   'zones',
   'global-settings',
   'store-management',
+  'shipping-methods',
 ];
 
 export default defineDashboardExtension({
