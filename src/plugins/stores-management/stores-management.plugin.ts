@@ -1,4 +1,5 @@
 import { PluginCommonModule, Type, VendurePlugin } from '@vendure/core';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { STORES_MANAGEMENT_PLUGIN_OPTIONS } from './constants';
 import { PluginInitOptions } from './types';
@@ -13,7 +14,7 @@ import { SuperAdminGuard } from './guards/super-admin.guard';
 import { StoreDailyAnalytics } from './entities/store-daily-analytics.entity';
 
 @VendurePlugin({
-    imports: [PluginCommonModule],
+    imports: [PluginCommonModule, TypeOrmModule.forFeature([StoreDailyAnalytics])],
     entities: [StoreDailyAnalytics],
     providers: [
         { provide: STORES_MANAGEMENT_PLUGIN_OPTIONS, useFactory: () => StoresManagementPlugin.options },
