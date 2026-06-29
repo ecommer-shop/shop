@@ -18,6 +18,7 @@ import {
     Permission,
     RequestContext,
     RequestContextService,
+    Role,
     RoleService,
     SellerService,
     StockLocation,
@@ -495,6 +496,31 @@ export class SellerOnboardingService {
 
         Logger.info(
             `Synced permissions for seller admin role: ${role.code}`,
+            loggerCtx,
+        );
+    }
+
+    /**
+     * Sincroniza todos los roles '-admin' de un usuario específico con SELLER_ADMIN_PERMISSIONS.
+     * Se llama durante authenticate() para asegurar que la sesión se cree con permisos actualizados.
+     */
+    public async syncAllSellerRolesForUser(
+        ctx: RequestContext,
+        user: User,
+    ): Promise<void> {
+        const superAdminCtx = await this.getSuperAdminContext(ctx);
+        const fullUser = await this.connection.getRepository(superAdminCtx, User).findOne({
+            where: { id: user.id as any },
+            relations: ['roles'],
+        });
+        if (!fullUser) return;
+        for (const role of fullUser.roles) {
+            if (role.code.includes('-admin')) {
+                await this.syncSellerAdminPermissions(superAdminCtx, role.id);
+            }
+        }
+        Logger.info(
+            `Synced ${fullUser.roles.filter(r => r.code.includes('-admin')).length} seller roles for user ${user.identifier}`,
             loggerCtx,
         );
     }
