@@ -79,6 +79,23 @@ const sharedStoreTypes = gql`
         totalUnits: Int!
     }
 
+    type InvestorMetric {
+        current: Float!
+        label: String!
+        type: String!
+    }
+
+    type InvestorMetrics {
+        gmvTotal: InvestorMetric!
+        monthlyGrowth: InvestorMetric!
+        commissions: InvestorMetric!
+        runRateAnnual: InvestorMetric!
+        avgTicketMonthly: InvestorMetric!
+        avgRevenuePerStore: InvestorMetric!
+        newStoresPerMonth: InvestorMetric!
+        uniqueCustomers: InvestorMetric!
+    }
+
     input AnalyticsFilterInput {
         channelId: ID
         days: Int!
@@ -141,6 +158,7 @@ export const adminApiExtensions = gql`
         storeAnalyticsSummary(filter: AnalyticsFilterInput!): StoreAnalyticsSummary!
         storeRanking(channelId: ID, by: String, limit: Int): [StoreRankingEntry!]!
         storeAnalyticsStoreList: [StoreSearchResult!]!
+        investorMetrics: InvestorMetrics!
     }
 `;
 

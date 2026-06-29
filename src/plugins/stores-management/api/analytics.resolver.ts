@@ -56,4 +56,12 @@ export class AnalyticsResolver {
     ) {
         return this.analyticsService.getStoreListForFilter();
     }
+
+    @Query()
+    @Allow(Permission.SuperAdmin)
+    async investorMetrics(
+        @Context() ctx: RequestContext,
+    ) {
+        return this.analyticsService.getInvestorMetrics();
+    }
 }

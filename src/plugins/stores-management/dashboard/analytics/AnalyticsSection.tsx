@@ -7,14 +7,17 @@ import {
     STORE_ANALYTICS_SUMMARY_QUERY,
     STORE_RANKING_QUERY,
     STORE_ANALYTICS_STORE_LIST_QUERY,
+    INVESTOR_METRICS_QUERY,
     type AnalyticsDataPoint,
     type StoreAnalyticsSummary,
     type StoreRankingEntry,
+    type InvestorMetricsResponse,
 } from '../graphql-queries';
 import { SummaryCards } from './SummaryCards';
 import { RevenueChart } from './RevenueChart';
 import { OrdersChart } from './OrdersChart';
 import { StoreRankingTable } from './StoreRankingTable';
+import { InvestorCards } from './InvestorCards';
 
 export function AnalyticsSection() {
     const [channelId, setChannelId] = useState<string | undefined>(undefined);
@@ -23,6 +26,7 @@ export function AnalyticsSection() {
     const [data, setData] = useState<AnalyticsDataPoint[]>([]);
     const [summary, setSummary] = useState<StoreAnalyticsSummary | null>(null);
     const [ranking, setRanking] = useState<StoreRankingEntry[]>([]);
+    const [investorMetrics, setInvestorMetrics] = useState<InvestorMetricsResponse | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -44,11 +48,13 @@ export function AnalyticsSection() {
                 by: 'revenue',
                 limit: 10,
             }),
+            gql<{ investorMetrics: InvestorMetricsResponse }>(INVESTOR_METRICS_QUERY),
         ])
-            .then(([dataRes, summaryRes, rankingRes]) => {
+            .then(([dataRes, summaryRes, rankingRes, invRes]) => {
                 setData(dataRes.storeAnalytics);
                 setSummary(summaryRes.storeAnalyticsSummary);
                 setRanking(rankingRes.storeRanking);
+                setInvestorMetrics(invRes.investorMetrics);
             })
             .catch(() => {})
             .finally(() => setLoading(false));
@@ -100,6 +106,7 @@ export function AnalyticsSection() {
 
             {!loading && hasData && (
                 <>
+                    <InvestorCards metrics={investorMetrics!} />
                     <SummaryCards summary={summary} />
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                         <RevenueChart data={data} />

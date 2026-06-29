@@ -224,3 +224,35 @@ export interface StoreRankingEntry {
   totalOrders: number;
   totalUnits: number;
 }
+
+export const INVESTOR_METRICS_QUERY = `
+  query InvestorMetrics {
+    investorMetrics {
+      gmvTotal { current label type }
+      monthlyGrowth { current label type }
+      commissions { current label type }
+      runRateAnnual { current label type }
+      avgTicketMonthly { current label type }
+      avgRevenuePerStore { current label type }
+      newStoresPerMonth { current label type }
+      uniqueCustomers { current label type }
+    }
+  }
+`;
+
+export interface InvestorMetric {
+  current: number;
+  label: string;
+  type: string;
+}
+
+export interface InvestorMetricsResponse {
+  gmvTotal: InvestorMetric;
+  monthlyGrowth: InvestorMetric;
+  commissions: InvestorMetric;
+  runRateAnnual: InvestorMetric;
+  avgTicketMonthly: InvestorMetric;
+  avgRevenuePerStore: InvestorMetric;
+  newStoresPerMonth: InvestorMetric;
+  uniqueCustomers: InvestorMetric;
+}
