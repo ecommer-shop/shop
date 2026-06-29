@@ -151,3 +151,76 @@ export function formatDate(dateStr?: string | null): string {
     minute: '2-digit',
   });
 }
+
+export const STORE_ANALYTICS_QUERY = `
+  query StoreAnalytics($filter: AnalyticsFilterInput!) {
+    storeAnalytics(filter: $filter) {
+      date totalOrders totalRevenue totalUnits avgOrderValue newCustomers productsSold
+    }
+  }
+`;
+
+export const STORE_ANALYTICS_SUMMARY_QUERY = `
+  query StoreAnalyticsSummary($filter: AnalyticsFilterInput!) {
+    storeAnalyticsSummary(filter: $filter) {
+      totalRevenue { current previous changePercent label type }
+      totalOrders { current previous changePercent label type }
+      totalActiveStores { current previous changePercent label type }
+      avgOrderValue { current previous changePercent label type }
+      totalUnits { current previous changePercent label type }
+      newCustomers { current previous changePercent label type }
+    }
+  }
+`;
+
+export const STORE_RANKING_QUERY = `
+  query StoreRanking($channelId: ID, $by: String, $limit: Int) {
+    storeRanking(channelId: $channelId, by: $by, limit: $limit) {
+      storeId storeName channelCode totalRevenue totalOrders totalUnits
+    }
+  }
+`;
+
+export const STORE_ANALYTICS_STORE_LIST_QUERY = `
+  query StoreAnalyticsStoreList {
+    storeAnalyticsStoreList {
+      id storeName channelCode
+    }
+  }
+`;
+
+export interface AnalyticsDataPoint {
+  date: string;
+  totalOrders: number;
+  totalRevenue: number;
+  totalUnits: number;
+  avgOrderValue: number;
+  newCustomers: number;
+  productsSold: number;
+}
+
+export interface AnalyticsSummaryMetric {
+  current: number;
+  previous: number;
+  changePercent: number;
+  label: string;
+  type: string;
+}
+
+export interface StoreAnalyticsSummary {
+  totalRevenue: AnalyticsSummaryMetric;
+  totalOrders: AnalyticsSummaryMetric;
+  totalActiveStores: AnalyticsSummaryMetric;
+  avgOrderValue: AnalyticsSummaryMetric;
+  totalUnits: AnalyticsSummaryMetric;
+  newCustomers: AnalyticsSummaryMetric;
+}
+
+export interface StoreRankingEntry {
+  storeId: string;
+  storeName: string;
+  channelCode: string;
+  totalRevenue: number;
+  totalOrders: number;
+  totalUnits: number;
+}

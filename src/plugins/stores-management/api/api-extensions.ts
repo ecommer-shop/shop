@@ -42,6 +42,47 @@ const sharedStoreTypes = gql`
         take: Int
         skip: Int
     }
+
+    type AnalyticsDataPoint {
+        date: DateTime!
+        totalOrders: Int!
+        totalRevenue: Int!
+        totalUnits: Int!
+        avgOrderValue: Float!
+        newCustomers: Int!
+        productsSold: Int!
+    }
+
+    type AnalyticsSummaryMetric {
+        current: Float!
+        previous: Float!
+        changePercent: Float!
+        label: String!
+        type: String!
+    }
+
+    type StoreAnalyticsSummary {
+        totalRevenue: AnalyticsSummaryMetric!
+        totalOrders: AnalyticsSummaryMetric!
+        totalActiveStores: AnalyticsSummaryMetric!
+        avgOrderValue: AnalyticsSummaryMetric!
+        totalUnits: AnalyticsSummaryMetric!
+        newCustomers: AnalyticsSummaryMetric!
+    }
+
+    type StoreRankingEntry {
+        storeId: ID!
+        storeName: String!
+        channelCode: String!
+        totalRevenue: Int!
+        totalOrders: Int!
+        totalUnits: Int!
+    }
+
+    input AnalyticsFilterInput {
+        channelId: ID
+        days: Int!
+    }
 `;
 
 export const adminApiExtensions = gql`
@@ -96,6 +137,10 @@ export const adminApiExtensions = gql`
         store(id: ID!): Store
         storesList(options: StoreListWithTotalsListOptions): StoreListWithTotals!
         searchStores(input: StoreSearchInput!): StoreSearchResultList!
+        storeAnalytics(filter: AnalyticsFilterInput!): [AnalyticsDataPoint!]!
+        storeAnalyticsSummary(filter: AnalyticsFilterInput!): StoreAnalyticsSummary!
+        storeRanking(channelId: ID, by: String, limit: Int): [StoreRankingEntry!]!
+        storeAnalyticsStoreList: [StoreSearchResult!]!
     }
 `;
 
