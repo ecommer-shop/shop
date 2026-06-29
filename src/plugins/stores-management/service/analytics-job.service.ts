@@ -15,9 +15,7 @@ export class AnalyticsJobService implements OnApplicationBootstrap {
     ) {}
 
     async onApplicationBootstrap() {
-        // Run once on startup
         await this.computeDailySnapshot();
-        // Schedule recurring run every 24h
         this.scheduleNext();
     }
 
@@ -39,47 +37,23 @@ export class AnalyticsJobService implements OnApplicationBootstrap {
     }
 
     private async computeDailySnapshot() {
-        // Compute for yesterday (most recent complete day)
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        const yStr = yesterday.toISOString().slice(0, 10);
+        const yStart = new Date(yesterday);
+        yStart.setHours(0, 0, 0, 0);
+        const yEnd = new Date(yesterday);
+        yEnd.setHours(23, 59, 59, 999);
 
-        Logger.info(`Computing daily analytics for ${yStr}`, loggerCtx);
+        Logger.info(`Computing daily analytics for ${yesterday.toISOString().slice(0, 10)}`, loggerCtx);
 
         try {
-            const result = await this.repo.query(
-                `INSERT INTO store_daily_analytics ("channelId", date, "totalOrders", "totalRevenue", "totalUnits", "avgOrderValue", "newCustomers", "productsSold")
-                 SELECT
-                     ol."sellerChannelId",
-                     $1::date,
-                     COUNT(DISTINCT o.id)::int,
-                     COALESCE(SUM(o.totalWithTax), 0)::int,
-                     COALESCE(SUM(ol.quantity), 0)::int,
-                     CASE WHEN COUNT(DISTINCT o.id) > 0
-                         THEN ROUND(COALESCE(SUM(o.totalWithTax), 0)::numeric / NULLIF(COUNT(DISTINCT o.id), 0), 2)
-                         ELSE 0 END,
-                     COUNT(DISTINCT o."customerId")::int,
-                     COUNT(DISTINCT ol."productVariantId")::int
-                 FROM order_line ol
-                 INNER JOIN "order" o ON o.id = ol."orderId"
-                 WHERE o.state = 'PaymentSettled'
-                   AND ol."sellerChannelId" IS NOT NULL
-                   AND o."orderPlacedAt" >= $1::date
-                   AND o."orderPlacedAt" < $1::date + INTERVAL '1 day'
-                 GROUP BY ol."sellerChannelId"
-                 ON CONFLICT ("channelId", date) DO UPDATE SET
-                     "totalOrders" = EXCLUDED."totalOrders",
-                     "totalRevenue" = EXCLUDED."totalRevenue",
-                     "totalUnits" = EXCLUDED."totalUnits",
-                     "avgOrderValue" = EXCLUDED."avgOrderValue",
-                     "newCustomers" = EXCLUDED."newCustomers",
-                     "productsSold" = EXCLUDED."productsSold",
-                     "updatedAt" = NOW()`,
-                [yStr],
-            );
-
-            const count = Array.isArray(result) ? result.length : 0;
-            Logger.info(`Daily analytics computed for ${yStr}: ${count} stores`, loggerCtx);
+            const records = await this.buildAnalyticsRecords(yStart, yEnd);
+            if (records.length === 0) {
+                Logger.info(`No orders found for yesterday`, loggerCtx);
+                return;
+            }
+            await this.upsertRecords(records);
+            Logger.info(`Daily analytics computed: ${records.length} stores`, loggerCtx);
         } catch (e: any) {
             Logger.error(`Failed to compute daily analytics: ${e.message}`, loggerCtx);
         }
@@ -88,34 +62,86 @@ export class AnalyticsJobService implements OnApplicationBootstrap {
     async backfill() {
         Logger.info(`Starting backfill for last 90 days`, loggerCtx);
         try {
-            const result = await this.repo.query(
-                `INSERT INTO store_daily_analytics ("channelId", date, "totalOrders", "totalRevenue", "totalUnits", "avgOrderValue", "newCustomers", "productsSold")
-                 SELECT
-                     ol."sellerChannelId",
-                     DATE_TRUNC('day', o."orderPlacedAt")::date,
-                     COUNT(DISTINCT o.id)::int,
-                     COALESCE(SUM(o.totalWithTax), 0)::int,
-                     COALESCE(SUM(ol.quantity), 0)::int,
-                     CASE WHEN COUNT(DISTINCT o.id) > 0
-                         THEN ROUND(COALESCE(SUM(o.totalWithTax), 0)::numeric / NULLIF(COUNT(DISTINCT o.id), 0), 2)
-                         ELSE 0 END,
-                     COUNT(DISTINCT o."customerId")::int,
-                     COUNT(DISTINCT ol."productVariantId")::int
-                 FROM order_line ol
-                 INNER JOIN "order" o ON o.id = ol."orderId"
-                 WHERE o.state = 'PaymentSettled'
-                   AND ol."sellerChannelId" IS NOT NULL
-                   AND o."orderPlacedAt" >= CURRENT_DATE - INTERVAL '90 days'
-                   AND o."orderPlacedAt" < CURRENT_DATE
-                 GROUP BY ol."sellerChannelId", DATE_TRUNC('day', o."orderPlacedAt")
-                 ON CONFLICT ("channelId", date) DO NOTHING`,
-            );
-            const count = Array.isArray(result) ? result.length : 0;
-            Logger.info(`Backfill complete: ${count} rows inserted`, loggerCtx);
-            return count;
+            const end = new Date();
+            end.setDate(end.getDate() - 1);
+            end.setHours(23, 59, 59, 999);
+            const start = new Date();
+            start.setDate(start.getDate() - 90);
+            start.setHours(0, 0, 0, 0);
+
+            const records = await this.buildAnalyticsRecords(start, end);
+            if (records.length === 0) {
+                Logger.info(`No orders found for last 90 days`, loggerCtx);
+                return 0;
+            }
+            const saved = await this.upsertRecords(records);
+            Logger.info(`Backfill complete: ${records.length} rows`, loggerCtx);
+            return records.length;
         } catch (e: any) {
             Logger.error(`Backfill failed: ${e.message}`, loggerCtx);
             throw e;
         }
+    }
+
+    private async buildAnalyticsRecords(startDate: Date, endDate: Date) {
+        const rawData = await this.repo.manager
+            .createQueryBuilder()
+            .select([
+                'ol."sellerChannelId" as "channelId"',
+                `DATE_TRUNC('day', o."orderPlacedAt")::date as "date"`,
+                'COUNT(DISTINCT o.id)::int as "totalOrders"',
+                `COALESCE(SUM(o."subTotalWithTax" + o."shippingWithTax"), 0)::int as "totalRevenue"`,
+                'COALESCE(SUM(ol.quantity), 0)::int as "totalUnits"',
+                `CASE WHEN COUNT(DISTINCT o.id) > 0
+                    THEN ROUND(COALESCE(SUM(o."subTotalWithTax" + o."shippingWithTax"), 0)::numeric
+                        / NULLIF(COUNT(DISTINCT o.id), 0), 2)
+                    ELSE 0 END as "avgOrderValue"`,
+                'COUNT(DISTINCT o."customerId")::int as "newCustomers"',
+                'COUNT(DISTINCT ol."productVariantId")::int as "productsSold"',
+            ])
+            .from('order_line', 'ol')
+            .innerJoin('order', 'o', 'o.id = ol."orderId"')
+            .where('o.state = :state', { state: 'PaymentSettled' })
+            .andWhere('ol."sellerChannelId" IS NOT NULL')
+            .andWhere('o."orderPlacedAt" >= :start', { start: startDate })
+            .andWhere('o."orderPlacedAt" <= :end', { end: endDate })
+            .groupBy('ol."sellerChannelId"')
+            .addGroupBy(`DATE_TRUNC('day', o."orderPlacedAt")`)
+            .getRawMany();
+
+        return rawData.map(r => {
+            const record = new StoreDailyAnalytics();
+            record.channelId = Number(r.channelId);
+            record.date = r.date;
+            record.totalOrders = Number(r.totalOrders);
+            record.totalRevenue = Number(r.totalRevenue);
+            record.totalUnits = Number(r.totalUnits);
+            record.avgOrderValue = Number(r.avgOrderValue);
+            record.newCustomers = Number(r.newCustomers);
+            record.productsSold = Number(r.productsSold);
+            return record;
+        });
+    }
+
+    private async upsertRecords(records: StoreDailyAnalytics[]) {
+        if (records.length === 0) return;
+        const qb = this.repo
+            .createQueryBuilder()
+            .insert()
+            .into(StoreDailyAnalytics)
+            .values(records)
+            .orUpdate(
+                [
+                    'totalOrders',
+                    'totalRevenue',
+                    'totalUnits',
+                    'avgOrderValue',
+                    'newCustomers',
+                    'productsSold',
+                    'updatedAt',
+                ],
+                ['channelId', 'date'],
+            );
+        await qb.execute();
     }
 }
