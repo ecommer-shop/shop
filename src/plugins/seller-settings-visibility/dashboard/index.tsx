@@ -1,6 +1,7 @@
 import { defineDashboardExtension } from '@vendure/dashboard';
 
 // IDs de vistas en Configuración (Settings) que se bloquean para canales vendedores:
+//   sellers           → Vendedores
 //   channels          → Canales
 //   administrators    → Administradores
 //   roles             → Roles
@@ -16,6 +17,7 @@ import { defineDashboardExtension } from '@vendure/dashboard';
 //   tax-categories    → Categorías de impuestos
 //   tax-rates         → Tasas de impuestos
 const RESTRICTED_NAV_IDS = [
+  'sellers',
   'channels',
   'administrators',
   'roles',
