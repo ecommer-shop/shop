@@ -1,7 +1,7 @@
 import { defineDashboardExtension } from '@vendure/dashboard';
 import { StoreList } from './pages/StoreList';
 import { StoreDetail } from './pages/StoreDetail';
-import { AnalyticsPage } from './analytics/AnalyticsPage';
+import { AnalyticsSection } from './analytics/AnalyticsSection';
 
 export default defineDashboardExtension({
     routes: [
@@ -21,16 +21,16 @@ export default defineDashboardExtension({
             loader: () => ({ breadcrumb: 'Detalle de la Tienda' }),
             component: (route: any) => <StoreDetail route={route} />,
         },
+    ],
+    pageBlocks: [
         {
-            path: '/analytics',
-            navMenuItem: {
-                sectionId: 'settings',
-                id: 'store-analytics',
-                title: 'Analíticas',
-                url: '/analytics',
+            id: 'store-analytics',
+            location: {
+                pageId: 'store-list',
+                column: 'full',
+                position: { blockId: 'list-table', order: 'after' },
             },
-            loader: () => ({ breadcrumb: 'Analíticas de Tiendas' }),
-            component: () => <AnalyticsPage />,
+            component: AnalyticsSection,
         },
     ],
 });
