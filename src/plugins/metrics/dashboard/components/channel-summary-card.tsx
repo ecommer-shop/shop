@@ -11,7 +11,7 @@ export function ChannelSummaryCard({ dateFrom, dateTo }: { dateFrom: Date; dateT
                 <CardDescription>Información general del período analizado</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-xs sm:text-sm">
                     <div>
                         <span className="text-muted-foreground">Período:</span>
                         <span className="ml-2 font-medium">{formatDate(dateFrom)} - {formatDate(dateTo)}</span>

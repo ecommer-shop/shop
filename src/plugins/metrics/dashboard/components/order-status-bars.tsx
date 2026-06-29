@@ -18,16 +18,16 @@ export function OrderStatusBars({ items }: { items: OrderStatusItem[] }) {
             <CardContent>
                 <div className="space-y-3">
                     {items.map(item => (
-                        <div key={item.state} className="flex items-center gap-4">
-                            <div className="w-36 text-sm font-medium truncate" title={item.state}>{item.state}</div>
-                            <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                        <div key={item.state} className="flex items-center gap-2 sm:gap-4">
+                            <div className="w-20 sm:w-36 text-xs sm:text-sm font-medium truncate" title={item.state}>{item.state}</div>
+                            <div className="flex-1 h-4 sm:h-5 bg-muted rounded-full overflow-hidden">
                                 <div
                                     className="h-full bg-primary rounded-full transition-all"
                                     style={{ width: `${item.percentage}%` }}
                                 />
                             </div>
-                            <div className="w-16 text-sm text-right text-muted-foreground">{item.count}</div>
-                            <div className="w-12 text-sm text-right font-medium">{item.percentage}%</div>
+                            <div className="w-12 sm:w-16 text-xs sm:text-sm text-right text-muted-foreground">{item.count}</div>
+                            <div className="w-10 sm:w-12 text-xs sm:text-sm text-right font-medium">{item.percentage}%</div>
                         </div>
                     ))}
                 </div>

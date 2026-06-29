@@ -25,9 +25,9 @@ export function TopProductsTable({ products }: { products: TopProduct[] }) {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>#</TableHead>
+                                <TableHead className="hidden sm:table-cell">#</TableHead>
                                 <TableHead>Producto</TableHead>
-                                <TableHead>SKU</TableHead>
+                                <TableHead className="hidden sm:table-cell">SKU</TableHead>
                                 <TableHead className="text-right">Cantidad</TableHead>
                                 <TableHead className="text-right">Ingresos</TableHead>
                             </TableRow>
@@ -35,11 +35,11 @@ export function TopProductsTable({ products }: { products: TopProduct[] }) {
                         <TableBody>
                             {products.map((product, idx) => (
                                 <TableRow key={product.productVariantId}>
-                                    <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                                    <TableCell className="font-medium">{product.productName}</TableCell>
-                                    <TableCell className="text-muted-foreground">{product.sku}</TableCell>
-                                    <TableCell className="text-right">{product.quantity.toLocaleString()}</TableCell>
-                                    <TableCell className="text-right font-medium">{formatCurrency(product.revenue)}</TableCell>
+                                    <TableCell className="text-muted-foreground hidden sm:table-cell">{idx + 1}</TableCell>
+                                    <TableCell className="font-medium text-xs sm:text-sm">{product.productName}</TableCell>
+                                    <TableCell className="text-muted-foreground hidden sm:table-cell text-xs sm:text-sm">{product.sku}</TableCell>
+                                    <TableCell className="text-right text-xs sm:text-sm">{product.quantity.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right font-medium text-xs sm:text-sm">{formatCurrency(product.revenue)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

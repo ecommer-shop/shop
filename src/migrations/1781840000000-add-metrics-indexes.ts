@@ -1,6 +1,9 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddMetricsIndexes1781840000000 implements MigrationInterface {
+    name = 'AddMetricsIndexes1781840000000';
+    transaction = false;
+
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(
             `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_occ_channel"

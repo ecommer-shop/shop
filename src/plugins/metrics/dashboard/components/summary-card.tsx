@@ -9,7 +9,7 @@ export function SummaryCard({ label, value, type, growth }: { label: string; val
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-xl sm:text-2xl font-bold">
                     {type === 'currency'
                         ? `$${(value / 100).toLocaleString('es-CO', {
                             minimumFractionDigits: 2,
