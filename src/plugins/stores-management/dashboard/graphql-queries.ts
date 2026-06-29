@@ -256,3 +256,9 @@ export interface InvestorMetricsResponse {
   newStoresPerMonth: InvestorMetric;
   uniqueCustomers: InvestorMetric;
 }
+
+export const BACKFILL_MUTATION = `
+  mutation BackfillStoreAnalytics {
+    backfillStoreAnalytics
+  }
+`;

@@ -160,6 +160,10 @@ export const adminApiExtensions = gql`
         storeAnalyticsStoreList: [StoreSearchResult!]!
         investorMetrics: InvestorMetrics!
     }
+
+    extend type Mutation {
+        backfillStoreAnalytics: Boolean!
+    }
 `;
 
 export const shopApiExtensions = gql`

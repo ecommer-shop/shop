@@ -84,4 +84,38 @@ export class AnalyticsJobService implements OnApplicationBootstrap {
             Logger.error(`Failed to compute daily analytics: ${e.message}`, loggerCtx);
         }
     }
+
+    async backfill() {
+        Logger.info(`Starting backfill for last 90 days`, loggerCtx);
+        try {
+            const result = await this.repo.query(
+                `INSERT INTO store_daily_analytics ("channelId", date, "totalOrders", "totalRevenue", "totalUnits", "avgOrderValue", "newCustomers", "productsSold")
+                 SELECT
+                     ol."sellerChannelId",
+                     DATE_TRUNC('day', o."orderPlacedAt")::date,
+                     COUNT(DISTINCT o.id)::int,
+                     COALESCE(SUM(o.totalWithTax), 0)::int,
+                     COALESCE(SUM(ol.quantity), 0)::int,
+                     CASE WHEN COUNT(DISTINCT o.id) > 0
+                         THEN ROUND(COALESCE(SUM(o.totalWithTax), 0)::numeric / NULLIF(COUNT(DISTINCT o.id), 0), 2)
+                         ELSE 0 END,
+                     COUNT(DISTINCT o."customerId")::int,
+                     COUNT(DISTINCT ol."productVariantId")::int
+                 FROM order_line ol
+                 INNER JOIN "order" o ON o.id = ol."orderId"
+                 WHERE o.state = 'PaymentSettled'
+                   AND ol."sellerChannelId" IS NOT NULL
+                   AND o."orderPlacedAt" >= CURRENT_DATE - INTERVAL '90 days'
+                   AND o."orderPlacedAt" < CURRENT_DATE
+                 GROUP BY ol."sellerChannelId", DATE_TRUNC('day', o."orderPlacedAt")
+                 ON CONFLICT ("channelId", date) DO NOTHING`,
+            );
+            const count = Array.isArray(result) ? result.length : 0;
+            Logger.info(`Backfill complete: ${count} rows inserted`, loggerCtx);
+            return count;
+        } catch (e: any) {
+            Logger.error(`Backfill failed: ${e.message}`, loggerCtx);
+            throw e;
+        }
+    }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@vendure/dashboard';
-import { BarChart3, Loader2 } from 'lucide-react';
+import { Card, CardContent, Button } from '@vendure/dashboard';
+import { BarChart3, Loader2, RefreshCw } from 'lucide-react';
 import {
     gql,
     STORE_ANALYTICS_QUERY,
@@ -8,6 +8,7 @@ import {
     STORE_RANKING_QUERY,
     STORE_ANALYTICS_STORE_LIST_QUERY,
     INVESTOR_METRICS_QUERY,
+    BACKFILL_MUTATION,
     type AnalyticsDataPoint,
     type StoreAnalyticsSummary,
     type StoreRankingEntry,
@@ -28,6 +29,7 @@ export function AnalyticsSection() {
     const [ranking, setRanking] = useState<StoreRankingEntry[]>([]);
     const [investorMetrics, setInvestorMetrics] = useState<InvestorMetricsResponse | null>(null);
     const [loading, setLoading] = useState(true);
+    const [backfilling, setBackfilling] = useState(false);
 
     useEffect(() => {
         gql<{ storeAnalyticsStoreList: { id: string; storeName: string; channelCode: string }[] }>(
@@ -61,6 +63,34 @@ export function AnalyticsSection() {
     }, [channelId, days]);
 
     const hasData = summary && summary.totalRevenue.current > 0;
+
+    const handleBackfill = async () => {
+        setBackfilling(true);
+        try {
+            await gql<{ backfillStoreAnalytics: boolean }>(BACKFILL_MUTATION);
+            setLoading(true);
+            const filter = { channelId: channelId || undefined, days };
+            Promise.all([
+                gql<{ storeAnalytics: AnalyticsDataPoint[] }>(STORE_ANALYTICS_QUERY, { filter }),
+                gql<{ storeAnalyticsSummary: StoreAnalyticsSummary }>(STORE_ANALYTICS_SUMMARY_QUERY, { filter }),
+                gql<{ storeRanking: StoreRankingEntry[] }>(STORE_RANKING_QUERY, {
+                    channelId: channelId || undefined,
+                    by: 'revenue',
+                    limit: 10,
+                }),
+                gql<{ investorMetrics: InvestorMetricsResponse }>(INVESTOR_METRICS_QUERY),
+            ])
+                .then(([dataRes, summaryRes, rankingRes, invRes]) => {
+                    setData(dataRes.storeAnalytics);
+                    setSummary(summaryRes.storeAnalyticsSummary);
+                    setRanking(rankingRes.storeRanking);
+                    setInvestorMetrics(invRes.investorMetrics);
+                })
+                .catch(() => {})
+                .finally(() => setLoading(false));
+        } catch { }
+        setBackfilling(false);
+    };
 
     return (
         <div className="px-4 sm:px-6 pb-6">
@@ -120,10 +150,19 @@ export function AnalyticsSection() {
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-10 text-center">
                         <BarChart3 className="h-8 w-8 text-muted-foreground/40 mb-3" />
-                        <p className="text-sm font-medium text-muted-foreground">No hay datos disponibles</p>
-                        <p className="text-xs text-muted-foreground/60 mt-0.5">
-                            Ejecuta la migración y reinicia el servidor. El job diario genera datos automáticamente.
-                        </p>
+                        <p className="text-sm font-medium text-muted-foreground mb-3">No hay datos disponibles</p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleBackfill}
+                            disabled={backfilling}
+                        >
+                            {backfilling ? (
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cargando...</>
+                            ) : (
+                                <><RefreshCw className="h-4 w-4 mr-2" />Cargar datos históricos</>
+                            )}
+                        </Button>
                     </CardContent>
                 </Card>
             )}

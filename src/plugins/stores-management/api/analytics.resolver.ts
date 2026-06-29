@@ -1,14 +1,18 @@
 import { Injectable, UseGuards } from '@nestjs/common';
-import { Resolver, Query, Args, Context } from '@nestjs/graphql';
+import { Resolver, Query, Mutation, Args, Context } from '@nestjs/graphql';
 import { Allow, Permission, RequestContext } from '@vendure/core';
 import { SuperAdminGuard } from '../guards/super-admin.guard';
 import { AnalyticsService } from '../service/analytics.service';
+import { AnalyticsJobService } from '../service/analytics-job.service';
 
 @Injectable()
 @Resolver()
 @UseGuards(SuperAdminGuard)
 export class AnalyticsResolver {
-    constructor(private analyticsService: AnalyticsService) {}
+    constructor(
+        private analyticsService: AnalyticsService,
+        private analyticsJobService: AnalyticsJobService,
+    ) {}
 
     @Query()
     @Allow(Permission.SuperAdmin)
@@ -63,5 +67,12 @@ export class AnalyticsResolver {
         @Context() ctx: RequestContext,
     ) {
         return this.analyticsService.getInvestorMetrics();
+    }
+
+    @Mutation()
+    @Allow(Permission.SuperAdmin)
+    async backfillStoreAnalytics() {
+        await this.analyticsJobService.backfill();
+        return true;
     }
 }
