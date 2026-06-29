@@ -260,43 +260,36 @@ export class StoreService {
         const { query, take, skip } = options;
         const limit = Math.min(take, 50);
 
+        const q = `%${query}%`;
+        const exactQ = query;
+
         const qb = this.connection.rawConnection
             .createQueryBuilder()
             .select('ch.id', 'channelId')
             .addSelect('ch.code', 'channelCode')
-            .addSelect('ch.token', 'channelToken')
-            .addSelect('ch.createdAt', 'channelCreatedAt')
-            .addSelect('ch.updatedAt', 'channelUpdatedAt')
-            .addSelect('s.id', 'sellerId')
             .addSelect('s.name', 'sellerName')
-            .addSelect('s.deletedAt', 'sellerDeletedAt')
             .addSelect(
-                `CASE WHEN s."deletedAt" IS NULL AND ch."createdAt" > CURRENT_TIMESTAMP - INTERVAL '2 days' THEN TRUE ELSE FALSE END`,
-                'isNew',
+                `CASE WHEN LOWER(s.name) = LOWER(:exactQ) THEN 0
+                      WHEN LOWER(s.name) LIKE LOWER(:q) THEN 1
+                      ELSE 2 END`,
+                'relevance',
             )
             .from('channel', 'ch')
             .innerJoin('seller', 's', 's.id = ch."sellerId"')
             .where('ch."sellerId" IS NOT NULL')
-            .andWhere('s."deletedAt" IS NULL');
+            .andWhere('s."deletedAt" IS NULL')
+            .andWhere(
+                new Brackets(qb2 => {
+                    qb2.where('LOWER(s.name) LIKE LOWER(:q)', { q })
+                        .orWhere('LOWER(ch.code) LIKE LOWER(:q)', { q });
+                }),
+            )
+            .orderBy('relevance', 'ASC')
+            .addOrderBy('s.name', 'ASC')
+            .limit(limit)
+            .offset(skip);
 
-        const q = `%${query}%`;
-        qb.andWhere(
-            new Brackets(qb2 => {
-                qb2.where('LOWER(s.name) LIKE LOWER(:q)', { q })
-                    .orWhere('LOWER(ch.code) LIKE LOWER(:q)', { q });
-            }),
-        );
-
-        qb.orderBy('s.name', 'ASC');
-        qb.limit(limit);
-        qb.offset(skip);
-
-        const rows: StoreRow[] = await qb.getRawMany();
-
-        const channelIds = rows.map(r => r.channelId);
-        const adminInfoMap = channelIds.length > 0 ? await this.loadAdminInfoByChannelIds(channelIds) : {};
-        const productCountMap = channelIds.length > 0 ? await this.loadProductCounts(channelIds) : {};
-        const customFieldsMap = channelIds.length > 0 ? await this.loadAdminCustomFieldsByChannelIds(channelIds) : {};
+        const rows = await qb.getRawMany();
 
         const totalQb = this.connection.rawConnection
             .createQueryBuilder()
@@ -318,22 +311,6 @@ export class StoreService {
             id: String(row.channelId),
             storeName: row.sellerName,
             channelCode: row.channelCode,
-            channelToken: row.channelToken,
-            createdAt: row.channelCreatedAt,
-            updatedAt: row.channelUpdatedAt,
-            isNew: row.isNew,
-            isDeleted: false,
-            deletedAt: null,
-            adminName: adminInfoMap[row.channelId]
-                ? `${adminInfoMap[row.channelId].firstName} ${adminInfoMap[row.channelId].lastName}`
-                : null,
-            adminEmail: adminInfoMap[row.channelId]?.emailAddress ?? null,
-            adminLastLogin: adminInfoMap[row.channelId]?.lastLogin ?? null,
-            productCount: productCountMap[row.channelId] ?? 0,
-            storeDescription: customFieldsMap[row.channelId]?.storeDescription ?? null,
-            storePickupAddress: customFieldsMap[row.channelId]?.storePickupAddress ?? null,
-            storePickupNeighborhood: customFieldsMap[row.channelId]?.storePickupNeighborhood ?? null,
-            storeBannerUrl: null,
         }));
 
         return {

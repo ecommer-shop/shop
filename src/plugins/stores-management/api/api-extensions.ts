@@ -26,6 +26,17 @@ const sharedStoreTypes = gql`
         totalItems: Int!
     }
 
+    type StoreSearchResult implements Node {
+        id: ID!
+        storeName: String!
+        channelCode: String!
+    }
+
+    type StoreSearchResultList implements PaginatedList {
+        items: [StoreSearchResult!]!
+        totalItems: Int!
+    }
+
     input StoreSearchInput {
         query: String!
         take: Int
@@ -84,7 +95,7 @@ export const adminApiExtensions = gql`
         stores(first: Int! = 20, after: String, filter: StoreFilterInput): StoreConnection!
         store(id: ID!): Store
         storesList(options: StoreListWithTotalsListOptions): StoreListWithTotals!
-        searchStores(input: StoreSearchInput!): StoreList!
+        searchStores(input: StoreSearchInput!): StoreSearchResultList!
     }
 `;
 
@@ -92,6 +103,6 @@ export const shopApiExtensions = gql`
     ${sharedStoreTypes}
 
     extend type Query {
-        searchStores(input: StoreSearchInput!): StoreList!
+        searchStores(input: StoreSearchInput!): StoreSearchResultList!
     }
 `;
