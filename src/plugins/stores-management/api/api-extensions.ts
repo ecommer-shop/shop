@@ -44,7 +44,7 @@ const sharedStoreTypes = gql`
     }
 
     type AnalyticsDataPoint {
-        date: DateTime!
+        date: String!
         totalOrders: Int!
         totalRevenue: Int!
         totalUnits: Int!
