@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
     Page,
     PageLayout,
-    FullWidthPageBlock,
     PageTitle,
     Card,
     CardContent,
@@ -110,7 +109,7 @@ export function AnalyticsPage() {
                 </span>
             </PageTitle>
             <PageLayout>
-                <FullWidthPageBlock>
+                <div className="col-span-full space-y-4">
                     <Filters
                         stores={stores}
                         selectedStore={channelId}
@@ -160,7 +159,7 @@ export function AnalyticsPage() {
                             </CardContent>
                         </Card>
                     )}
-                </FullWidthPageBlock>
+                </div>
             </PageLayout>
         </Page>
     );
