@@ -8,7 +8,8 @@ import { defineDashboardExtension } from '@vendure/dashboard';
 //   countries         → Países
 //   zones             → Zonas
 //   global-settings   → Configuración global
-//   store-management  → Tiendas (plugin superadmin-sellers-management)
+//   store-management  → Tiendas
+//   store-analytics   → Analíticas de Tiendas
 //
 // IDs disponibles para bloquear en el futuro (añadir al array):
 //   stock-locations   → Ubicaciones de stock
@@ -25,6 +26,7 @@ const RESTRICTED_NAV_IDS = [
   'zones',
   'global-settings',
   'store-management',
+  'store-analytics',
   'shipping-methods',
 ];
 

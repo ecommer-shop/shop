@@ -86,19 +86,23 @@ export class AnalyticsJobService implements OnApplicationBootstrap {
     private async buildAnalyticsRecords(startDate: Date, endDate: Date) {
         const rawData = await this.repo.manager
             .createQueryBuilder()
-            .select([
-                'ol."sellerChannelId" as "channelId"',
-                `DATE_TRUNC('day', o."orderPlacedAt")::date as "date"`,
-                'COUNT(DISTINCT o.id)::int as "totalOrders"',
-                `COALESCE(SUM(o."subTotalWithTax" + o."shippingWithTax"), 0)::int as "totalRevenue"`,
-                'COALESCE(SUM(ol.quantity), 0)::int as "totalUnits"',
+            .select('ol.sellerChannelId', 'channelId')
+            .addSelect(`DATE_TRUNC('day', o."orderPlacedAt")::date`, 'date')
+            .addSelect('COUNT(DISTINCT o.id)::int', 'totalOrders')
+            .addSelect(
+                `COALESCE(SUM(o."subTotalWithTax" + o."shippingWithTax"), 0)::int`,
+                'totalRevenue',
+            )
+            .addSelect('COALESCE(SUM(ol.quantity), 0)::int', 'totalUnits')
+            .addSelect(
                 `CASE WHEN COUNT(DISTINCT o.id) > 0
                     THEN ROUND(COALESCE(SUM(o."subTotalWithTax" + o."shippingWithTax"), 0)::numeric
                         / NULLIF(COUNT(DISTINCT o.id), 0), 2)
-                    ELSE 0 END as "avgOrderValue"`,
-                'COUNT(DISTINCT o."customerId")::int as "newCustomers"',
-                'COUNT(DISTINCT ol."productVariantId")::int as "productsSold"',
-            ])
+                    ELSE 0 END`,
+                'avgOrderValue',
+            )
+            .addSelect('COUNT(DISTINCT o."customerId")::int', 'newCustomers')
+            .addSelect('COUNT(DISTINCT ol."productVariantId")::int', 'productsSold')
             .from('order_line', 'ol')
             .innerJoin('order', 'o', 'o.id = ol."orderId"')
             .where('o.state = :state', { state: 'PaymentSettled' })
