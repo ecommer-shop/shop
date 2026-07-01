@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
     LineChart, Line, CartesianGrid, Tooltip, XAxis, YAxis, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -5,12 +6,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@vendure/dashboard';
 import { ShoppingCart } from 'lucide-react';
 import type { AnalyticsDataPoint } from '../graphql-queries';
 
+const LIGHT = ['#6BB8FF', '#4A90D9'];
+const DARK = ['#9969F8', '#7B4DD4'];
+
 function formatDate(dateStr: string): string {
     const d = new Date(dateStr);
     return d.toLocaleDateString('es-CO', { month: 'short', day: 'numeric' });
 }
 
+function useColors(): string[] {
+    const [colors, setColors] = useState(LIGHT);
+    useEffect(() => {
+        const el = document.documentElement;
+        const update = () => setColors(el.classList.contains('dark') ? DARK : LIGHT);
+        update();
+        const observer = new MutationObserver(update);
+        observer.observe(el, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
+    return colors;
+}
+
 export function OrdersChart({ data }: { data: AnalyticsDataPoint[] }) {
+    const colors = useColors();
     const chartData = data.map(d => ({
         date: formatDate(d.date),
         Órdenes: d.totalOrders,
@@ -38,14 +56,14 @@ export function OrdersChart({ data }: { data: AnalyticsDataPoint[] }) {
                         <Line
                             type="monotone"
                             dataKey="Órdenes"
-                            stroke="hsl(var(--chart-2))"
+                            stroke={colors[0]}
                             strokeWidth={2}
                             dot={{ r: 3 }}
                         />
                         <Line
                             type="monotone"
                             dataKey="Unidades"
-                            stroke="hsl(var(--chart-3))"
+                            stroke={colors[1]}
                             strokeWidth={2}
                             dot={{ r: 3 }}
                         />

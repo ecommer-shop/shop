@@ -1,4 +1,4 @@
-import type { InvestorMetric } from '../graphql-queries';
+import type { InvestorMetric, InvestorMetricsResponse } from '../graphql-queries';
 
 function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('es-CO', {

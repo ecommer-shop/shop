@@ -45,7 +45,7 @@ export function AnalyticsPage() {
             STORE_ANALYTICS_STORE_LIST_QUERY,
         )
             .then(d => setStores(d.storeAnalyticsStoreList))
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     useEffect(() => {
@@ -67,7 +67,7 @@ export function AnalyticsPage() {
                 setRanking(rankingRes.storeRanking);
                 setInvestorMetrics(invRes.investorMetrics);
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoading(false));
     }, [channelId, days]);
 
@@ -95,7 +95,7 @@ export function AnalyticsPage() {
                     setRanking(rankingRes.storeRanking);
                     setInvestorMetrics(invRes.investorMetrics);
                 })
-                .catch(() => {})
+                .catch(() => { })
                 .finally(() => setLoading(false));
         } catch { }
         setBackfilling(false);
