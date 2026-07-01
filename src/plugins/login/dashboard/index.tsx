@@ -41,6 +41,10 @@ defineDashboardExtension({
                 position: { blockId: 'custom-fields', order: 'after' },
             },
             component: DeleteAccountSection,
+            shouldRender: () => {
+                if (typeof window === 'undefined') return false;
+                return localStorage.getItem('ecommer.isSuperAdmin') !== 'true';
+            },
         },
     ],
 });

@@ -169,6 +169,11 @@ export function App() {
                         );
                     }
 
+                    const isSuperAdmin = authResult.channels?.some(
+                        (ch: any) => ch.permissions?.includes?.('SuperAdmin'),
+                    );
+                    localStorage.setItem('ecommer.isSuperAdmin', isSuperAdmin ? 'true' : 'false');
+
                     document.body.classList.remove('hide-native-login');
                     window.location.href = '/dashboard';
                 } else {
