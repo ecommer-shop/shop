@@ -25,6 +25,7 @@ import { PluginInitOptions } from './types';
         return config;
     },
     compatibility: '^3.0.0',
+    dashboard: './dashboard/index.tsx',
 })
 export class SuperadminvisibilityPlugin implements OnApplicationBootstrap {
     constructor(
