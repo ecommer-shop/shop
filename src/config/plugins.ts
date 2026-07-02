@@ -61,6 +61,7 @@ import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
 import { SafeShippingPlugin } from '../plugins/safe-shipping/safe-shipping.plugin';
 import { StoresManagementPlugin } from '../plugins/stores-management/stores-management.plugin';
 import { SellerSettingsVisibilityPlugin } from '../plugins/seller-settings-visibility/seller-settings-visibility.plugin';
+import { CommandPalettePlugin } from '../plugins/command-palette/command-palette.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -192,6 +193,8 @@ export const plugins: VendureConfig['plugins'] = [
   StoresManagementPlugin.init({}),
 
   SellerSettingsVisibilityPlugin,
+
+  CommandPalettePlugin,
 
   WompiSubscriptionPlugin.init({
     wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',

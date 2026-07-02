@@ -63,7 +63,7 @@ export function AdvancedMetricsWidget() {
     const formatValue = (value: number) => {
         if (!activeMetric) return String(value);
         if (activeMetric.type === 'currency') {
-            return formatCurrency(value, activeChannel?.defaultCurrencyCode);
+            return formatCurrency(value, activeChannel?.defaultCurrencyCode!);
         }
         return value.toLocaleString();
     };

@@ -103,6 +103,7 @@ export function FiltersSection({
                                         : 'outline'
                                 }
                                 size="sm"
+                                className="cursor-pointer"
                                 onClick={() => {
                                     if (selectedMetrics.includes(metric.code)) {
                                         onMetricsChange(
@@ -124,6 +125,7 @@ export function FiltersSection({
                     <Button
                         variant="outline"
                         size="sm"
+                        className="cursor-pointer"
                         onClick={onRefresh}
                         disabled={isRefetching}
                     >
@@ -133,6 +135,7 @@ export function FiltersSection({
                     <Button
                         variant="outline"
                         size="sm"
+                        className="cursor-pointer"
                         onClick={onDownload}
                         disabled={isDownloadDisabled}
                     >
