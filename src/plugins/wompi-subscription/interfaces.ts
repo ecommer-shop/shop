@@ -23,6 +23,7 @@ export interface WompiCreateTransactionResponse {
     amount_in_cents: number;
     currency: string;
     payment_method_type?: string;
+    receipt_url?: string;
     payment_method?: {
         type: string;
         extra?: {
@@ -34,6 +35,11 @@ export interface WompiCreateTransactionResponse {
                 code_otp_send: string;
                 code_otp_validate: string;
             };
+            last_four?: string;
+            brand?: string;
+            card_holder?: string;
+            exp_month?: string;
+            exp_year?: string;
         };
     };
 }

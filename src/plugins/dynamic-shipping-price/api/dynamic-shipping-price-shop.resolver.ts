@@ -39,12 +39,18 @@ export class DynamicShippingPriceShopResolver {
         }
 
         const order = await this.connection.getEntityOrThrow(ctx, Order, activeOrder.id, {
-            relations: ['shippingLines'],
+            relations: ['shippingLines', 'shippingLines.shippingMethod'],
         });
         const shippingLine = order.shippingLines?.[0];
 
         if (!shippingLine) {
             throw new UserInputError('Selecciona un metodo de envio antes de calcular el domicilio.');
+        }
+        if (!shippingLine.shippingMethodId) {
+            throw new UserInputError('La línea de envío no tiene un método de envío asignado.');
+        }
+        if (!shippingLine.shippingMethod?.code) {
+            throw new UserInputError('El método de envío no tiene un código válido.');
         }
 
         shippingLine.listPrice = price;

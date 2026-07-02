@@ -1,6 +1,6 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@vendure/dashboard';
 
-export function SummaryCard({ label, value, type }: { label: string; value: number; type: string }) {
+export function SummaryCard({ label, value, type, growth }: { label: string; value: number; type: string; growth?: number | null }) {
     return (
         <Card>
             <CardHeader className="pb-2">
@@ -9,14 +9,18 @@ export function SummaryCard({ label, value, type }: { label: string; value: numb
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-xl sm:text-2xl font-bold">
                     {type === 'currency'
                         ? `$${(value / 100).toLocaleString('es-CO', {
                             minimumFractionDigits: 2,
                         })}`
                         : value.toLocaleString()}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">Total del período</p>
+                {growth != null && (
+                    <p className={`text-xs mt-2 ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {growth >= 0 ? '▲' : '▼'} {Math.abs(growth).toFixed(1)}% vs mes anterior
+                    </p>
+                )}
             </CardContent>
         </Card>
     );
