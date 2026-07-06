@@ -210,6 +210,8 @@ export const plugins: VendureConfig['plugins'] = [
 
   SellerUxPlugin,
 
+  BlogPlugin.init({}),
+
   WompiSubscriptionPlugin.init({
     wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co/v1',
     wompiApiKey: process.env.WOMPI_API_KEY || process.env.PAYMENT_PRIVATE_KEY || '',
