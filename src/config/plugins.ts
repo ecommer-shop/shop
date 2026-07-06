@@ -56,6 +56,7 @@ import {
   MessengerDomisDeliveryOrderStrategy,
 } from '../plugins/delivery-order';
 import { SuperadminvisibilityPlugin } from '../plugins/superadminvisibility/superadminvisibility.plugin';
+import { BlogPlugin } from '../plugins/blog/blog.plugin';
 import { WompiSubscriptionPlugin } from '../plugins/wompi-subscription/wompi-subscription.plugin';
 import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
 import { SafeShippingPlugin } from '../plugins/safe-shipping/safe-shipping.plugin';
@@ -195,6 +196,8 @@ export const plugins: VendureConfig['plugins'] = [
   SellerSettingsVisibilityPlugin,
 
   CommandPalettePlugin,
+
+  BlogPlugin.init({}),
 
   WompiSubscriptionPlugin.init({
     wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
