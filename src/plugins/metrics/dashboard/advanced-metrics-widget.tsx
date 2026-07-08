@@ -6,7 +6,7 @@ import {
     Button,
 } from '@vendure/dashboard';
 import { RefreshCw } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
     LineChart,
     Line,
@@ -41,6 +41,16 @@ export function AdvancedMetricsWidget() {
     const { height } = useWidgetDimensions();
     const { formatCurrency } = useLocalFormat();
     const { activeChannel } = useChannel();
+
+    useEffect(() => {
+        if (activeChannel?.code) {
+            (window as any).dataLayer = (window as any).dataLayer || [];
+            (window as any).dataLayer.push({
+                event: 'seller_view_dashboard',
+                seller_id: activeChannel.code
+            });
+        }
+    }, [activeChannel?.code]);
 
     const [selectedMetricCode, setSelectedMetricCode] = useState<string | null>(null);
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;

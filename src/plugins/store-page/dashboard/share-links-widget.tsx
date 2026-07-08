@@ -43,6 +43,14 @@ export function ShareLinksWidget() {
         const link = `https://ecommer.shop/es/store/${activeChannel?.code}`;
         await navigator.clipboard.writeText(link);
         toast.success('Link de tu tienda copiado');
+
+        (window as any).dataLayer = (window as any).dataLayer || [];
+        (window as any).dataLayer.push({
+            event: 'seller_share_link',
+            seller_id: activeChannel?.code || 'unknown',
+            share_type: 'copy_store_links'
+        });
+
         setCopiedStore(true);
         setTimeout(() => setCopiedStore(false), 2000);
     };
@@ -51,6 +59,14 @@ export function ShareLinksWidget() {
         const link = `https://ecommer.shop/es/product/${slug}`;
         await navigator.clipboard.writeText(link);
         toast.success('Link del producto copiado');
+
+        (window as any).dataLayer = (window as any).dataLayer || [];
+        (window as any).dataLayer.push({
+            event: 'seller_share_link',
+            seller_id: activeChannel?.code || 'unknown',
+            share_type: 'copy_product_links'
+        });
+
         setCopiedId(slug);
         setTimeout(() => setCopiedId(null), 2000);
     };
@@ -58,6 +74,14 @@ export function ShareLinksWidget() {
     const handleDownloadQR = (slug: string, imageUrl?: string | null) => {
         const params = new URLSearchParams({ slug });
         if (imageUrl) params.set('image', imageUrl);
+
+        (window as any).dataLayer = (window as any).dataLayer || [];
+        (window as any).dataLayer.push({
+            event: 'seller_share_link',
+            seller_id: activeChannel?.code || 'unknown',
+            share_type: 'download_product_qr'
+        });
+        
         window.open(`https://stg.ecommer.shop/api/product-qr?${params.toString()}`, '_blank');
     };
 
