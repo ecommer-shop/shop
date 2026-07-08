@@ -1,7 +1,9 @@
 import { defineDashboardExtension, DropdownMenuItem, useChannel } from '@vendure/dashboard';
 import { Share2 } from 'lucide-react';
+import ProductTracker from '@/plugins/login/dashboard/components/ProductTracker';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import SellerFirstSaleTracker from '@/plugins/login/dashboard/components/SellerFirstSaleTracker';
 import { StoreBannerAssetPickerInput } from './store-banner-asset-picker-input';
 import { StoreFeaturedStarInput } from './store-featured-star-input';
 import { StorePickupMapPreviewInput } from './store-pickup-map-preview-input';
@@ -29,6 +31,18 @@ defineDashboardExtension({
             pageId: 'product-detail',
             component: ShareProductDropdownItem,
             type: 'dropdown',
+        },
+        {
+            id: 'ecommer-product-tracker',
+            pageId: 'product-detail',
+            component: ProductTracker,
+            type: 'button',
+        },
+        {
+            id: 'ecommer-seller-first-sale-tracker',
+            pageId: 'seller-order-detail',
+            component: SellerFirstSaleTracker,
+            type: 'button',
         },
     ],
     dataTables: [
