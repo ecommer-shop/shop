@@ -251,6 +251,14 @@ export function SellerRegistrationForm({
                 setSuccess(
                     `Registro exitoso. Se creó tu tienda "${shopName}" con el email ${data.email}. Iniciando sesión automáticamente...`,
                 );
+                
+                (window as any).dataLayer = (window as any).dataLayer || [];
+                (window as any).dataLayer.push({
+                    event: 'seller_create_store',
+                    seller_id: data.email,
+                    plan_type: 'free'
+                });
+
                 await onRegistered(data.email, idToken);
             } else {
                 setError('Error inesperado en el registro');
