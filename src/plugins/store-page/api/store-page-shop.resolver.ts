@@ -3,14 +3,16 @@ import {
     Administrator,
     Allow,
     Asset,
-    Collection,
     Channel,
+    Collection,
     Ctx,
     Permission,
     Product,
     RequestContext,
     TransactionalConnection,
 } from '@vendure/core';
+
+import { parseSocialLinksJson } from '../services/social-links.service';
 
 type AssetFieldValue = string | { preview?: string | null; source?: string | null } | null;
 
@@ -194,7 +196,13 @@ export class StorePageShopResolver {
     async storePageProfile(
         @Ctx() ctx: RequestContext,
         @Args('collectionSlug', { type: () => String, nullable: true }) collectionSlug?: string | null,
-    ): Promise<StorePageProfile> {
+    ): Promise<{
+        storeName: string;
+        storeDescription: string | null;
+        storeBannerUrl: string | null;
+        storeHeaderBannerUrl: string | null;
+        socialLinks: Array<{ platform: string; username: string; dmLink: string; profileUrl: string; displayName: string | null; inPipeline: boolean }>;
+    }> {
         if (!collectionSlug) {
             return this.storePageProfileFromChannelSeller(ctx);
         }
@@ -264,15 +272,35 @@ export class StorePageShopResolver {
                 resolveAssetUrl(adminFields?.storeHeaderBannerUrl, true) || storeHeaderBannerUrl;
         }
 
+        const socialLinks = seller?.customFields?.socialLinks
+            ? parseSocialLinksJson(seller.customFields.socialLinks).map(l => ({
+                  platform: l.platform,
+                  username: l.username,
+                  dmLink: l.dmLink,
+                  profileUrl: l.profileUrl,
+                  displayName: l.displayName ?? null,
+                  inPipeline: l.inPipeline,
+              }))
+            : [];
+
         return {
             storeName: sellerName,
             storeDescription,
             storeBannerUrl,
             storeHeaderBannerUrl,
+            socialLinks,
         };
     }
 
-    private async storePageProfileFromChannelSeller(ctx: RequestContext): Promise<StorePageProfile> {
+    private async storePageProfileFromChannelSeller(
+        ctx: RequestContext,
+    ): Promise<{
+        storeName: string;
+        storeDescription: string | null;
+        storeBannerUrl: string | null;
+        storeHeaderBannerUrl: string | null;
+        socialLinks: Array<{ platform: string; username: string; dmLink: string; profileUrl: string; displayName: string | null; inPipeline: boolean }>;
+    }> {
         const channel = await this.connection.getRepository(ctx, Channel).findOne({
             where: { id: ctx.channelId },
             relations: ['seller'],
@@ -284,6 +312,7 @@ export class StorePageShopResolver {
                 storeDescription: null,
                 storeBannerUrl: null,
                 storeHeaderBannerUrl: null,
+                socialLinks: [],
             };
         }
 
@@ -292,6 +321,49 @@ export class StorePageShopResolver {
         const administrator = await this.loadAdminWithStoreFields(ctx, ctx.channelId);
         const adminFields = administrator?.customFields as AdminStoreFields | undefined;
 
-        return this.profileFromAdminFields(storeName, adminFields);
+        const storeDescription = adminFields?.storeDescription ?? null;
+        const storeBannerUrl = resolveAssetUrl(adminFields?.storeBannerUrl);
+        const storeHeaderBannerUrl = resolveAssetUrl(adminFields?.storeHeaderBannerUrl, true);
+
+        const socialLinks = channel.seller?.customFields?.socialLinks
+            ? parseSocialLinksJson(channel.seller.customFields.socialLinks).map(l => ({
+                  platform: l.platform,
+                  username: l.username,
+                  dmLink: l.dmLink,
+                  profileUrl: l.profileUrl,
+                  displayName: l.displayName ?? null,
+                  inPipeline: l.inPipeline,
+              }))
+            : [];
+
+        return {
+            storeName,
+            storeDescription,
+            storeBannerUrl,
+            storeHeaderBannerUrl,
+            socialLinks,
+        };
+    }
+
+    @Query()
+    @Allow(Permission.Public)
+    async storeSocialLinks(
+        @Ctx() ctx: RequestContext,
+        @Args('channelCode') channelCode: string,
+    ) {
+        const channel = await this.connection.getRepository(ctx, Channel).findOne({
+            where: { code: channelCode },
+            relations: ['seller'],
+        });
+        if (!channel?.seller?.customFields?.socialLinks) return [];
+
+        return parseSocialLinksJson(channel.seller.customFields.socialLinks).map(l => ({
+            platform: l.platform,
+            username: l.username,
+            dmLink: l.dmLink,
+            profileUrl: l.profileUrl,
+            displayName: l.displayName ?? null,
+            inPipeline: l.inPipeline,
+        }));
     }
 }

@@ -11,8 +11,16 @@ import { StorePickupAddressInput } from './store-pickup-address-input';
 import { ShareProductButton } from './share-product-button';
 import { SlugShareDisplay } from './slug-share-display';
 import { ShareLinksWidget } from './share-links-widget';
+import { SocialOAuthCallback } from './social-oauth-callback';
 
 defineDashboardExtension({
+    routes: [
+        {
+            path: '/social/oauth/callback',
+            authenticated: false,
+            component: SocialOAuthCallback,
+        },
+    ],
     customFormComponents: {
         customFields: [
             { id: 'ecommer-store-featured-star', component: StoreFeaturedStarInput },
