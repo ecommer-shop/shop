@@ -25,14 +25,14 @@ export class StorePageAdminResolver {
     }
 
     @Query()
-    @Allow(Permission.UpdateCatalog, Permission.UpdateProduct)
+    @Allow(Permission.Authenticated)
     async sellerSocialLinks(@Ctx() ctx: RequestContext): Promise<SocialLink[]> {
         return this.socialLinksService.get(ctx);
     }
 
     @Mutation()
     @Transaction()
-    @Allow(Permission.UpdateCatalog, Permission.UpdateProduct)
+    @Allow(Permission.Authenticated)
     async updateSellerSocialLinks(
         @Ctx() ctx: RequestContext,
         @Args() args: { input: SocialLinkInput[] },
@@ -42,7 +42,7 @@ export class StorePageAdminResolver {
 
     @Mutation()
     @Transaction()
-    @Allow(Permission.UpdateCatalog, Permission.UpdateProduct)
+    @Allow(Permission.Authenticated)
     async connectFacebookWithToken(
         @Ctx() ctx: RequestContext,
         @Args() args: { accessToken: string },
@@ -78,7 +78,7 @@ export class StorePageAdminResolver {
 
     @Mutation()
     @Transaction()
-    @Allow(Permission.UpdateCatalog, Permission.UpdateProduct)
+    @Allow(Permission.Authenticated)
     async connectInstagramWithToken(
         @Ctx() ctx: RequestContext,
         @Args() args: { accessToken: string },
@@ -96,7 +96,7 @@ export class StorePageAdminResolver {
 
     @Mutation()
     @Transaction()
-    @Allow(Permission.UpdateCatalog, Permission.UpdateProduct)
+    @Allow(Permission.Authenticated)
     async disconnectSocialPlatform(
         @Ctx() ctx: RequestContext,
         @Args() args: { platform: string },
