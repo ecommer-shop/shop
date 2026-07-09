@@ -48,7 +48,7 @@ defineDashboardExtension({
             location: {
                 pageId: 'profile',
                 column: 'main',
-                position: { blockId: 'social-links-section', order: 'after' },
+                position: { blockId: 'custom-fields', order: 'after' },
             },
             component: DeleteAccountSection,
             shouldRender: () => {
