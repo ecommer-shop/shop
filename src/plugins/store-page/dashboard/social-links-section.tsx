@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { loadFacebookSDK, fbLogin } from './facebook-sdk';
 
 type SocialLinkEntry = {
     platform: string;
@@ -19,6 +20,8 @@ const PLATFORMS = [
     { value: 'facebook', label: 'Facebook', icon: '👍', color: '#1877F2' },
     { value: 'instagram', label: 'Instagram', icon: '📷', color: '#E4405F' },
 ];
+
+const FACEBOOK_APP_ID = import.meta.env.VITE_FACEBOOK_APP_ID || '1789597475329797';
 
 function getAdminApiUrl(): string {
     return `${window.location.origin}/admin-api`;
@@ -53,6 +56,26 @@ const DISCONNECT_PLATFORM = `
     }
 `;
 
+const CONNECT_FACEBOOK_WITH_TOKEN = `
+    mutation ConnectFB($token: String!) {
+        connectFacebookWithToken(accessToken: $token) {
+            username
+            displayName
+            status
+        }
+    }
+`;
+
+const CONNECT_INSTAGRAM_WITH_TOKEN = `
+    mutation ConnectIG($token: String!) {
+        connectInstagramWithToken(accessToken: $token) {
+            username
+            displayName
+            status
+        }
+    }
+`;
+
 function generateDmLink(platform: string, username: string): string {
     if (!username) return '';
     switch (platform) {
@@ -79,39 +102,6 @@ function generateProfileUrl(platform: string, username: string): string {
         default:
             return '';
     }
-}
-
-function openOAuthPopup(url: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const width = 600;
-        const height = 700;
-        const left = window.screenX + (window.innerWidth - width) / 2;
-        const top = window.screenY + (window.innerHeight - height) / 2;
-        const popup = window.open(
-            url,
-            'oauth',
-            `width=${width},height=${height},left=${left},top=${top}`,
-        );
-        if (!popup) {
-            reject(new Error('Pop-up bloqueado. Permite ventanas emergentes e intenta de nuevo.'));
-            return;
-        }
-        const interval = setInterval(() => {
-            try {
-                if (popup.closed) {
-                    clearInterval(interval);
-                    resolve('');
-                }
-            } catch {
-                clearInterval(interval);
-                resolve('');
-            }
-        }, 500);
-        setTimeout(() => {
-            clearInterval(interval);
-            resolve('');
-        }, 120000);
-    });
 }
 
 async function graphql(query: string, variables?: Record<string, any>) {
@@ -147,31 +137,6 @@ export function SocialLinksSection() {
 
     useEffect(() => {
         loadLinks();
-    }, [loadLinks]);
-
-    useEffect(() => {
-        const handler = async (event: MessageEvent) => {
-            if (event.data?.type === 'oauth-code') {
-                const code = event.data.code;
-                const state = event.data.state || '';
-                const platform = state.startsWith('ig_') ? 'instagram' : 'facebook';
-                try {
-                    setConnecting(platform);
-                    const mutationName = platform === 'facebook' ? 'connectFacebook' : 'connectInstagram';
-                    const mutation = `mutation Connect($code: String!) { ${mutationName}(authCode: $code) { username } }`;
-                    await graphql(mutation, { code });
-                    const label = PLATFORMS.find(p => p.value === platform)?.label || platform;
-                    toast.success(`${label} conectado`);
-                    await loadLinks();
-                } catch (e: any) {
-                    toast.error(e.message || 'Error al conectar');
-                } finally {
-                    setConnecting(null);
-                }
-            }
-        };
-        window.addEventListener('message', handler);
-        return () => window.removeEventListener('message', handler);
     }, [loadLinks]);
 
     const handleUsernameChange = (index: number, username: string) => {
@@ -270,18 +235,33 @@ export function SocialLinksSection() {
     const handleSave = () => saveLinks(links);
 
     const handleOAuth = async (platform: 'facebook' | 'instagram') => {
-        const queryName = platform === 'facebook' ? 'getFacebookOAuthUrl' : 'getInstagramOAuthUrl';
-        const query = `query GetOAuthUrl { ${queryName} }`;
+        const scope =
+            platform === 'facebook'
+                ? 'pages_show_list,pages_read_engagement,pages_manage_metadata,instagram_basic,public_profile'
+                : 'instagram_business_basic';
+        const mutation =
+            platform === 'facebook' ? CONNECT_FACEBOOK_WITH_TOKEN : CONNECT_INSTAGRAM_WITH_TOKEN;
+        const platformName =
+            platform === 'facebook' ? 'Facebook' : 'Instagram';
+
         try {
-            const data = await graphql(query);
-            const url = data?.[queryName];
-            if (!url) {
-                toast.error('Error al obtener URL de conexión');
+            setConnecting(platform);
+            await loadFacebookSDK(FACEBOOK_APP_ID);
+            const response = await fbLogin({ scope });
+
+            if (!response.authResponse?.accessToken) {
+                toast.error(`Conexión con ${platformName} cancelada`);
                 return;
             }
-            openOAuthPopup(url);
+
+            const accessToken = response.authResponse.accessToken;
+            await graphql(mutation, { token: accessToken });
+            toast.success(`${platformName} conectado`);
+            await loadLinks();
         } catch (e: any) {
-            toast.error(e.message || 'Error al conectar');
+            toast.error(e.message || `Error al conectar con ${platformName}`);
+        } finally {
+            setConnecting(null);
         }
     };
 

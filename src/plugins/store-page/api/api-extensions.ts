@@ -80,8 +80,6 @@ export const storePageAdminApiExtensions = gql`
 
     extend type Query {
         sellerSocialLinks: [SocialLink!]!
-        getFacebookOAuthUrl: String!
-        getInstagramOAuthUrl: String!
     }
 
     extend type Mutation {
@@ -94,13 +92,13 @@ export const storePageAdminApiExtensions = gql`
         """
         updateSellerSocialLinks(input: [SocialLinkInput!]!): Boolean!
         """
-        Conecta Facebook vía OAuth: intercambia code por token y guarda datos.
+        Conecta Facebook con access token del SDK JS.
         """
-        connectFacebook(authCode: String!): SocialLink!
+        connectFacebookWithToken(accessToken: String!): SocialLink!
         """
-        Conecta Instagram vía OAuth: intercambia code por token y guarda datos.
+        Conecta Instagram con access token del SDK JS.
         """
-        connectInstagram(authCode: String!): SocialLink!
+        connectInstagramWithToken(accessToken: String!): SocialLink!
         """
         Desconecta una red social.
         """
