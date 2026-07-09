@@ -39,7 +39,7 @@ defineDashboardExtension({
             location: {
                 pageId: 'profile',
                 column: 'main',
-                position: { blockId: 'delete-account-section', order: 'before' },
+                position: { blockId: 'custom-fields', order: 'after' },
             },
             component: SocialLinksSection,
         },
@@ -48,7 +48,7 @@ defineDashboardExtension({
             location: {
                 pageId: 'profile',
                 column: 'main',
-                position: { blockId: 'custom-fields', order: 'after' },
+                position: { blockId: 'social-links-section', order: 'after' },
             },
             component: DeleteAccountSection,
             shouldRender: () => {
