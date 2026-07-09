@@ -3,6 +3,10 @@ import type { RequestContext } from '@vendure/core';
 export type DeliveryOrderPaymentMethod = 'Efectivo' | 'Transferencia';
 
 export interface CreateDeliveryOrderInput {
+    orderId?: string;
+    orderCode?: string;
+    sellerChannelCode?: string;
+    sellerName?: string;
     barrio_origen: string;
     barrio_destino: string;
     origen_lat_lng: string;
@@ -28,6 +32,31 @@ export interface CreateDeliveryOrderResult {
     required_fields?: string[];
 }
 
+export interface DeliveryOrderStatusUpdateInput {
+    provider?: string;
+    providerDocumentId?: string;
+    id_documento?: string;
+    orderId?: string;
+    orderCode?: string;
+    sellerChannelCode?: string;
+    sellerName?: string;
+    status?: string;
+    estado?: string;
+    state?: string;
+    statusLabel?: string;
+    message?: string;
+    mensaje?: string;
+    trackingUrl?: string;
+    tracking_url?: string;
+    rawPayload?: Record<string, unknown>;
+}
+
+export interface DeliveryOrderStatusUpdateResult {
+    success: boolean;
+    error?: string;
+    deliveryOrder?: unknown;
+}
+
 export interface DeliveryOrderStrategy {
     create(ctx: RequestContext, input: CreateDeliveryOrderInput): Promise<CreateDeliveryOrderResult>;
 }
@@ -41,6 +70,7 @@ export interface MessengerDomisDeliveryOrderOptions {
     url?: string;
     apiKey?: string;
     timeoutMs?: number;
+    webhookSecret?: string;
 }
 
 /**
@@ -51,4 +81,5 @@ export interface PluginInitOptions {
     creator?: DeliveryOrderCreator;
     strategy?: DeliveryOrderStrategy;
     messengerDomis?: MessengerDomisDeliveryOrderOptions;
+    webhookSecret?: string;
 }

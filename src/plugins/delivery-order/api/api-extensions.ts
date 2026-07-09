@@ -2,6 +2,10 @@ import gql from 'graphql-tag';
 
 const deliveryOrderShopApiExtensions = gql`
     input CreateDeliveryOrderInput {
+        orderId: String
+        orderCode: String
+        sellerChannelCode: String
+        sellerName: String
         barrio_origen: String!
         barrio_destino: String!
         origen_lat_lng: String!
@@ -25,6 +29,26 @@ const deliveryOrderShopApiExtensions = gql`
         error: String
         missing_fields: [String!]
         required_fields: [String!]
+    }
+
+    type ExternalDeliveryOrder {
+        id: ID!
+        orderId: String
+        orderCode: String
+        sellerChannelCode: String
+        sellerName: String
+        provider: String!
+        providerDocumentId: String
+        status: String!
+        statusLabel: String
+        trackingUrl: String
+        statusUpdatedAt: DateTime
+        createdAt: DateTime!
+        updatedAt: DateTime!
+    }
+
+    extend type Query {
+        deliveryOrdersByOrderCode(orderCode: String!): [ExternalDeliveryOrder!]!
     }
 
     extend type Mutation {

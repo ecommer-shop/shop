@@ -43,3 +43,5 @@ Thumbs.db
 admin-ui/
 shop/src/admin-ui-custom/
 .yarnrc.yml
+
+AGENTS.md   

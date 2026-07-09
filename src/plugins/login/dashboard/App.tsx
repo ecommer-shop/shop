@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { GoogleLoginButton } from './components/GoogleLoginButton';
 import { SellerRegistrationForm } from './components/SellerRegistrationForm';
-import { POST_LOGIN_RELOAD_KEY } from './components/PostLoginReloadBlock';
 
 const FALLBACK_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '';
 const FALLBACK_GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -100,6 +99,7 @@ export function App() {
                                         channels {
                                             id
                                             code
+                                            token
                                             permissions
                                         }
                                     }
@@ -160,11 +160,22 @@ export function App() {
 
                 if (authResult?.id) {
                     setStatus('¡Sesión iniciada! Redirigiendo...');
-                    sessionStorage.setItem(POST_LOGIN_RELOAD_KEY, '1');
+
+                    const firstChannel = authResult.channels?.[0];
+                    if (firstChannel?.token) {
+                        localStorage.setItem(
+                            'vendure-selected-channel-token',
+                            firstChannel.token,
+                        );
+                    }
+
+                    const isSuperAdmin = authResult.channels?.some(
+                        (ch: any) => ch.permissions?.includes?.('SuperAdmin'),
+                    );
+                    localStorage.setItem('ecommer.isSuperAdmin', isSuperAdmin ? 'true' : 'false');
+
                     document.body.classList.remove('hide-native-login');
-                    setTimeout(() => {
-                        window.location.href = '/dashboard';
-                    }, 500);
+                    window.location.href = '/dashboard';
                 } else {
                     if (!fromRegistration) {
                         redirectToRegisterFlow();

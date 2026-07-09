@@ -1,7 +1,6 @@
 import { defineDashboardExtension } from '@vendure/dashboard';
 import { App } from './App';
 import { LoginLogo } from './components/LoginLogo';
-import { PostLoginReloadBlock, POST_LOGIN_RELOAD_KEY } from './components/PostLoginReloadBlock';
 import { DeleteAccountSection } from './components/DeleteAccountSection';
 
 defineDashboardExtension({
@@ -35,21 +34,6 @@ defineDashboardExtension({
 
     pageBlocks: [
         {
-            id: 'post-login-reload-block',
-            location: {
-                pageId: 'insights',
-                column: 'full',
-                position: { blockId: 'widgets', order: 'before' },
-            },
-            component: PostLoginReloadBlock,
-            shouldRender: () => {
-                if (typeof window === 'undefined') {
-                    return false;
-                }
-                return sessionStorage.getItem(POST_LOGIN_RELOAD_KEY) === '1';
-            },
-        },
-        {
             id: 'delete-account-section',
             location: {
                 pageId: 'profile',
@@ -57,6 +41,10 @@ defineDashboardExtension({
                 position: { blockId: 'custom-fields', order: 'after' },
             },
             component: DeleteAccountSection,
+            shouldRender: () => {
+                if (typeof window === 'undefined') return false;
+                return localStorage.getItem('ecommer.isSuperAdmin') !== 'true';
+            },
         },
     ],
 });

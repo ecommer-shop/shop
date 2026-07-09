@@ -10,8 +10,6 @@ import { DeleteSellerAccountService } from './services/delete-seller-account.ser
 import { SellerChannelSetupJobService } from './services/seller-channel-setup-job.service';
 import { LoginResolver } from './api/login.resolver';
 import { adminApiExtensions } from './api/api-extensions';
-import { PostLoginSyncResolver } from './api/post-login-sync.resolver';
-import { postLoginSyncGraphql } from './api/post-login-sync.resolver';
 import { DeleteAccountResolver } from './api/delete-account.resolver';
 
 @VendurePlugin({
@@ -27,7 +25,7 @@ import { DeleteAccountResolver } from './api/delete-account.resolver';
     ],
     adminApiExtensions: {
         schema: adminApiExtensions,
-        resolvers: [LoginResolver, PostLoginSyncResolver, DeleteAccountResolver],
+        resolvers: [LoginResolver, DeleteAccountResolver],
     },
 
     configuration: config => {
