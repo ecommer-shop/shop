@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { api } from '@vendure/dashboard';
 import { loadFacebookSDK, fbLogin } from './facebook-sdk';
 
 type SocialLinkEntry = {
@@ -23,10 +24,13 @@ const PLATFORMS = [
 
 const FACEBOOK_APP_ID = import.meta.env.VITE_FACEBOOK_APP_ID || '1789597475329797';
 
-function getAdminApiUrl(): string {
-    return `${window.location.origin}/admin-api`;
+async function graphql(query: string, variables?: Record<string, any>) {
+    const result = await api.query(query, variables);
+    if (result.errors?.length) {
+        throw new Error(result.errors[0].message);
+    }
+    return result.data;
 }
-
 const GET_SOCIAL_LINKS = `
     query GetSellerSocialLinks {
         sellerSocialLinks {
@@ -102,20 +106,6 @@ function generateProfileUrl(platform: string, username: string): string {
         default:
             return '';
     }
-}
-
-async function graphql(query: string, variables?: Record<string, any>) {
-    const res = await fetch(getAdminApiUrl(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ query, variables }),
-    });
-    const json = await res.json();
-    if (json.errors?.length) {
-        throw new Error(json.errors[0].message);
-    }
-    return json.data;
 }
 
 export function SocialLinksSection() {
