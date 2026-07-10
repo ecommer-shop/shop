@@ -11,6 +11,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+import { abbreviateChartValue, formatFullPesos } from './utils';
 
 interface MetricSeries {
     name: string;
@@ -20,6 +21,7 @@ interface MetricSeries {
 interface Metric {
     code: string;
     title: string;
+    type: string;
     series: MetricSeries[];
 }
 
@@ -71,8 +73,20 @@ export function MetricsAreaChart({
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
+                        <YAxis tickFormatter={abbreviateChartValue} />
+                        <Tooltip
+                            formatter={(value: number, name: string) => {
+                                const metric = metrics.find(m =>
+                                    m.series.some(s => `${m.title} - ${s.name}` === name),
+                                );
+                                return [
+                                    metric?.type === 'currency'
+                                        ? formatFullPesos(value)
+                                        : value.toLocaleString('es-CO'),
+                                    name,
+                                ];
+                            }}
+                        />
                         <Legend />
                         {metrics.map((metric, metricIdx) =>
                             metric.series.map((series, seriesIdx) => (
@@ -112,8 +126,20 @@ export function MetricsLineChart({
                     <LineChart data={data}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
+                        <YAxis tickFormatter={abbreviateChartValue} />
+                        <Tooltip
+                            formatter={(value: number, name: string) => {
+                                const metric = metrics.find(m =>
+                                    m.series.some(s => `${m.title} - ${s.name}` === name),
+                                );
+                                return [
+                                    metric?.type === 'currency'
+                                        ? formatFullPesos(value)
+                                        : value.toLocaleString('es-CO'),
+                                    name,
+                                ];
+                            }}
+                        />
                         <Legend />
                         {metrics.map((metric, metricIdx) =>
                             metric.series.map((series, seriesIdx) => (

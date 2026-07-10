@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
+import { useIsSuperAdmin } from '../../../superadminvisibility/dashboard/hooks';
 
 function getAdminApiUrl(): string {
     return `${window.location.origin}/admin-api`;
 }
 
 export function DeleteAccountSection() {
+    const isSuperAdmin = useIsSuperAdmin();
     const [channelName, setChannelName] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [confirmationInput, setConfirmationInput] = useState('');
     const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
+        if (isSuperAdmin) return;
+
         const fetchChannelName = async () => {
             try {
                 const res = await fetch(getAdminApiUrl(), {
@@ -21,9 +25,13 @@ export function DeleteAccountSection() {
                         query: `
                             query ActiveAdminChannels {
                                 activeAdministrator {
-                                    roles {
-                                        channels {
+                                    user {
+                                        roles {
                                             code
+                                            permissions
+                                            channels {
+                                                code
+                                            }
                                         }
                                     }
                                 }
@@ -32,7 +40,7 @@ export function DeleteAccountSection() {
                     }),
                 });
                 const json = await res.json();
-                const roles = json?.data?.activeAdministrator?.roles ?? [];
+                const roles = json?.data?.activeAdministrator?.user?.roles ?? [];
                 for (const role of roles) {
                     for (const ch of role.channels ?? []) {
                         if (ch.code) {
@@ -48,7 +56,9 @@ export function DeleteAccountSection() {
             }
         };
         fetchChannelName();
-    }, []);
+    }, [isSuperAdmin]);
+
+    if (isSuperAdmin === true) return <div style={{ display: 'none' }} />;
 
     const expectedText = channelName ? `Eliminar ${channelName}` : 'ELIMINAR';
     const canDelete = confirmationInput === expectedText && !deleting && !loading;

@@ -922,7 +922,6 @@ export default defineConfig({
       /* Fix: ancho de app en móvil */
       html, body, #app {
         max-width: 100vw;
-        overflow-x: hidden;
         width: 100%;
       }
 
@@ -934,24 +933,21 @@ export default defineConfig({
                 }
             }
 
-            /* Sticky header - solo en displays pequeños */
-            @media (max-width: 768px) {
-                [data-slot="sidebar-inset"] {
-                    display: flex;
-                    flex-direction: column;
-                    overflow-y: auto;
-                    max-height: 100vh;
-                }
+            /* Sticky header - global (todos los tamaños) */
+            header.border-b.border-border {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 100 !important;
+                background: var(--background, #fff) !important;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+            }
 
-                [data-slot="sidebar-inset"] header,
-                main header {
-                    position: sticky;
-                    top: 0;
-                    z-index: 100;
-                    background: var(--background, #fff);
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-                    flex-shrink: 0;
-                }
+            /* Sidebar scroll container - todos los tamaños */
+            [data-slot="sidebar-inset"] {
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto;
+                max-height: 100vh;
             }
 
             /* --- Vendure Dashboard: Fix superposición de labels en gráficos métricas home --- */
