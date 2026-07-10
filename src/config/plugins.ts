@@ -63,6 +63,7 @@ import { SafeShippingPlugin } from '../plugins/safe-shipping/safe-shipping.plugi
 import { StoresManagementPlugin } from '../plugins/stores-management/stores-management.plugin';
 import { SellerSettingsVisibilityPlugin } from '../plugins/seller-settings-visibility/seller-settings-visibility.plugin';
 import { CommandPalettePlugin } from '../plugins/command-palette/command-palette.plugin';
+import { MetricsApiPlugin } from '../plugins/metrics-api/metrics-api.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -207,5 +208,7 @@ export const plugins: VendureConfig['plugins'] = [
     currency: process.env.WOMPI_CURRENCY || 'COP',
     wompiPublicKey: process.env.WOMPI_PUBLIC_KEY || '',
   }),
+
+  MetricsApiPlugin,
 ];
 
