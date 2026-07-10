@@ -1,4 +1,4 @@
-import { Controller, Get, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Get, HttpException, HttpStatus, Logger, Headers } from '@nestjs/common';
 import { MetricsService } from './metrics.service';
 
 @Controller('api/metrics')
@@ -8,7 +8,11 @@ export class MetricsController {
     constructor(private metricsService: MetricsService) {}
 
     @Get('operational')
-    async getOperationalMetrics() {
+    async getOperationalMetrics(@Headers('x-metrics-api-key') apiKey: string) {
+        const expectedKey = process.env.METRICS_API_KEY;
+        if (!expectedKey || apiKey !== expectedKey) {
+            throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+        }
         try {
             return await this.metricsService.getOperationalMetrics();
         } catch (error: any) {
