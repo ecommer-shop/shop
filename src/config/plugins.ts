@@ -60,6 +60,7 @@ import {
 import { SuperadminvisibilityPlugin } from '../plugins/superadminvisibility/superadminvisibility.plugin';
 import { WompiSubscriptionPlugin } from '../plugins/wompi-subscription/wompi-subscription.plugin';
 import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
+import { MetricsApiPlugin } from '../plugins/metrics-api/metrics-api.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -203,5 +204,7 @@ export const plugins: VendureConfig['plugins'] = [
     currency: process.env.WOMPI_CURRENCY || 'COP',
     wompiPublicKey: process.env.WOMPI_PUBLIC_KEY || '',
   }),
+
+  MetricsApiPlugin,
 ];
 

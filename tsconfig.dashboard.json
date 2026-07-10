@@ -10,6 +10,9 @@
             ],
             "@/vdb/*": [
                 "./node_modules/@vendure/dashboard/src/lib/*"
+            ],
+            "@/plugins/*": [
+                "./src/plugins/*"
             ]
         }
     },
