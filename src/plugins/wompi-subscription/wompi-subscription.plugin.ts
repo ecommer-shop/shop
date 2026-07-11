@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WOMPI_SUBSCRIPTION_PLUGIN_OPTIONS } from './constants';
 import { WompiSubscriptionPluginInitOptions } from './interfaces';
 import { Plan, Feature, PlanFeature, CustomerSubscription } from './entities';
-import { WompiService, PlanManagementService, SubscriptionQueryService, SubscriptionWriteService, SubscriptionLifecycleService, FeatureCheckService, ProductLimitEnforcementService, BillingJobService, BillingEmailService } from './services';
+import { WompiService, PlanManagementService, SubscriptionQueryService, SubscriptionWriteService, SubscriptionLifecycleService, FeatureCheckService, ProductLimitEnforcementService, BillingJobService, BillingEmailService, FixTranslationJobService } from './services';
 import { WompiWebhookController } from './api/wompi-webhook.controller';
 import { WompiTokenController } from './api/wompi-token.controller';
 import { PlanResolver } from './api/plan.resolver';
@@ -33,6 +33,7 @@ import { ProductTranslationSubscriber } from './subscribers/product-translation.
         SubscriptionResolver,
         WompiResolver,
         FixTranslationsResolver,
+        FixTranslationJobService,
         // ProductLimitResolver,
         FeatureGuard,
         ProductLimitGuard,
