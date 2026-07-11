@@ -74,7 +74,11 @@ export function CommandPaletteTrigger() {
                 )}
             </button>
 
-            {createPortal(<CommandPaletteDialog open={open} onClose={handleClose} />, document.body)}
+            {/* Dialog via portal */}
+            {createPortal(
+                <CommandPaletteDialog open={open} onClose={handleClose} />,
+                document.body,
+            )}
         </>
     );
 }
