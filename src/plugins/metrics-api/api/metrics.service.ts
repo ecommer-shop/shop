@@ -61,7 +61,7 @@ export class MetricsService {
             SELECT COALESCE(SUM(sp.price), 0) AS revenue_suscripciones
             FROM customer_subscription cs
             JOIN subscription_plan sp ON sp.id = cs.plan_id
-            WHERE cs.status = 'active'
+            WHERE cs.status = 'ACTIVE'
         `);
 
         return {
