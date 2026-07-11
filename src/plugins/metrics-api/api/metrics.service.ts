@@ -57,6 +57,13 @@ export class MetricsService {
             GROUP BY semana ORDER BY semana DESC
         `);
 
+        const revenueSuscripciones = await this.dataSource.query(`
+            SELECT COALESCE(SUM(sp.price), 0) AS revenue_suscripciones
+            FROM customer_subscription cs
+            JOIN subscription_plan sp ON sp.id = cs.plan_id
+            WHERE cs.status = 'active'
+        `);
+
         return {
             tiendas_con_productos: parseInt(tiendasConProductos[0]?.tiendas_con_productos ?? '0'),
             tiendas_con_ventas: parseInt(tiendasConVentas[0]?.tiendas_con_ventas ?? '0'),
@@ -74,7 +81,9 @@ export class MetricsService {
                 gmv_cop: parseFloat(r.gmv_cop),
                 transacciones: parseInt(r.transacciones),
                 ticket_promedio_cop: parseFloat(r.ticket_promedio_cop),
+                revenue_ecommer: parseFloat((r.gmv_cop * 0.079).toFixed(0)),
             })),
+            revenue_suscripciones_activas: parseFloat(revenueSuscripciones[0]?.revenue_suscripciones ?? '0'),
         };
     }
 }
