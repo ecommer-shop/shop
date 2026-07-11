@@ -14,6 +14,7 @@ export const adminApiExtensions = gql`
         gmv_cop: Float!
         transacciones: Int!
         ticket_promedio_cop: Float!
+        revenue_ecommer: Float!
     }
     type OperationalMetrics {
         tiendas_con_productos: Int!
@@ -22,6 +23,7 @@ export const adminApiExtensions = gql`
         tiendas_por_semana: [WeeklyStat!]!
         distribucion_planes: [PlanStat!]!
         transaccional_semanal: [WeeklyTransactional!]!
+        revenue_suscripciones_activas: Float!
     }
     extend type Query {
         operationalMetrics: OperationalMetrics!
