@@ -1,8 +1,14 @@
+import { LanguageCode } from '@vendure/common/lib/generated-types';
+
 export const PLACEHOLDER_NAMES = new Set(['sin nombre', 'untitled', 'unnamed', 'product', 'variante', 'variant', '']);
 
-export function hasValidTranslation(translations: Array<{ name?: string | null }> | undefined): boolean {
+export function hasValidTranslation(
+    translations: Array<{ name?: string | null; languageCode?: string }> | undefined,
+    languageCode: string = LanguageCode.es,
+): boolean {
     if (!translations?.length) return false;
     return translations.some(t => {
+        if (t.languageCode !== languageCode) return false;
         const name = t.name?.trim().toLowerCase();
         return !!name && !PLACEHOLDER_NAMES.has(name);
     });

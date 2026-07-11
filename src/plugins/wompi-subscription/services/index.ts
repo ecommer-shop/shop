@@ -7,3 +7,4 @@ export * from './feature-check.service';
 export * from './product-limit-enforcement.service';
 export * from './billing-job.service';
 export * from './billing-email.service';
+export * from './fix-translation-job.service';

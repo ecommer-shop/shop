@@ -1,6 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { Resolver, Mutation, Args, Context } from '@nestjs/graphql';
-import { RequestContext, TransactionalConnection, Product, ProductVariant, ProductTranslation, ProductVariantTranslation, Logger } from '@vendure/core';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { JobQueue, JobQueueService, ProcessContext, TransactionalConnection, Product, ProductVariant, ProductTranslation, ProductVariantTranslation } from '@vendure/core';
 import { LanguageCode } from '@vendure/common/lib/generated-types';
 import { MoreThan } from 'typeorm';
 import { hasValidTranslation, getProductFallbackName, getVariantFallbackName } from '../subscribers/translation-utils';
@@ -9,17 +8,65 @@ const BATCH_SIZE = 200;
 const CONCURRENCY = 3;
 
 @Injectable()
-@Resolver()
-export class FixTranslationsResolver {
+export class FixTranslationJobService implements OnModuleInit {
+    private readonly logger = new Logger(FixTranslationJobService.name);
+    private queue: JobQueue<{}>;
+
     constructor(
         private connection: TransactionalConnection,
+        private jobQueueService: JobQueueService,
+        private processContext: ProcessContext,
     ) { }
+
+    async onModuleInit() {
+        this.queue = await this.jobQueueService.createQueue({
+            name: 'fix-translations',
+            process: async (job) => {
+                await this.processFix();
+            },
+        });
+
+        if (this.processContext.isServer) {
+            this.scheduleRecurring();
+        }
+
+        this.logger.log('Created fix-translations job queue');
+    }
+
+    private scheduleRecurring() {
+        const delay = this.getDelayUntilNextExecution(4, 0);
+        setTimeout(async () => {
+            await this.enqueueJob();
+            setInterval(async () => {
+                await this.enqueueJob();
+            }, 24 * 60 * 60 * 1000);
+        }, delay);
+    }
+
+    private getDelayUntilNextExecution(hour: number, minute: number): number {
+        const now = new Date();
+        const next = new Date(now);
+        next.setHours(hour, minute, 0, 0);
+        if (next <= now) {
+            next.setDate(next.getDate() + 1);
+        }
+        return next.getTime() - now.getTime();
+    }
+
+    private async enqueueJob() {
+        try {
+            await this.queue.add({}, { retries: 3 });
+            this.logger.log('Enqueued fix-translations job');
+        } catch (e: any) {
+            this.logger.error(`Failed to enqueue fix-translations job: ${e.message}`);
+        }
+    }
 
     private async withConcurrency<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
         const executing = new Set<Promise<void>>();
         for (const item of items) {
             const p = fn(item).catch((e: any) => {
-                Logger.error(`[FixTranslations] Item failed: ${e.message}`);
+                this.logger.error(`[FixTranslations] Item failed: ${e.message}`);
             }).finally(() => executing.delete(p));
             executing.add(p);
             if (executing.size >= limit) {
@@ -29,21 +76,17 @@ export class FixTranslationsResolver {
         await Promise.allSettled(executing);
     }
 
-    @Mutation('fixProductTranslations')
-    async fixProductTranslations(
-        @Context() ctx: RequestContext,
-        @Args('dryRun') dryRun: boolean,
-    ) {
-        let productsScanned = 0;
-        let productsFixed = 0;
-        let variantsScanned = 0;
-        let variantsFixed = 0;
+    private async processFix() {
+        this.logger.log('Starting scheduled fix-translations process');
 
         const conn = this.connection.rawConnection;
         const ptRepo = conn.getRepository(ProductTranslation);
         const pvtRepo = conn.getRepository(ProductVariantTranslation);
 
-        // ── Products ──
+        let productsFixed = 0;
+        let variantsFixed = 0;
+
+        // Products
         {
             let lastId = 0;
             let batch: Product[];
@@ -57,21 +100,17 @@ export class FixTranslationsResolver {
 
                 const toFix: Product[] = [];
                 for (const product of batch) {
-                    productsScanned++;
                     lastId = product.id as number;
                     if (hasValidTranslation(product.translations)) continue;
-                    productsFixed++;
                     toFix.push(product);
                 }
 
-                if (!dryRun && toFix.length > 0) {
-                    const ptBatch: Array<{ product: Product; name: string; slug: string; description: string }> = [];
-                    for (const product of toFix) {
+                if (toFix.length > 0) {
+                    const ptBatch = toFix.map(product => {
                         const { name, slug, description } = getProductFallbackName(product.id as number, 'default');
-                        ptBatch.push({ product, name, slug, description });
-                    }
+                        return { product, name, slug, description };
+                    });
 
-                    let fixedInBatch = 0;
                     await this.withConcurrency(ptBatch, CONCURRENCY, async ({ product, name, slug, description }) => {
                         const esTranslation = product.translations?.find(t => t.languageCode === LanguageCode.es);
                         if (esTranslation) {
@@ -79,18 +118,15 @@ export class FixTranslationsResolver {
                         } else {
                             await ptRepo.save({ base: { id: product.id }, languageCode: LanguageCode.es, name, slug, description } as any);
                         }
-                        fixedInBatch++;
                     });
-                    Logger.info(`[FixTranslations] Products batch: ${fixedInBatch}/${toFix.length} fixed`);
+                    productsFixed += toFix.length;
                 }
 
-                if (dryRun && toFix.length > 0) {
-                    Logger.info(`[FixTranslations] Products batch: ${toFix.length} would be fixed`);
-                }
+                this.logger.log(`[FixTranslations] Products batch: ${toFix.length} fixed`);
             } while (batch.length === BATCH_SIZE);
         }
 
-        // ── Variants ──
+        // Variants
         {
             let lastId = 0;
             let batch: ProductVariant[];
@@ -104,22 +140,18 @@ export class FixTranslationsResolver {
 
                 const toFix: ProductVariant[] = [];
                 for (const variant of batch) {
-                    variantsScanned++;
                     lastId = variant.id as number;
                     if (hasValidTranslation(variant.translations)) continue;
-                    variantsFixed++;
                     toFix.push(variant);
                 }
 
-                if (!dryRun && toFix.length > 0) {
-                    const pvtBatch: Array<{ variant: ProductVariant; name: string }> = [];
-                    for (const variant of toFix) {
+                if (toFix.length > 0) {
+                    const pvtBatch = toFix.map(variant => {
                         const productId = variant.product?.id || 0;
                         const name = getVariantFallbackName(variant.id as number, productId as number, 'default');
-                        pvtBatch.push({ variant, name });
-                    }
+                        return { variant, name };
+                    });
 
-                    let fixedInBatch = 0;
                     await this.withConcurrency(pvtBatch, CONCURRENCY, async ({ variant, name }) => {
                         const esTranslation = variant.translations?.find(t => t.languageCode === LanguageCode.es);
                         if (esTranslation) {
@@ -127,24 +159,14 @@ export class FixTranslationsResolver {
                         } else {
                             await pvtRepo.save({ base: { id: variant.id }, languageCode: LanguageCode.es, name } as any);
                         }
-                        fixedInBatch++;
                     });
-                    Logger.info(`[FixTranslations] Variants batch: ${fixedInBatch}/${toFix.length} fixed`);
+                    variantsFixed += toFix.length;
                 }
 
-                if (dryRun && toFix.length > 0) {
-                    Logger.info(`[FixTranslations] Variants batch: ${toFix.length} would be fixed`);
-                }
+                this.logger.log(`[FixTranslations] Variants batch: ${toFix.length} fixed`);
             } while (batch.length === BATCH_SIZE);
         }
 
-        Logger.info(`Fix translations complete: ${productsFixed}/${productsScanned} products, ${variantsFixed}/${variantsScanned} variants (dryRun=${dryRun})`);
-
-        return {
-            productsScanned,
-            productsFixed,
-            variantsScanned,
-            variantsFixed,
-        };
+        this.logger.log(`Scheduled fix-translations complete: ${productsFixed} products, ${variantsFixed} variants`);
     }
 }
