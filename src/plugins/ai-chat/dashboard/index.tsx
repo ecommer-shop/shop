@@ -1,6 +1,7 @@
 import { defineDashboardExtension, DashboardRouteDefinition } from '@vendure/dashboard';
 import { AiChatPage } from './AiChatPage';
 import { AiChatWindow } from './AiChatWindow';
+import { AiChatFabTrigger } from './AiChatFabTrigger';
 
 const aiChatRoute: DashboardRouteDefinition = {
     path: '/ai-chat',
@@ -24,6 +25,12 @@ export default defineDashboardExtension({
             defaultSize: { w: 6, h: 4 },
             minSize: { w: 4, h: 3 },
             maxSize: { w: 12, h: 6 },
+        },
+    ],
+    toolbarItems: [
+        {
+            id: 'ai-chat-trigger',
+            component: AiChatFabTrigger,
         },
     ],
 });

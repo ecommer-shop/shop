@@ -1,40 +1,37 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Search } from 'lucide-react';
-import { CommandPaletteDialog } from './CommandPaletteDialog';
+import { Drawer, DrawerContent, useNavigate } from '@vendure/dashboard';
+import { MessageSquare } from 'lucide-react';
+import { AiChatDrawerContent } from './AiChatDrawerContent';
 
-export function CommandPaletteTrigger() {
+export function AiChatFabTrigger() {
     const [open, setOpen] = useState(false);
+    const navigate = useNavigate();
 
-    const handleOpen = useCallback(() => {
-        setOpen(true);
-    }, []);
+    const handleToggle = useCallback(() => setOpen(prev => !prev), []);
 
-    const handleClose = useCallback(() => {
+    const handleNavigateToFullChat = useCallback(() => {
         setOpen(false);
-    }, []);
+        navigate({ to: '/ai-chat' });
+    }, [navigate]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             const isMod = e.metaKey || e.ctrlKey;
-            if (isMod && e.key === 'k') {
+            if (isMod && e.shiftKey && e.key === 'K') {
                 e.preventDefault();
                 setOpen(prev => !prev);
-            }
-            if (e.key === 'Escape' && open) {
-                setOpen(false);
             }
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [open]);
+    }, []);
 
     return (
         <>
-            {/* Toolbar button */}
             <button
-                onClick={handleOpen}
-                title="Buscar comandos (⌘K)"
+                onClick={handleToggle}
+                title="Asistente IA (Ctrl+Shift+K)"
                 style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -59,12 +56,15 @@ export function CommandPaletteTrigger() {
                     e.currentTarget.style.opacity = '1';
                 }}
             >
-                <Search style={{ width: 18, height: 18 }} />
+                <MessageSquare style={{ width: 18, height: 18 }} />
             </button>
 
-            {/* Dialog via portal */}
             {createPortal(
-                <CommandPaletteDialog open={open} onClose={handleClose} />,
+                <Drawer open={open} onOpenChange={setOpen} direction="right">
+                    <DrawerContent className="flex flex-col sm:max-w-[400px]">
+                        <AiChatDrawerContent onNavigateToFullChat={handleNavigateToFullChat} />
+                    </DrawerContent>
+                </Drawer>,
                 document.body,
             )}
         </>
