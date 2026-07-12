@@ -21,7 +21,15 @@ export function ShareProductButton({ context }: { context: PageContextValue }) {
                 : null;
             const text = [productLink, storeLink].filter(Boolean).join('\n');
             await navigator.clipboard.writeText(text);
-            toast.success('Links copiados al portapapeles');
+            toast.success("Links copiados al portapapeles");
+            
+            (window as any).dataLayer = (window as any).dataLayer || [];
+            (window as any).dataLayer.push({
+                event: 'seller_share_link',
+                seller_id: storeCode || 'unknown',
+                share_type: 'copy_links'
+            });
+
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch {
@@ -37,9 +45,16 @@ export function ShareProductButton({ context }: { context: PageContextValue }) {
         
         const base = 'https://stg.ecommer.shop/api/product-qr';
         const params = new URLSearchParams({ slug: slugFromEntity });
-        if (imageUrl) params.set('image', imageUrl);
+        if (imageUrl) params.set("image", imageUrl);
 
-        window.open(`${base}?${params.toString()}`, '_blank');
+        (window as any).dataLayer = (window as any).dataLayer || [];
+        (window as any).dataLayer.push({
+            event: "seller_share_link",
+            seller_id: storeCode || "unknown",
+            share_type: "download_qr"
+        });
+
+        window.open(`${base}?${params.toString()}`, "_blank");
     };
 
     return (
