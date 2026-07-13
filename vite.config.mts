@@ -984,9 +984,8 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            // This allows all plugins to reference a shared set of
-            // GraphQL types.
             '@/gql': `${__dirname}/src/gql/graphql.ts`,
+            '@/plugins': `${__dirname}/src/plugins`,
         },
     },
 });
