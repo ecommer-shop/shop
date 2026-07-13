@@ -2,8 +2,10 @@ FROM node:20
 
 WORKDIR /usr/src/app
 
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN npm install -g bun
+
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 COPY . .
-RUN yarn build
+RUN bun run build
 RUN cp -R ./static ./dist/static
