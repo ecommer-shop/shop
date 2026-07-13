@@ -8,7 +8,7 @@
         "dev": "concurrently npm:dev:*",
         "build:server": "tsc",
         "build:dashboard": "node scripts/patch-base-ui.mjs && vite build",
-        "build": "yarn run build:server && yarn run build:dashboard",
+        "build": "npm run build:server && npm run build:dashboard",
         "build:seed": "tsc && cp -R ./static ./dist/static",
         "start:server": "node ./dist/index.js",
         "start:worker": "node ./dist/index-worker.js",

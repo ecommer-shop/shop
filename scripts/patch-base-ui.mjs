@@ -1,8 +1,9 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 
 const files = [
     'node_modules/@base-ui/react/esm/menu/item/useMenuItemCommonProps.js',
     'node_modules/@base-ui/react/menu/item/useMenuItemCommonProps.js',
+    'node_modules/@base-ui/react/menu/item/useMenuItemCommonProps.mjs',
 ];
 
 const patches = [
@@ -14,6 +15,10 @@ const patches = [
 
 let totalPatched = 0;
 for (const file of files) {
+    if (!existsSync(file)) {
+        console.log(`[patch-base-ui] skipping missing file ${file}`);
+        continue;
+    }
     let content = readFileSync(file, 'utf-8');
     let filePatchedCount = 0;
     for (const patch of patches) {
