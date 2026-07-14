@@ -67,6 +67,12 @@ const paymentShopApiExtensions = gql`
     paymentMethodCode: String!
     sessionId: String
     deviceId: String
+    financialInstitutionCode: String
+    userType: String
+    userLegalIdType: String
+    userLegalId: String
+    paymentDescription: String
+    paymentMethodDetails: JSON
   }
 
   input InitWompiSavedCardTransactionInput {
@@ -89,9 +95,24 @@ const paymentShopApiExtensions = gql`
     savedPaymentMethods: [SavedPaymentMethod!]!
   }
 
+  type WompiPaymentSourceResult {
+    id: Int!
+    type: String!
+    status: String!
+    publicData: JSON
+  }
+
+  input CreateWompiPaymentSourceInput {
+    token: String!
+    type: String!
+    customerEmail: String!
+    acceptanceToken: String!
+  }
+
   extend type Mutation {
     initWompiTransaction(input: InitWompiTransactionInput!): WompiTransactionResult!
     initWompiSavedCardTransaction(input: InitWompiSavedCardTransactionInput!): WompiTransactionResult!
+    createWompiPaymentSource(input: CreateWompiPaymentSourceInput!): WompiPaymentSourceResult!
     confirmWompiPayment(input: ConfirmWompiPaymentInput!): ConfirmPaymentResult!
     deleteSavedPaymentMethod(id: ID!): DeletePaymentMethodResult!
     setDefaultPaymentMethod(id: ID!): SavedPaymentMethod

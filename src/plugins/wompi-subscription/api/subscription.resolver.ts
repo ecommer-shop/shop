@@ -9,6 +9,7 @@ import { FeatureCheckService } from '../services/feature-check.service';
 import { WompiService } from '../services/wompi.service';
 import { FEATURE_CODES } from '../constants';
 import { PAYMENT_METHOD_FLOW, PaymentFlowType } from '../payment-methods';
+import { SavedPaymentMethod } from '../../payment/entities/saved-payment-method.entity';
 
 @Injectable()
 @Resolver()
@@ -152,6 +153,11 @@ export class SubscriptionResolver {
         @Args('customerEmail') customerEmail?: string,
         @Args('sessionId') sessionId?: string,
         @Args('deviceId') deviceId?: string,
+        @Args('lastFour') lastFour?: string,
+        @Args('brand') brand?: string,
+        @Args('expiryMonth') expiryMonth?: string,
+        @Args('expiryYear') expiryYear?: string,
+        @Args('cardHolderName') cardHolderName?: string,
     ) {
         let administratorId = await this.resolveAdministratorId(ctx, customerEmail);
         if (!administratorId) {
@@ -192,6 +198,33 @@ export class SubscriptionResolver {
             paymentSource.id,
             admin.emailAddress,
         );
+
+        // Save as saved payment method if card details are provided
+        if (lastFour && brand) {
+            try {
+                const savedRepo = this.connection.rawConnection.getRepository(SavedPaymentMethod);
+                const existingCount = await savedRepo.count({
+                    where: { customerId: administratorId.toString() },
+                });
+
+                const saved = savedRepo.create({
+                    customerId: administratorId.toString(),
+                    type: paymentMethod,
+                    wompiPaymentSourceId: paymentSource.id,
+                    lastFour,
+                    brand,
+                    expiryMonth: expiryMonth || '',
+                    expiryYear: expiryYear || '',
+                    cardHolderName,
+                    isDefault: existingCount === 0,
+                    channelToken: ctx.channel?.token || '',
+                });
+                await savedRepo.save(saved);
+                Logger.debug(`Saved payment method for administrator ${administratorId}`, 'SubscriptionResolver');
+            } catch (saveError) {
+                Logger.warn(`Failed to save payment method: ${saveError}`, 'SubscriptionResolver');
+            }
+        }
 
         const targetPlan = await this.planManagementService.getPlanById(planId);
         if (!targetPlan) {

@@ -28,7 +28,7 @@ export function PaymentStep({
     paymentProcessing: boolean;
     showTokenForm: boolean;
     onCloseTokenForm: () => void;
-    onTokenReceived: (token: string, sessionId?: string, deviceId?: string) => void;
+    onTokenReceived: (token: string, sessionId?: string, deviceId?: string, cardDetails?: { lastFour?: string; brand?: string; expiryMonth?: string; expiryYear?: string; cardHolderName?: string }) => void;
     pendingResult: any;
     onSuccess: () => void;
     onBack: () => void;

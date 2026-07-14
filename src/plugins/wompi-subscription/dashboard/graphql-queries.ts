@@ -73,8 +73,8 @@ export const CHECK_VARIATION_LIMIT_QUERY = `
 `;
 
 export const CREATE_SUBSCRIPTION_MUTATION = `
-  mutation CreateSubscriptionWithPayment($token: String!, $planId: Int!, $paymentMethod: String!, $customerEmail: String, $sessionId: String, $deviceId: String) {
-    createSubscriptionWithPayment(token: $token, planId: $planId, paymentMethod: $paymentMethod, customerEmail: $customerEmail, sessionId: $sessionId, deviceId: $deviceId) {
+  mutation CreateSubscriptionWithPayment($token: String!, $planId: Int!, $paymentMethod: String!, $customerEmail: String, $sessionId: String, $deviceId: String, $lastFour: String, $brand: String, $expiryMonth: String, $expiryYear: String, $cardHolderName: String) {
+    createSubscriptionWithPayment(token: $token, planId: $planId, paymentMethod: $paymentMethod, customerEmail: $customerEmail, sessionId: $sessionId, deviceId: $deviceId, lastFour: $lastFour, brand: $brand, expiryMonth: $expiryMonth, expiryYear: $expiryYear, cardHolderName: $cardHolderName) {
       id
       status
       startsAt
@@ -192,6 +192,92 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
     const json = await res.json();
     if (json.errors) throw new Error(json.errors[0].message);
     return json.data as T;
+}
+
+export const MY_SAVED_PAYMENT_METHODS = `
+    query MySavedPaymentMethods {
+        mySavedPaymentMethods {
+            id
+            type
+            lastFour
+            brand
+            expiryMonth
+            expiryYear
+            cardHolderName
+            isDefault
+            createdAt
+        }
+    }
+`;
+
+export const SAVE_PAYMENT_METHOD_FOR_SUBSCRIPTION = `
+    mutation SavePaymentMethodForSubscription(
+        $token: String!
+        $type: String!
+        $lastFour: String!
+        $brand: String!
+        $expiryMonth: String!
+        $expiryYear: String!
+        $cardHolderName: String
+    ) {
+        savePaymentMethodForSubscription(
+            token: $token
+            type: $type
+            lastFour: $lastFour
+            brand: $brand
+            expiryMonth: $expiryMonth
+            expiryYear: $expiryYear
+            cardHolderName: $cardHolderName
+        ) {
+            id
+            type
+            lastFour
+            brand
+            expiryMonth
+            expiryYear
+            cardHolderName
+            isDefault
+            createdAt
+        }
+    }
+`;
+
+export const DELETE_SAVED_PAYMENT_METHOD_FOR_SUBSCRIPTION = `
+    mutation DeleteSavedPaymentMethodForSubscription($id: ID!) {
+        deleteSavedPaymentMethodForSubscription(id: $id)
+    }
+`;
+
+export const SET_DEFAULT_PAYMENT_METHOD_FOR_SUBSCRIPTION = `
+    mutation SetDefaultPaymentMethodForSubscription($id: ID!) {
+        setDefaultPaymentMethodForSubscription(id: $id) {
+            id
+            isDefault
+        }
+    }
+`;
+
+export const USE_SAVED_PAYMENT_METHOD_FOR_SUBSCRIPTION = `
+    mutation UseSavedPaymentMethodForSubscription($paymentMethodId: ID!) {
+        useSavedPaymentMethodForSubscription(paymentMethodId: $paymentMethodId) {
+            id
+            status
+            paymentMethodType
+            autoRenew
+        }
+    }
+`;
+
+export interface SavedPaymentMethod {
+    id: string;
+    type: string;
+    lastFour: string;
+    brand: string;
+    expiryMonth: string;
+    expiryYear: string;
+    cardHolderName?: string;
+    isDefault: boolean;
+    createdAt: string;
 }
 
 export function statusColor(status: string): 'success' | 'warning' | 'danger' | 'default' {

@@ -27,6 +27,7 @@ import {
 import { ViewStep } from './ViewStep';
 import { PlansStep } from './PlansStep';
 import { PaymentStep } from './PaymentStep';
+import { SavedPaymentMethodsSection } from './components/saved-payment-methods-section';
 
 export function BillingPage() {
     const [step, setStep] = useState<'view' | 'plans' | 'payment'>('view');
@@ -160,7 +161,7 @@ export function BillingPage() {
         setShowTokenForm(false);
     }, []);
 
-    const handleWidgetTokenReceived = async (token: string, sessionId?: string, deviceId?: string) => {
+    const handleWidgetTokenReceived = async (token: string, sessionId?: string, deviceId?: string, cardDetails?: { lastFour?: string; brand?: string; expiryMonth?: string; expiryYear?: string; cardHolderName?: string }) => {
         if (!selectedPlan || !selectedMethod) return;
         setPaymentProcessing(true);
         try {
@@ -171,6 +172,11 @@ export function BillingPage() {
                 customerEmail: adminEmail || null,
                 sessionId: sessionId || null,
                 deviceId: deviceId || null,
+                lastFour: cardDetails?.lastFour || null,
+                brand: cardDetails?.brand || null,
+                expiryMonth: cardDetails?.expiryMonth || null,
+                expiryYear: cardDetails?.expiryYear || null,
+                cardHolderName: cardDetails?.cardHolderName || null,
             });
             setSelectedPlan(null);
             setStep('view');
@@ -239,14 +245,19 @@ export function BillingPage() {
                     )}
 
                     {step === 'view' && (
-                        <ViewStep
-                            sub={sub}
-                            usage={usage}
-                            onShowPlans={() => setStep('plans')}
-                            onStopAutoRenew={handleStopAutoRenew}
-                            onCancel={handleCancel}
-                            actionLoading={actionLoading}
-                        />
+                        <>
+                            <ViewStep
+                                sub={sub}
+                                usage={usage}
+                                onShowPlans={() => setStep('plans')}
+                                onStopAutoRenew={handleStopAutoRenew}
+                                onCancel={handleCancel}
+                                actionLoading={actionLoading}
+                            />
+                            <SavedPaymentMethodsSection
+                                onSubscriptionUpdated={loadData}
+                            />
+                        </>
                     )}
                 </PageBlock>
             </PageLayout>
