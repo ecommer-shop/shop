@@ -58,6 +58,7 @@ import {
 import { SuperadminvisibilityPlugin } from '../plugins/superadminvisibility/superadminvisibility.plugin';
 import { WompiSubscriptionPlugin } from '../plugins/wompi-subscription/wompi-subscription.plugin';
 import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
+import { MetricsApiPlugin } from '../plugins/metrics-api/metrics-api.plugin';
 import { SafeShippingPlugin } from '../plugins/safe-shipping/safe-shipping.plugin';
 import { StoresManagementPlugin } from '../plugins/stores-management/stores-management.plugin';
 import { SellerSettingsVisibilityPlugin } from '../plugins/seller-settings-visibility/seller-settings-visibility.plugin';
@@ -204,5 +205,7 @@ export const plugins: VendureConfig['plugins'] = [
     currency: process.env.WOMPI_CURRENCY || 'COP',
     wompiPublicKey: process.env.WOMPI_PUBLIC_KEY || '',
   }),
+
+  MetricsApiPlugin,
 ];
 

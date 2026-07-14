@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
 import { IS_DEV } from './src/config/environment';
 import { patchBaseUiMouseUp } from './src/vite-plugins/patch-base-ui-mouseup';
+import { injectGtm } from './src/vite-plugins/inject-gtm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -707,6 +708,7 @@ export default defineConfig({
     plugins: [
         patchVendureDashboardChannelPermissions(),
         patchBaseUiMouseUp(),
+        injectGtm(),
         vendureDashboardPlugin({
             // The vendureDashboardPlugin will scan your configuration in order
             // to find any plugins which have dashboard extensions, as well as
@@ -982,9 +984,8 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            // This allows all plugins to reference a shared set of
-            // GraphQL types.
             '@/gql': `${__dirname}/src/gql/graphql.ts`,
+            '@/plugins': `${__dirname}/src/plugins`,
         },
     },
 });
