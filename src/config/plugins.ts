@@ -64,6 +64,7 @@ import { StoresManagementPlugin } from '../plugins/stores-management/stores-mana
 import { SellerSettingsVisibilityPlugin } from '../plugins/seller-settings-visibility/seller-settings-visibility.plugin';
 import { CommandPalettePlugin } from '../plugins/command-palette/command-palette.plugin';
 import { MetricsApiPlugin } from '../plugins/metrics-api/metrics-api.plugin';
+import { EnviaShippingPlugin } from '../plugins/envia-shipping';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -156,6 +157,8 @@ export const plugins: VendureConfig['plugins'] = [
   DynamicShippingPricePlugin,
 
   SafeShippingPlugin,
+
+  EnviaShippingPlugin.init({}),
 
   PaymentPlugin.init({
     secretKey: process.env.WOMPI_INTEGRITY_SECRET || process.env.PAYMENT_SECRET_KEY,
