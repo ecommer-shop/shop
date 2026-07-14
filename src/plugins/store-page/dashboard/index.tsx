@@ -7,6 +7,7 @@ import SellerFirstSaleTracker from '@/plugins/login/dashboard/components/SellerF
 import { StoreBannerAssetPickerInput } from './store-banner-asset-picker-input';
 import { StoreFeaturedStarInput } from './store-featured-star-input';
 import { StorePickupMapPreviewInput } from './store-pickup-map-preview-input';
+import { StorePickupAddressInput } from './store-pickup-address-input';
 import { ShareProductButton } from './share-product-button';
 import { SlugShareDisplay } from './slug-share-display';
 import { ShareLinksWidget } from './share-links-widget';
@@ -17,6 +18,7 @@ defineDashboardExtension({
             { id: 'ecommer-store-featured-star', component: StoreFeaturedStarInput },
             { id: 'ecommer-store-banner-asset-picker', component: StoreBannerAssetPickerInput },
             { id: 'ecommer-store-pickup-map-preview', component: StorePickupMapPreviewInput },
+            { id: 'ecommer-store-pickup-address-input', component: StorePickupAddressInput },
         ],
     },
     actionBarItems: [
