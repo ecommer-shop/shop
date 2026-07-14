@@ -26,6 +26,12 @@ export class CheckoutPaymentResolver {
             paymentMethodCode: string;
             sessionId?: string;
             deviceId?: string;
+            financialInstitutionCode?: string;
+            userType?: string;
+            userLegalIdType?: string;
+            userLegalId?: string;
+            paymentDescription?: string;
+            paymentMethodDetails?: Record<string, any>;
         },
     ) {
         try {
@@ -90,6 +96,31 @@ export class CheckoutPaymentResolver {
             };
         } catch (error: any) {
             Logger.error(`getWompiTransactionStatus failed: ${error.message}`, 'CheckoutPaymentResolver');
+            throw error;
+        }
+    }
+
+    @Mutation()
+    @Allow(Permission.Owner)
+    async createWompiPaymentSource(
+        @Ctx() ctx: RequestContext,
+        @Args('input') input: {
+            token: string;
+            type: string;
+            customerEmail: string;
+            acceptanceToken: string;
+        },
+    ) {
+        try {
+            const result = await this.checkoutService.createPaymentSource(input);
+            return {
+                id: result.id,
+                type: result.type,
+                status: result.status,
+                publicData: (result as any).public_data || null,
+            };
+        } catch (error: any) {
+            Logger.error(`createWompiPaymentSource failed: ${error.message}`, 'CheckoutPaymentResolver');
             throw error;
         }
     }

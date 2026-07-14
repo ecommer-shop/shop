@@ -32,27 +32,52 @@ export class WompiCheckoutService {
         paymentMethodCode: string;
         sessionId?: string;
         deviceId?: string;
+        financialInstitutionCode?: string;
+        userType?: string;
+        userLegalIdType?: string;
+        userLegalId?: string;
+        paymentDescription?: string;
+        paymentMethodDetails?: Record<string, any>;
     }) {
         const methodCode = input.paymentMethodCode || 'CARD';
 
-        if (methodCode === 'CARD' || methodCode === 'CARD_SAVED') {
-            const payload: Record<string, any> = {
+        const requiresPaymentSource = ['CARD', 'NEQUI', 'DAVIPLATA', 'BANCOLOMBIA_TRANSFER'];
+
+        if (requiresPaymentSource.includes(methodCode) && input.token) {
+            const { acceptanceToken: acceptToken, personalAuthToken } =
+                await this.wompiService.getAcceptanceTokens();
+
+            const finalAcceptToken = input.acceptanceToken || acceptToken;
+
+            const paymentSource = await this.wompiService.createPaymentSource(
+                methodCode === 'BANCOLOMBIA_TRANSFER' ? 'BANCOLOMBIA_TRANSFER' : methodCode,
+                input.token,
+                input.customerEmail,
+                finalAcceptToken,
+                personalAuthToken,
+                input.sessionId,
+                input.deviceId,
+            );
+
+            const txnPayload: Record<string, any> = {
                 amount_in_cents: input.amountInCents,
                 currency: input.currency,
                 reference: input.reference,
                 customer_email: input.customerEmail,
-                acceptance_token: input.acceptanceToken,
-                payment_method: {
-                    type: 'CARD',
-                    token: input.token,
-                    is_three_ds: true,
-                },
+                payment_source_id: paymentSource.id,
             };
 
-            if (input.sessionId) payload.session_id = input.sessionId;
-            if (input.deviceId) payload.customer_data = { device_id: input.deviceId };
+            if (methodCode === 'CARD') {
+                txnPayload.payment_method = {
+                    type: 'CARD',
+                    installments: 1,
+                };
+            }
 
-            return this.wompiService.createTransaction(payload);
+            if (input.sessionId) txnPayload.session_id = input.sessionId;
+            if (input.deviceId) txnPayload.customer_data = { device_id: input.deviceId };
+
+            return this.wompiService.createTransaction(txnPayload);
         }
 
         const payload: Record<string, any> = {
@@ -60,15 +85,50 @@ export class WompiCheckoutService {
             currency: input.currency,
             reference: input.reference,
             customer_email: input.customerEmail,
-            payment_method: {
-                type: methodCode,
-            },
+            payment_method: { type: methodCode } as Record<string, any>,
         };
 
+        if (input.financialInstitutionCode) {
+            payload.payment_method.financial_institution_code = input.financialInstitutionCode;
+        }
+        if (input.userType !== undefined) {
+            payload.payment_method.user_type = input.userType;
+        }
+        if (input.userLegalIdType) {
+            payload.payment_method.user_legal_id_type = input.userLegalIdType;
+        }
+        if (input.userLegalId) {
+            payload.payment_method.user_legal_id = input.userLegalId;
+        }
+        if (input.paymentDescription) {
+            payload.payment_method.payment_description = input.paymentDescription;
+        }
+        if (input.paymentMethodDetails) {
+            Object.assign(payload.payment_method, input.paymentMethodDetails);
+        }
         if (input.sessionId) payload.session_id = input.sessionId;
         if (input.deviceId) payload.customer_data = { device_id: input.deviceId };
 
         return this.wompiService.createTransaction(payload);
+    }
+
+    async createPaymentSource(input: {
+        token: string;
+        type: string;
+        customerEmail: string;
+        acceptanceToken: string;
+    }) {
+        const { personalAuthToken } = await this.wompiService.getAcceptanceTokens();
+        const finalAcceptToken = input.acceptanceToken || '';
+
+        const paymentSource = await this.wompiService.createPaymentSource(
+            input.type,
+            input.token,
+            input.customerEmail,
+            finalAcceptToken,
+            personalAuthToken,
+        );
+        return paymentSource;
     }
 
     async initSavedCardTransaction(input: {

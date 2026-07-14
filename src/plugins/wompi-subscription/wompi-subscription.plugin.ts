@@ -11,6 +11,7 @@ import { PlanResolver } from './api/plan.resolver';
 import { SubscriptionResolver } from './api/subscription.resolver';
 import { WompiResolver } from './api/wompi.resolver';
 import { FixTranslationsResolver } from './api/fix-translations.resolver';
+import { AdminSavedPaymentResolver } from './api/admin-saved-payment.resolver';
 import { shopApiExtensions } from './api/api-extensions';
 import { FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAccessGuard, PlanGuard } from './guards';
 import { ProductTranslationSubscriber } from './subscribers/product-translation.subscriber';
@@ -33,6 +34,7 @@ import { ProductTranslationSubscriber } from './subscribers/product-translation.
         SubscriptionResolver,
         WompiResolver,
         FixTranslationsResolver,
+        AdminSavedPaymentResolver,
         FixTranslationJobService,
         // ProductLimitResolver,
         FeatureGuard,
@@ -75,7 +77,7 @@ export class WompiSubscriptionModule { }
     },
     adminApiExtensions: {
         schema: shopApiExtensions,
-        resolvers: [PlanResolver, SubscriptionResolver, WompiResolver, FixTranslationsResolver],
+        resolvers: [PlanResolver, SubscriptionResolver, WompiResolver, FixTranslationsResolver, AdminSavedPaymentResolver],
     },
     dashboard: './dashboard/index.tsx',
     configuration: (config) => {
