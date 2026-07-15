@@ -5,14 +5,15 @@
     "scripts": {
         "dev:server": "nodemon --watch 'src/**/*.ts' --exec ts-node ./src/index.ts",
         "dev:worker": "ts-node ./src/index-worker.ts",
-        "dev": "concurrently npm:dev:*",
+        "dev:dashboard": "vite",
+        "dev": "concurrently \"bun run dev:server\" \"bun run dev:worker\" \"bun run dev:dashboard\"",
         "build:server": "tsc",
         "build:dashboard": "vite build",
         "build": "yarn run build:server && yarn run build:dashboard",
         "build:seed": "tsc && cp -R ./static ./dist/static",
         "start:server": "node ./dist/index.js",
         "start:worker": "node ./dist/index-worker.js",
-        "start": "concurrently npm:start:*",
+        "start": "concurrently \"bun run start:server\" \"bun run start:worker\"",
         "seed:prod": "node ./dist/populate/seed.js",
         "seed:dev": "ts-node ./src/populate/seed.ts"
     },
