@@ -33,7 +33,7 @@ export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnA
                 if (!productId) return;
 
                 try {
-                    const ptRepo = this.connection.rawConnection.getRepository(ProductTranslation);
+                    const ptRepo = this.connection.getRepository(ProductTranslation);
                     const placeholders = [...PLACEHOLDER_NAMES].filter(Boolean);
 
                     const row = await ptRepo
@@ -90,7 +90,7 @@ export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnA
                         const productId = full.product?.id || 0;
                         const name = getVariantFallbackName(full.id as number, productId as number, channelCode);
 
-                        const pvtRepo = this.connection.rawConnection.getRepository(ProductVariantTranslation);
+                        const pvtRepo = this.connection.getRepository(ProductVariantTranslation);
                         const existing = await pvtRepo.findOne({
                             where: { base: { id: full.id } as any, languageCode: LanguageCode.es },
                         });
