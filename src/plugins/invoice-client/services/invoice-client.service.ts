@@ -1,15 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Order, RequestContext } from '@vendure/core';
-import { INVOICE_CLIENT_PLUGIN_OPTIONS, MATIAS_BEARER_TOKEN_HEADER } from '../constants';
+import { INVOICE_CLIENT_PLUGIN_OPTIONS, MATIAS_COMPANY_ID_HEADER } from '../constants';
 import type { PluginInitOptions } from '../types';
 import { InvoiceMicroHttpClient } from './invoice-micro-http.client';
 import { resolveInvoiceBillingCustomer } from './invoice-order-billing';
+import { formatInvoiceEmissionError } from './format-invoice-emission-error';
 
 interface CreateInvoiceRequest {
   orderCode: string;
-  resolutionNumber: string;
+  matiasCompanyId: string;
   prefix: string;
-  documentNumber: string;
+  resolutionNumber: string;
   notes?: string;
   graphicRepresentation?: number;
   sendEmail?: number;
@@ -89,22 +90,6 @@ export class InvoiceClientService {
   ) {}
 
   /**
-   * Siguiente número de documento (persistido en la BD del microservicio).
-   */
-  async fetchNextDocumentNumber(prefix: string): Promise<string> {
-    const res = await this.microHttp.axios.get<{
-      success: boolean;
-      data?: { documentNumber: string };
-      error?: string;
-    }>('/sequence/next', { params: { prefix } });
-
-    if (!res.data.success || !res.data.data?.documentNumber) {
-      throw new Error(res.data.error || 'Failed to get next document number from invoice service');
-    }
-    return res.data.data.documentNumber;
-  }
-
-  /**
    * Comprueba si ya existe factura para la orden (solo lectura en el micro).
    */
   async getInvoiceByOrderCode(orderCode: string): Promise<InvoiceCreateResponseData | null> {
@@ -131,13 +116,12 @@ export class InvoiceClientService {
     _ctx: RequestContext,
     order: Order,
     config: {
-      resolutionNumber: string;
+      matiasCompanyId: string;
       prefix: string;
-      documentNumber: string;
+      resolutionNumber: string;
       operationTypeId?: number;
       typeDocumentId?: number;
       sendEmail?: number;
-      matiasBearerToken?: string | null;
     },
   ): Promise<InvoiceResponse> {
     try {
@@ -216,9 +200,9 @@ export class InvoiceClientService {
 
       const request: CreateInvoiceRequest = {
         orderCode: order.code,
-        resolutionNumber: config.resolutionNumber,
+        matiasCompanyId: config.matiasCompanyId,
         prefix: config.prefix,
-        documentNumber: config.documentNumber,
+        resolutionNumber: config.resolutionNumber,
         notes: `Orden ${order.code}`,
         graphicRepresentation: 0,
         sendEmail: config.sendEmail ?? 1,
@@ -250,8 +234,10 @@ export class InvoiceClientService {
         `Sending POST ${this.options.invoiceServiceUrl.replace(/\/+$/, '')}/invoices for order ${order.code}`,
       );
 
-      const trimmed = config.matiasBearerToken?.trim();
-      const headers = trimmed ? { [MATIAS_BEARER_TOKEN_HEADER]: trimmed } : undefined;
+      const trimmedCompanyId = config.matiasCompanyId?.trim();
+      const headers = trimmedCompanyId
+        ? { [MATIAS_COMPANY_ID_HEADER]: trimmedCompanyId }
+        : undefined;
       const response = await this.microHttp.axios.post<InvoiceResponse>('/invoices', request, { headers });
       if (!response.data.success) {
         throw new Error(response.data.error || response.data.message || 'Failed to create invoice');
@@ -266,17 +252,18 @@ export class InvoiceClientService {
 
       return response.data;
     } catch (error: any) {
-      this.logger.error(`Error creating invoice for order ${order.code}:`, error.message);
-      throw error;
+      const readable = formatInvoiceEmissionError(error);
+      this.logger.error(`Error creating invoice for order ${order.code}: ${readable}`, error?.stack);
+      throw new Error(readable);
     }
   }
 
   async fetchInvoiceMatiasStatus(
     invoiceId: string,
-    matiasBearerToken?: string | null,
+    matiasCompanyId?: string | null,
   ): Promise<InvoiceMatiasStatusPayload> {
-    const trimmed = matiasBearerToken?.trim();
-    const headers = trimmed ? { [MATIAS_BEARER_TOKEN_HEADER]: trimmed } : undefined;
+    const trimmed = matiasCompanyId?.trim();
+    const headers = trimmed ? { [MATIAS_COMPANY_ID_HEADER]: trimmed } : undefined;
     const res = await this.microHttp.axios.get<{
       success: boolean;
       data?: InvoiceMatiasStatusPayload;
@@ -296,10 +283,10 @@ export class InvoiceClientService {
   async resendInvoiceMatiasEmail(
     invoiceId: string,
     email: string | undefined,
-    matiasBearerToken?: string | null,
+    matiasCompanyId?: string | null,
   ): Promise<InvoiceCreateResponseData> {
-    const trimmed = matiasBearerToken?.trim();
-    const headers = trimmed ? { [MATIAS_BEARER_TOKEN_HEADER]: trimmed } : undefined;
+    const trimmed = matiasCompanyId?.trim();
+    const headers = trimmed ? { [MATIAS_COMPANY_ID_HEADER]: trimmed } : undefined;
     const res = await this.microHttp.axios.post<InvoiceResponse>(
       `/invoices/${encodeURIComponent(invoiceId)}/resend`,
       email?.trim() ? { email: email.trim() } : {},

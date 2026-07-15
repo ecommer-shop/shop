@@ -24,6 +24,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { AlertCircle, Info, Mail, RefreshCw, Search } from 'lucide-react';
 import { optionalPublicGraphQlDetail, userFacingDashboardError } from './format-graphql-error';
+import { humanizeInvoiceEmissionError } from '../services/format-invoice-emission-error';
 import { InvoiceQuotaStatusCard } from './invoice-quota-status-card';
 import { useCurrentInvoiceQuotaStatus } from './use-current-invoice-quota-status';
 
@@ -345,7 +346,13 @@ export function InvoicesPage() {
         onSettled: () => setActingInvoiceId(null),
     });
 
-    const { data: quotaData, refetch: refetchQuota, isLoading: quotaLoading } = useCurrentInvoiceQuotaStatus();
+    // El hook ya selecciona currentInvoiceQuotaStatus; data ES el cupo (no un wrapper).
+    const {
+        data: quotaStatus,
+        refetch: refetchQuota,
+        isLoading: quotaLoading,
+        isError: quotaError,
+    } = useCurrentInvoiceQuotaStatus();
 
     const items = invData?.invoices.items ?? [];
     const total = invData?.invoices.total ?? 0;
@@ -357,7 +364,6 @@ export function InvoicesPage() {
     const invErrDetail = invError ? optionalPublicGraphQlDetail(invError) : null;
     const failErrDetail = failError ? optionalPublicGraphQlDetail(failError) : null;
     const queueStatus = queueData?.invoiceEmissionQueueStatus;
-    const quotaStatus = quotaData?.currentInvoiceQuotaStatus;
     const failuresCardTone = failErrMsg
         ? 'border-destructive/40'
         : queueStatus && queueStatus.activeTotal > 0
@@ -372,24 +378,27 @@ export function InvoicesPage() {
 
     return (
         <Page pageId="invoices-matias">
-            <PageTitle>Facturas (Matias)</PageTitle>
+            <PageTitle>Facturas</PageTitle>
             <PageLayout>
                 <PageBlock column="main" blockId="intro">
                     <p className="text-muted-foreground text-sm max-w-3xl">
-                        Busca facturas y comprobantes emitidos por el microservicio Matias. Puedes dejar todas las
+                        Busca facturas y comprobantes emitidos por el sistema. Puedes dejar todas las
                         casillas desmarcadas y pulsar «Buscar facturas» para listar
-                        resultados paginados, o marcar solo el criterio que necesites (uno o varios). Los errores de
-                        emisión quedan en la orden y se muestran abajo. En cada fila, Matias usa el token Bearer del
-                        canal vendedor de ese pedido (si existe) para sincronizar estado o reenviar correo.
+                        resultados paginados, o marcar solo el criterio que necesites. Los errores de
+                        emisión quedan en la orden y se muestran abajo.
                     </p>
                 </PageBlock>
 
                 <PageBlock column="main" blockId="quota-status">
-                    <InvoiceQuotaStatusCard
-                        quotaStatus={quotaStatus}
-                        isLoading={quotaLoading}
-                        variant="default"
-                    />
+                    {quotaError && !quotaStatus ? (
+                        <InvoiceQuotaStatusCard quotaStatus={undefined} isLoading={false} variant="default" />
+                    ) : (
+                        <InvoiceQuotaStatusCard
+                            quotaStatus={quotaStatus}
+                            isLoading={quotaLoading}
+                            variant="default"
+                        />
+                    )}
                 </PageBlock>
 
                 <PageBlock column="main" blockId="failures">
@@ -469,7 +478,7 @@ export function InvoicesPage() {
                                                         {new Date(f.failedAt).toLocaleString('es-CO')}
                                                     </TableCell>
                                                     <TableCell className="max-w-xl text-sm text-destructive">
-                                                        {f.error}
+                                                        {humanizeInvoiceEmissionError(f.error)}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}

@@ -6,14 +6,19 @@ import {
   TransactionalConnection,
   UserInputError,
 } from '@vendure/core';
+import { Request } from 'express';
 import { WompiService } from '../../wompi-subscription/services/wompi.service';
 import { PAYMENT_METHOD_FLOW, PaymentFlowType } from '../../wompi-subscription/payment-methods';
+import { buildCertPaymentReference, parseCertPaymentReference } from '../payment-reference.util';
 import { BillingPlansService, BillingPlanState } from './billing-plans.service';
 import { ClickwrapAcceptanceService } from './clickwrap-acceptance.service';
-import { Request } from 'express';
-import { parsePlanPaymentReference } from '../payment-reference.util';
 
-export interface InvoicePlanPurchaseResult {
+const loggerCtx = 'BillingCertificateWompiPayment';
+
+/** Precio del certificado anual (COP), alineado con la UI. */
+export const CERTIFICATE_ANNUAL_PRICE_COP = 199_000;
+
+export interface BillingCertificatePaymentResult {
   reference: string;
   transactionStatus: string | null;
   asyncPaymentUrl: string | null;
@@ -23,8 +28,12 @@ export interface InvoicePlanPurchaseResult {
   billingPlanState: BillingPlanState;
 }
 
+/**
+ * Pago del certificado vía API Wompi (mismo patrón que suscripciones / paquetes),
+ * sin Web Checkout (checkout.wompi.co/p o /l).
+ */
 @Injectable()
-export class InvoicePlanWompiPaymentService {
+export class BillingCertificateWompiPaymentService {
   constructor(
     private readonly wompiService: WompiService,
     private readonly billingPlans: BillingPlansService,
@@ -32,51 +41,37 @@ export class InvoicePlanWompiPaymentService {
     private readonly clickwrapAcceptance: ClickwrapAcceptanceService,
   ) {}
 
-  buildPlanReference(channelCode: string, planCode: string): string {
-    return `PLAN-${channelCode}-${planCode}-${Date.now()}`;
-  }
-
-  async createPendingPurchase(
+  async createPendingPayment(
     ctx: RequestContext,
-    planCode: string,
     paymentMethod: string,
     clickwrap: { accepted: boolean; contractVersion: string },
     req?: Request,
-  ): Promise<InvoicePlanPurchaseResult> {
+  ): Promise<BillingCertificatePaymentResult> {
     const flowType = PAYMENT_METHOD_FLOW[paymentMethod as keyof typeof PAYMENT_METHOD_FLOW];
     if (!flowType) {
       throw new UserInputError(`Método de pago no válido: ${paymentMethod}`);
     }
     if (flowType !== PaymentFlowType.MANUAL) {
-      throw new UserInputError('Usa purchaseInvoicePlanWithPayment para métodos tokenizables.');
+      throw new UserInputError('Usa purchaseBillingCertificateWithPayment para métodos tokenizables.');
     }
 
-    const state = await this.billingPlans.getCurrentChannelPlanState(ctx);
-    if (!state.canBuyPlans) {
-      throw new UserInputError(this.blockedPurchaseMessage(state));
-    }
-
-    const plan = this.billingPlans.getPlanCatalog().find((p) => p.code === planCode);
-    if (!plan) {
-      throw new UserInputError(`Plan no válido: ${planCode}`);
-    }
-    await this.billingPlans.assertGlobalPoolCanCoverPlan(ctx, plan.code);
+    const state = await this.assertCanPayCertificate(ctx);
 
     await this.clickwrapAcceptance.recordAcceptance(
       ctx,
       {
         accepted: clickwrap.accepted,
         contractVersion: clickwrap.contractVersion,
-        contractContext: 'INVOICE_PLAN',
-        planName: plan.name,
-        planCode: plan.code,
+        contractContext: 'BILLING_CERTIFICATE',
+        planName: 'Certificado anual',
+        planCode: 'certificate-annual',
       },
       req,
     );
 
-    const adminEmail = await this.resolveAdminEmail(ctx);
-    const reference = this.buildPlanReference(state.channelCode, plan.code);
-    const amountInCents = Math.round(plan.priceCop * 100);
+    const adminEmail = await this.resolvePayerEmail(ctx);
+    const reference = buildCertPaymentReference(state.channelCode);
+    const amountInCents = Math.round(CERTIFICATE_ANNUAL_PRICE_COP * 100);
     const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
 
     const transaction = await this.wompiService.createTransaction({
@@ -92,12 +87,7 @@ export class InvoicePlanWompiPaymentService {
 
     let applied = false;
     if (transaction.status === 'APPROVED') {
-      await this.billingPlans.applyPlanPurchaseFromWebhook(
-        ctx,
-        state.channelCode,
-        plan.code,
-        reference,
-      );
+      await this.billingPlans.applyCertificatePaymentByChannelCode(ctx, state.channelCode);
       applied = true;
     }
 
@@ -112,55 +102,45 @@ export class InvoicePlanWompiPaymentService {
         null,
       qrImage: transaction.payment_method?.extra?.qr_image || null,
       transactionId: transaction.id ?? null,
-      applied,
+      applied: applied || billingPlanState.certificatePaymentStatus === 'PAID',
       billingPlanState,
     };
   }
 
   async purchaseWithToken(
     ctx: RequestContext,
-    planCode: string,
     paymentMethod: string,
     token: string,
     clickwrap: { accepted: boolean; contractVersion: string },
     req?: Request,
     sessionId?: string,
     deviceId?: string,
-  ): Promise<InvoicePlanPurchaseResult> {
+  ): Promise<BillingCertificatePaymentResult> {
     const flowType = PAYMENT_METHOD_FLOW[paymentMethod as keyof typeof PAYMENT_METHOD_FLOW];
     if (!flowType) {
       throw new UserInputError(`Método de pago no válido: ${paymentMethod}`);
     }
     if (flowType !== PaymentFlowType.RECURRENTE) {
-      throw new UserInputError('Usa createPendingInvoicePlanPurchase para métodos de pago manual.');
+      throw new UserInputError('Usa createPendingBillingCertificatePayment para métodos de pago manual.');
     }
 
-    const state = await this.billingPlans.getCurrentChannelPlanState(ctx);
-    if (!state.canBuyPlans) {
-      throw new UserInputError(this.blockedPurchaseMessage(state));
-    }
-
-    const plan = this.billingPlans.getPlanCatalog().find((p) => p.code === planCode);
-    if (!plan) {
-      throw new UserInputError(`Plan no válido: ${planCode}`);
-    }
-    await this.billingPlans.assertGlobalPoolCanCoverPlan(ctx, plan.code);
+    const state = await this.assertCanPayCertificate(ctx);
 
     await this.clickwrapAcceptance.recordAcceptance(
       ctx,
       {
         accepted: clickwrap.accepted,
         contractVersion: clickwrap.contractVersion,
-        contractContext: 'INVOICE_PLAN',
-        planName: plan.name,
-        planCode: plan.code,
+        contractContext: 'BILLING_CERTIFICATE',
+        planName: 'Certificado anual',
+        planCode: 'certificate-annual',
       },
       req,
     );
 
-    const adminEmail = await this.resolveAdminEmail(ctx);
-    const reference = this.buildPlanReference(state.channelCode, plan.code);
-    const amountInCents = Math.round(plan.priceCop * 100);
+    const adminEmail = await this.resolvePayerEmail(ctx);
+    const reference = buildCertPaymentReference(state.channelCode);
+    const amountInCents = Math.round(CERTIFICATE_ANNUAL_PRICE_COP * 100);
     const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
 
     const paymentSource = await this.wompiService.createPaymentSource(
@@ -194,21 +174,16 @@ export class InvoicePlanWompiPaymentService {
       transactionId = transaction.id ?? null;
 
       if (transaction.status === 'APPROVED') {
-        await this.billingPlans.applyPlanPurchaseFromWebhook(
-          ctx,
-          state.channelCode,
-          plan.code,
-          reference,
-        );
+        await this.billingPlans.applyCertificatePaymentByChannelCode(ctx, state.channelCode);
         applied = true;
       } else {
         Logger.debug(
-          `Invoice plan payment ${transaction.id} status ${transaction.status} — awaiting webhook`,
-          'InvoicePlanWompiPaymentService',
+          `Certificate payment ${transaction.id} status ${transaction.status} — awaiting webhook`,
+          loggerCtx,
         );
       }
     } catch (error) {
-      Logger.error(`Invoice plan charge failed: ${error}`, 'InvoicePlanWompiPaymentService');
+      Logger.error(`Certificate charge failed: ${error}`, loggerCtx);
       throw error;
     } finally {
       await this.wompiService.deletePaymentSource(paymentSource.id);
@@ -222,41 +197,30 @@ export class InvoicePlanWompiPaymentService {
       asyncPaymentUrl: null,
       qrImage: null,
       transactionId,
-      applied,
+      applied: applied || billingPlanState.certificatePaymentStatus === 'PAID',
       billingPlanState,
     };
   }
 
-  async checkPurchaseStatus(
+  async checkPaymentStatus(
     ctx: RequestContext,
     reference: string,
     transactionId?: string | null,
-  ): Promise<InvoicePlanPurchaseResult> {
+  ): Promise<BillingCertificatePaymentResult> {
     let transactionStatus: string | null = null;
     const cleanTransactionId = transactionId?.trim() || null;
+    const channelCode = parseCertPaymentReference(reference);
 
     if (cleanTransactionId) {
       const transaction = await this.wompiService.getTransaction(cleanTransactionId);
       transactionStatus = transaction.status ?? null;
 
-      if (transaction.status === 'APPROVED') {
-        const parsed = parsePlanPaymentReference(reference);
-        if (!parsed) {
-          throw new UserInputError('Referencia de paquete de facturación inválida.');
-        }
-        await this.billingPlans.applyPlanPurchaseFromWebhook(
-          ctx,
-          parsed.channelCode,
-          parsed.planCode,
-          reference,
-        );
+      if (transaction.status === 'APPROVED' && channelCode) {
+        await this.billingPlans.applyCertificatePaymentByChannelCode(ctx, channelCode);
       }
     }
 
     const billingPlanState = await this.billingPlans.getCurrentChannelPlanState(ctx);
-    const applied = billingPlanState.purchaseHistory.some(
-      (entry) => entry.paymentReference === reference,
-    );
 
     return {
       reference,
@@ -264,12 +228,35 @@ export class InvoicePlanWompiPaymentService {
       asyncPaymentUrl: null,
       qrImage: null,
       transactionId: cleanTransactionId,
-      applied,
+      applied: billingPlanState.certificatePaymentStatus === 'PAID',
       billingPlanState,
     };
   }
 
-  private async resolveAdminEmail(ctx: RequestContext): Promise<string> {
+  private async assertCanPayCertificate(ctx: RequestContext): Promise<BillingPlanState> {
+    const state = await this.billingPlans.getCurrentChannelPlanState(ctx);
+    if (state.certificatePaymentStatus === 'PAID') {
+      throw new UserInputError('El certificado ya está pagado.');
+    }
+    const docs = state.documents;
+    if (
+      !docs.chamber?.trim() ||
+      !docs.rut?.trim() ||
+      !docs.nit?.trim() ||
+      !docs.dianResolution?.trim() ||
+      !docs.storeLogo?.trim()
+    ) {
+      throw new UserInputError('Debes guardar todos los documentos y el logo antes de pagar.');
+    }
+    return state;
+  }
+
+  private async resolvePayerEmail(ctx: RequestContext): Promise<string> {
+    const fromEnv = process.env.BILLING_PAYER_EMAIL?.trim();
+    if (fromEnv && this.isValidEmail(fromEnv)) {
+      return fromEnv;
+    }
+
     if (!ctx.activeUserId) {
       throw new UserInputError('No autenticado.');
     }
@@ -278,16 +265,16 @@ export class InvoicePlanWompiPaymentService {
       where: { user: { id: Number(ctx.activeUserId) } },
       relations: ['user'],
     });
-    if (!admin?.emailAddress) {
-      throw new UserInputError('Administrador no encontrado o sin correo.');
+    const email = admin?.emailAddress?.trim() ?? '';
+    if (!this.isValidEmail(email)) {
+      throw new UserInputError(
+        'Tu cuenta no tiene un correo válido para Wompi. Actualiza el email del administrador (ej. tu@dominio.com) o define BILLING_PAYER_EMAIL en el servidor.',
+      );
     }
-    return admin.emailAddress;
+    return email;
   }
 
-  private blockedPurchaseMessage(state: BillingPlanState): string {
-    if (state.certificateStatus === 'ACTIVE' && state.certificatePaymentStatus === 'PAID') {
-      return 'Tu certificado ya fue aprobado, pero aún falta que el superadmin configure token, prefijo y resolución Matias para habilitar la compra de paquetes.';
-    }
-    return 'Debes tener certificado activo y pago confirmado para comprar paquetes de facturación.';
+  private isValidEmail(value: string): boolean {
+    return /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(value);
   }
 }

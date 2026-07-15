@@ -64,7 +64,8 @@ const invoiceType = gql`
     sellerName: String
     billingActive: Boolean!
     remaining: Int
-    matiasTokenConfigured: Boolean!
+    matiasCompanyId: String
+    matiasCompanyIdConfigured: Boolean!
     matiasInvoicePrefix: String
     matiasResolutionNumber: String
     matiasEmitProfileComplete: Boolean!
@@ -74,9 +75,9 @@ const invoiceType = gql`
     channelId: ID!
     billingActive: Boolean!
     invoiceLimitRemaining: Int
+    matiasCompanyId: String
     matiasInvoicePrefix: String
     matiasResolutionNumber: String
-    matiasAccessToken: String
   }
 
   type MatiasGlobalInvoicePool {
@@ -94,6 +95,8 @@ const invoiceType = gql`
     chamber: String
     rut: String
     nit: String
+    dianResolution: String
+    storeLogo: String
   }
 
   type BillingPlanState {
@@ -109,9 +112,7 @@ const invoiceType = gql`
     documents: BillingCertificateDocs!
     invoicesRemaining: Int!
     canBuyPlans: Boolean!
-    matiasTokenConfigured: Boolean!
-    matiasPrefixConfigured: Boolean!
-    matiasResolutionConfigured: Boolean!
+    matiasCompanyIdConfigured: Boolean!
     matiasProfileComplete: Boolean!
     purchaseHistory: [BillingPlanPurchaseEntry!]!
   }
@@ -137,6 +138,8 @@ const invoiceType = gql`
     chamber: String!
     rut: String!
     nit: String!
+    dianResolution: String!
+    storeLogo: String!
     certificateType: String!
   }
 
@@ -150,11 +153,6 @@ const invoiceType = gql`
     contractVersion: String!
     contractContext: String!
     planName: String!
-  }
-
-  input ConfirmBillingPlanPaymentInput {
-    planCode: String!
-    channelId: ID
   }
 
   type InvoicePlanPurchaseResult {
@@ -193,10 +191,9 @@ const invoiceType = gql`
     remaining: Int
     hasPlan: Boolean!
     isBlocked: Boolean!
-    matiasTokenConfigured: Boolean!
-    matiasPrefixConfigured: Boolean!
-    matiasResolutionConfigured: Boolean!
-    matiasInvoicePrefix: String
+    matiasCompanyIdConfigured: Boolean!
+    matiasCompanyId: String
+    matiasEmitProfileComplete: Boolean!
   }
 
   type InvoiceMatiasActionResult {
@@ -232,9 +229,7 @@ const adminMutations = gql`
     updateMatiasGlobalInvoicePool(input: UpdateMatiasGlobalInvoicePoolInput!): MatiasGlobalInvoicePool!
     updateMatiasBillingStore(input: UpdateMatiasBillingStoreInput!): MatiasBillingStoreRow!
     submitBillingCertificate(input: SubmitBillingCertificateInput!): BillingPlanState!
-    confirmMyBillingCertificatePayment: BillingPlanState!
     approveBillingCertificate(input: ApproveBillingCertificateInput!): BillingPlanState!
-    confirmBillingPlanPayment(input: ConfirmBillingPlanPaymentInput!): BillingPlanState!
     createPendingInvoicePlanPurchase(
       planCode: String!
       paymentMethod: String!
@@ -249,6 +244,27 @@ const adminMutations = gql`
       contractVersion: String!
       sessionId: String
       deviceId: String
+    ): InvoicePlanPurchaseResult!
+    checkInvoicePlanPurchaseStatus(
+      reference: String!
+      transactionId: String
+    ): InvoicePlanPurchaseResult!
+    createPendingBillingCertificatePayment(
+      paymentMethod: String!
+      clickwrapAccepted: Boolean!
+      contractVersion: String!
+    ): InvoicePlanPurchaseResult!
+    purchaseBillingCertificateWithPayment(
+      paymentMethod: String!
+      token: String!
+      clickwrapAccepted: Boolean!
+      contractVersion: String!
+      sessionId: String
+      deviceId: String
+    ): InvoicePlanPurchaseResult!
+    checkBillingCertificatePaymentStatus(
+      reference: String!
+      transactionId: String
     ): InvoicePlanPurchaseResult!
     syncInvoiceFromMatias(invoiceId: ID!, orderCode: String!): InvoiceMatiasActionResult!
     resendInvoiceMatiasEmail(invoiceId: ID!, orderCode: String!, email: String): InvoiceMatiasActionResult!
@@ -267,7 +283,6 @@ const shopQueries = gql`
 const shopMutations = gql`
   extend type Mutation {
     submitBillingCertificate(input: SubmitBillingCertificateInput!): BillingPlanState!
-    confirmMyBillingCertificatePayment: BillingPlanState!
   }
 `;
 

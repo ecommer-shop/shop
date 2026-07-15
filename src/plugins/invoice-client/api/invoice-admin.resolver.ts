@@ -14,6 +14,7 @@ import { InvoiceEmissionQueueStatusService } from '../services/invoice-emission-
 import { InvoiceQuotaService } from '../services/invoice-quota.service';
 import { InvoiceMatiasActionService } from '../services/invoice-matias-action.service';
 import { InvoicePlanWompiPaymentService } from '../services/invoice-plan-wompi-payment.service';
+import { BillingCertificateWompiPaymentService } from '../services/billing-certificate-wompi-payment.service';
 import { ClickwrapAcceptanceService } from '../services/clickwrap-acceptance.service';
 
 @Resolver()
@@ -28,6 +29,7 @@ export class InvoiceAdminResolver {
     private invoiceQuota: InvoiceQuotaService,
     private invoiceMatiasAction: InvoiceMatiasActionService,
     private invoicePlanWompiPayment: InvoicePlanWompiPaymentService,
+    private billingCertificateWompiPayment: BillingCertificateWompiPaymentService,
     private clickwrapAcceptance: ClickwrapAcceptanceService,
   ) { }
 
@@ -181,21 +183,24 @@ export class InvoiceAdminResolver {
   @Allow(Permission.Authenticated)
   async submitBillingCertificate(
     @Ctx() ctx: RequestContext,
-    @Args('input') input: { chamber: string; rut: string; nit: string; certificateType: string },
+    @Args('input') input: {
+      chamber: string;
+      rut: string;
+      nit: string;
+      dianResolution: string;
+      storeLogo: string;
+      certificateType: string;
+    },
   ) {
     const type = input.certificateType === 'MONTHLY' ? 'MONTHLY' : 'ANNUAL';
     return this.billingPlans.submitCertificateDocuments(ctx, {
       chamber: input.chamber,
       rut: input.rut,
       nit: input.nit,
+      dianResolution: input.dianResolution,
+      storeLogo: input.storeLogo,
       certificateType: type as 'MONTHLY' | 'ANNUAL',
     });
-  }
-
-  @Mutation()
-  @Allow(Permission.Authenticated)
-  async confirmMyBillingCertificatePayment(@Ctx() ctx: RequestContext) {
-    return this.billingPlans.confirmCertificatePayment(ctx);
   }
 
   @Mutation()
@@ -216,9 +221,9 @@ export class InvoiceAdminResolver {
       channelId: string;
       billingActive: boolean;
       invoiceLimitRemaining?: number | null;
+      matiasCompanyId?: string | null;
       matiasInvoicePrefix?: string | null;
       matiasResolutionNumber?: string | null;
-      matiasAccessToken?: string | null;
     },
   ) {
     return this.matiasBillingStoresService.updateStoreBilling(ctx, input);
@@ -231,15 +236,6 @@ export class InvoiceAdminResolver {
     @Args('input') input: { channelId: string; approve: boolean; note?: string | null },
   ) {
     return this.billingPlans.approveCertificate(ctx, input);
-  }
-
-  @Mutation()
-  @Allow(Permission.SuperAdmin)
-  async confirmBillingPlanPayment(
-    @Ctx() ctx: RequestContext,
-    @Args('input') input: { planCode: string; channelId?: string | null },
-  ) {
-    return this.billingPlans.confirmPlanPayment(ctx, input);
   }
 
   @Mutation()
@@ -284,6 +280,66 @@ export class InvoiceAdminResolver {
       sessionId,
       deviceId,
     );
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async checkInvoicePlanPurchaseStatus(
+    @Ctx() ctx: RequestContext,
+    @Args('reference') reference: string,
+    @Args('transactionId') transactionId?: string,
+  ) {
+    return this.invoicePlanWompiPayment.checkPurchaseStatus(ctx, reference, transactionId);
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async createPendingBillingCertificatePayment(
+    @Ctx() ctx: RequestContext,
+    @Context('req') req: Request,
+    @Args('paymentMethod') paymentMethod: string,
+    @Args('clickwrapAccepted') clickwrapAccepted: boolean,
+    @Args('contractVersion') contractVersion: string,
+  ) {
+    return this.billingCertificateWompiPayment.createPendingPayment(
+      ctx,
+      paymentMethod,
+      { accepted: clickwrapAccepted, contractVersion },
+      req,
+    );
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async purchaseBillingCertificateWithPayment(
+    @Ctx() ctx: RequestContext,
+    @Context('req') req: Request,
+    @Args('paymentMethod') paymentMethod: string,
+    @Args('token') token: string,
+    @Args('clickwrapAccepted') clickwrapAccepted: boolean,
+    @Args('contractVersion') contractVersion: string,
+    @Args('sessionId') sessionId?: string,
+    @Args('deviceId') deviceId?: string,
+  ) {
+    return this.billingCertificateWompiPayment.purchaseWithToken(
+      ctx,
+      paymentMethod,
+      token,
+      { accepted: clickwrapAccepted, contractVersion },
+      req,
+      sessionId,
+      deviceId,
+    );
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async checkBillingCertificatePaymentStatus(
+    @Ctx() ctx: RequestContext,
+    @Args('reference') reference: string,
+    @Args('transactionId') transactionId?: string,
+  ) {
+    return this.billingCertificateWompiPayment.checkPaymentStatus(ctx, reference, transactionId);
   }
 
   @Mutation()

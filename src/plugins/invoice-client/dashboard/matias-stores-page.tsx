@@ -26,7 +26,8 @@ const STORES_QUERY = `
       sellerName
       billingActive
       remaining
-      matiasTokenConfigured
+      matiasCompanyId
+      matiasCompanyIdConfigured
       matiasInvoicePrefix
       matiasResolutionNumber
       matiasEmitProfileComplete
@@ -56,7 +57,8 @@ const UPDATE_STORE = `
       channelCode
       billingActive
       remaining
-      matiasTokenConfigured
+      matiasCompanyId
+      matiasCompanyIdConfigured
       matiasInvoicePrefix
       matiasResolutionNumber
       matiasEmitProfileComplete
@@ -70,7 +72,8 @@ type StoreRow = {
     sellerName: string | null;
     billingActive: boolean;
     remaining: number | null;
-    matiasTokenConfigured: boolean;
+    matiasCompanyId: string | null;
+    matiasCompanyIdConfigured: boolean;
     matiasInvoicePrefix: string | null;
     matiasResolutionNumber: string | null;
     matiasEmitProfileComplete: boolean;
@@ -107,10 +110,11 @@ export function MatiasStoresPage() {
             <PageLayout>
                 <PageBlock column="main" blockId="intro">
                     <p className="text-muted-foreground text-sm max-w-3xl">
-                        El <strong>prefijo</strong> y la <strong>resolución</strong> los defines{' '}
-                        <strong>manualmente</strong> según lo que entregue Matias al dar de alta cada tienda (no
-                        vienen solos en el token). El cupo de facturas se acredita automáticamente cuando la tienda
-                        paga un paquete en Planes de facturación.
+                        Modelo <strong>Casa de Software</strong>: un solo login Matias en el microservicio. Por
+                        cada tienda vendedora configura el <strong>Company ID (UUID)</strong>, el{' '}
+                        <strong>prefijo</strong> y el <strong>número de resolución DIAN</strong>. El Company ID
+                        identifica la cuenta; la resolución indica a Matias qué rango de numeración aplicar. El
+                        cupo se acredita al pagar un paquete en Planes de facturación.
                     </p>
                 </PageBlock>
 
@@ -120,11 +124,11 @@ export function MatiasStoresPage() {
 
                 <PageBlock column="main" blockId="stores">
                     <Card>
-                        <CardHeader className="flex flex-row items-center justify-between gap-2">
+                        <CardHeader className="flex flex-row items-center justify-between gap-4">
                             <div>
-                                <CardTitle>Tiendas registradas</CardTitle>
+                                <CardTitle>Tiendas vendedoras</CardTitle>
                                 <CardDescription>
-                                    Perfil completo = token + prefijo + resolución. Prefijo único por tienda.
+                                    Sin Company ID, prefijo y resolución no se puede emitir.
                                 </CardDescription>
                             </div>
                             <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
@@ -132,23 +136,17 @@ export function MatiasStoresPage() {
                                 Actualizar
                             </Button>
                         </CardHeader>
-                        <CardContent>
-                            {errMsg ? (
+                        <CardContent className="space-y-4">
+                            {isLoading ? (
+                                <p className="text-sm text-muted-foreground">Cargando tiendas…</p>
+                            ) : errMsg ? (
                                 <p className="text-sm text-destructive">{errMsg}</p>
-                            ) : isLoading ? (
-                                <p className="text-sm text-muted-foreground">Cargando…</p>
                             ) : rows.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">No hay canales con vendedor.</p>
                             ) : (
-                                <div className="space-y-6">
-                                    {rows.map((row) => (
-                                        <StoreEditorRow
-                                            key={row.channelId}
-                                            row={row}
-                                            onSaved={() => void refetch()}
-                                        />
-                                    ))}
-                                </div>
+                                rows.map((row) => (
+                                    <StoreEditorRow key={row.channelId} row={row} onSaved={() => void refetch()} />
+                                ))
                             )}
                         </CardContent>
                     </Card>
@@ -158,11 +156,15 @@ export function MatiasStoresPage() {
     );
 }
 
-function GlobalPoolCard({ pool, onSaved }: { pool: GlobalPool | undefined; onSaved: () => void }) {
-    const [total, setTotal] = useState(pool?.total != null ? String(pool.total) : '');
-    const [sellable, setSellable] = useState(
-        pool?.sellableRemaining != null ? String(pool.sellableRemaining) : '',
-    );
+function GlobalPoolCard({
+    pool,
+    onSaved,
+}: {
+    pool: GlobalPool | undefined;
+    onSaved: () => void;
+}) {
+    const [total, setTotal] = useState(String(pool?.total ?? ''));
+    const [sellable, setSellable] = useState(String(pool?.sellableRemaining ?? ''));
 
     useEffect(() => {
         setTotal(pool?.total != null ? String(pool.total) : '');
@@ -171,18 +173,10 @@ function GlobalPoolCard({ pool, onSaved }: { pool: GlobalPool | undefined; onSav
 
     const saveMutation = useMutation({
         mutationFn: async () => {
-            const totalParsed = total.trim() === '' ? null : Number(total);
-            const sellableParsed = sellable.trim() === '' ? null : Number(sellable);
-            if (total.trim() !== '' && !Number.isFinite(totalParsed as number)) {
-                throw new Error('Total inválido.');
-            }
-            if (sellable.trim() !== '' && !Number.isFinite(sellableParsed as number)) {
-                throw new Error('Vendible restante inválido.');
-            }
             await api.mutate(UPDATE_GLOBAL_POOL, {
                 input: {
-                    total: totalParsed,
-                    sellableRemaining: sellableParsed,
+                    total: total.trim() ? Number(total) : null,
+                    sellableRemaining: sellable.trim() ? Number(sellable) : null,
                 },
             });
         },
@@ -192,29 +186,42 @@ function GlobalPoolCard({ pool, onSaved }: { pool: GlobalPool | undefined; onSav
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Pool global Ecommer (paquete Matias)</CardTitle>
+                <CardTitle>Pool global Matias ({pool?.defaultChannelCode ?? '—'})</CardTitle>
                 <CardDescription>
-                    Canal «{pool?.defaultChannelCode ?? '…'}». Cuando compras un paquete grande en Matias, sube total y
-                    vendible. Al vender a tiendas solo baja el vendible.
+                    Paquete grande de facturas de la cuenta Casa de Software. Lo vendes en paquetes pequeños a
+                    tiendas.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-3 items-end">
+            <CardContent className="grid gap-4 sm:grid-cols-2 max-w-xl">
                 <div className="space-y-1">
-                    <Label>Total comprado</Label>
-                    <Input inputMode="numeric" value={total} onChange={(e) => setTotal(e.target.value)} />
+                    <Label htmlFor="pool-total">Total del paquete</Label>
+                    <Input
+                        id="pool-total"
+                        type="number"
+                        min={0}
+                        value={total}
+                        onChange={(e) => setTotal(e.target.value)}
+                    />
                 </div>
                 <div className="space-y-1">
-                    <Label>Vendible restante (sin asignar a tiendas)</Label>
-                    <Input inputMode="numeric" value={sellable} onChange={(e) => setSellable(e.target.value)} />
+                    <Label htmlFor="pool-sellable">Disponible para vender</Label>
+                    <Input
+                        id="pool-sellable"
+                        type="number"
+                        min={0}
+                        value={sellable}
+                        onChange={(e) => setSellable(e.target.value)}
+                    />
                 </div>
                 <Button
                     type="button"
                     size="sm"
+                    className="sm:col-span-2 w-fit"
                     disabled={saveMutation.isPending}
                     onClick={() => saveMutation.mutate()}
                 >
                     <Save className="h-4 w-4 mr-1" />
-                    Guardar pool
+                    {saveMutation.isPending ? 'Guardando…' : 'Guardar pool'}
                 </Button>
             </CardContent>
             {saveMutation.isError && saveMutation.error instanceof Error ? (
@@ -231,35 +238,30 @@ function StoreEditorRow({
     row: StoreRow;
     onSaved: () => void;
 }) {
+    const [companyId, setCompanyId] = useState(row.matiasCompanyId ?? '');
     const [prefix, setPrefix] = useState(row.matiasInvoicePrefix ?? '');
     const [resolution, setResolution] = useState(row.matiasResolutionNumber ?? '');
-    const [newToken, setNewToken] = useState('');
 
     useEffect(() => {
+        setCompanyId(row.matiasCompanyId ?? '');
         setPrefix(row.matiasInvoicePrefix ?? '');
         setResolution(row.matiasResolutionNumber ?? '');
-        setNewToken('');
     }, [
         row.channelId,
         row.billingActive,
         row.remaining,
-        row.matiasTokenConfigured,
+        row.matiasCompanyId,
         row.matiasInvoicePrefix,
         row.matiasResolutionNumber,
     ]);
 
-    const dirty = useMemo(() => {
-        const tokenTyped = newToken.trim().length > 0;
-        const prefixChanged = prefix.trim().toUpperCase() !== (row.matiasInvoicePrefix ?? '').toUpperCase();
-        const resolutionChanged = resolution.trim() !== (row.matiasResolutionNumber ?? '');
-        return tokenTyped || prefixChanged || resolutionChanged;
-    }, [
-        newToken,
-        prefix,
-        resolution,
-        row.matiasInvoicePrefix,
-        row.matiasResolutionNumber,
-    ]);
+    const dirty = useMemo(
+        () =>
+            companyId.trim() !== (row.matiasCompanyId ?? '').trim() ||
+            prefix.trim() !== (row.matiasInvoicePrefix ?? '').trim() ||
+            resolution.trim() !== (row.matiasResolutionNumber ?? '').trim(),
+        [companyId, prefix, resolution, row.matiasCompanyId, row.matiasInvoicePrefix, row.matiasResolutionNumber],
+    );
 
     const saveMutation = useMutation({
         mutationFn: async () => {
@@ -267,16 +269,13 @@ function StoreEditorRow({
                 input: {
                     channelId: row.channelId,
                     billingActive: row.billingActive,
+                    matiasCompanyId: companyId.trim() || null,
                     matiasInvoicePrefix: prefix.trim() || null,
                     matiasResolutionNumber: resolution.trim() || null,
-                    ...(newToken.trim() ? { matiasAccessToken: newToken.trim() } : {}),
                 },
             });
         },
-        onSuccess: () => {
-            setNewToken('');
-            onSaved();
-        },
+        onSuccess: onSaved,
     });
 
     return (
@@ -291,7 +290,7 @@ function StoreEditorRow({
                 </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                <div className="space-y-1 rounded-md border bg-muted/30 p-3 sm:col-span-2">
                     <p className="text-xs uppercase text-muted-foreground">Estado actual</p>
                     <p className="text-sm">
                         {row.billingActive ? 'Facturación activa' : 'Sin paquete activo comprado'}
@@ -300,35 +299,42 @@ function StoreEditorRow({
                         Cupo restante: {row.remaining ?? 0} facturas
                     </p>
                 </div>
-                <div className="space-y-1">
-                    <Label htmlFor={`pfx-${row.channelId}`}>Prefijo (manual, único)</Label>
+                <div className="space-y-1 sm:col-span-2">
+                    <Label htmlFor={`cid-${row.channelId}`}>Company ID Matias (UUID)</Label>
                     <Input
-                        id={`pfx-${row.channelId}`}
-                        placeholder="Ej. FE01 — lo indica Matias"
+                        id={`cid-${row.channelId}`}
+                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        value={companyId}
+                        onChange={(e) => setCompanyId(e.target.value)}
+                        className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        Identifica la cuenta o subcuenta del cliente en Matias.
+                    </p>
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor={`prefix-${row.channelId}`}>Prefijo</Label>
+                    <Input
+                        id={`prefix-${row.channelId}`}
+                        placeholder="Ej. SETP"
                         value={prefix}
-                        onChange={(e) => setPrefix(e.target.value.toUpperCase())}
+                        onChange={(e) => setPrefix(e.target.value)}
+                        className="font-mono text-sm"
                     />
                 </div>
                 <div className="space-y-1">
-                    <Label htmlFor={`res-${row.channelId}`}>Resolución (manual)</Label>
+                    <Label htmlFor={`res-${row.channelId}`}>Número de resolución</Label>
                     <Input
                         id={`res-${row.channelId}`}
-                        placeholder="Número de resolución DIAN/Matias"
+                        placeholder="Ej. 18760000001"
                         value={resolution}
                         onChange={(e) => setResolution(e.target.value)}
+                        className="font-mono text-sm"
                     />
+                    <p className="text-xs text-muted-foreground">
+                        Obligatorio: Matias usa este dato para el rango de numeración del documento.
+                    </p>
                 </div>
-            </div>
-            <div className="space-y-1">
-                <Label htmlFor={`tok-${row.channelId}`}>Token Matias</Label>
-                <Input
-                    id={`tok-${row.channelId}`}
-                    type="password"
-                    autoComplete="off"
-                    placeholder={row.matiasTokenConfigured ? 'Vacío = no cambiar' : 'Pegar Bearer de Matias'}
-                    value={newToken}
-                    onChange={(e) => setNewToken(e.target.value)}
-                />
             </div>
             <Button
                 type="button"
@@ -337,7 +343,7 @@ function StoreEditorRow({
                 onClick={() => saveMutation.mutate()}
             >
                 <Save className="h-4 w-4 mr-1" />
-                {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
+                {saveMutation.isPending ? 'Guardando…' : 'Guardar configuración Matias'}
             </Button>
             {saveMutation.isError && saveMutation.error instanceof Error ? (
                 <p className="text-sm text-destructive">{saveMutation.error.message}</p>

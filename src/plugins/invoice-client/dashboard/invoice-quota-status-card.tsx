@@ -11,7 +11,7 @@ export interface InvoiceQuotaStatusCardProps {
 
 function blockedReason(q: Quota): string {
   if (!q.billingActive) {
-    return 'Facturación desactivada (interruptor en el canal).';
+    return 'Facturación desactivada.';
   }
   if (q.remaining == null) {
     return 'Sin cupo numérico asignado en el canal.';
@@ -19,14 +19,8 @@ function blockedReason(q: Quota): string {
   if (q.remaining <= 0) {
     return `Cupo agotado (${q.remaining}). El interruptor se apaga solo al llegar a 0.`;
   }
-  if (!q.matiasTokenConfigured) {
-    return 'Falta el token Bearer de Matias (Ventas → Matias por tienda).';
-  }
-  if (!q.matiasPrefixConfigured) {
-    return 'Falta el prefijo de factura de esta tienda (Ventas → Matias por tienda).';
-  }
-  if (!q.matiasResolutionConfigured) {
-    return 'Falta el número de resolución de esta tienda (Ventas → Matias por tienda).';
+  if (!q.matiasEmitProfileComplete) {
+    return 'Falta perfil Matias completo (Company ID, prefijo y resolución) en Ventas → Matias por tienda.';
   }
   return '';
 }
@@ -37,8 +31,11 @@ export function InvoiceQuotaStatusCard({
   variant = 'default',
 }: InvoiceQuotaStatusCardProps) {
   if (variant === 'compact') {
-    if (isLoading || !quotaStatus) {
+    if (isLoading && !quotaStatus) {
       return <p className="text-sm text-muted-foreground">Cupo de facturas: cargando…</p>;
+    }
+    if (!quotaStatus) {
+      return <p className="text-sm text-destructive">Cupo de facturas: no disponible.</p>;
     }
     if (quotaStatus.isBlocked) {
       return (
@@ -60,16 +57,13 @@ export function InvoiceQuotaStatusCard({
     <Card>
       <CardHeader>
         <CardTitle>Cupo de facturación de la tienda actual</CardTitle>
-        <CardDescription>
-          En el Admin clásico: <strong>Ajustes → Canales</strong>, campo «Facturación electrónica (activar /
-          desactivar)», «Cupo restante» y token Matias. El super admin puede usar{' '}
-          <strong>Ventas → Matias por tienda</strong>. Aquí ves el resumen del <strong>canal seleccionado</strong> en
-          este panel.
-        </CardDescription>
+        <CardDescription>Facturas disponibles en el paquete activo de esta tienda.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        {isLoading || !quotaStatus ? (
+        {isLoading && !quotaStatus ? (
           <p className="text-sm text-muted-foreground">Cargando estado de cupo…</p>
+        ) : !quotaStatus ? (
+          <p className="text-sm text-destructive">No se pudo cargar el estado de cupo.</p>
         ) : quotaStatus.isBlocked ? (
           <p className="text-sm text-destructive">
             <strong>{quotaStatus.channelCode || 'Esta tienda'}</strong>: {blockedReason(quotaStatus)}
@@ -78,13 +72,7 @@ export function InvoiceQuotaStatusCard({
           <p className="text-sm text-emerald-600 dark:text-emerald-400">
             <strong>{quotaStatus.channelCode}</strong>: facturación <strong>activa</strong>. Cupo restante:{' '}
             <strong>{quotaStatus.remaining}</strong>
-            {quotaStatus.matiasInvoicePrefix ? (
-              <>
-                {' '}
-                · prefijo <strong>{quotaStatus.matiasInvoicePrefix}</strong>
-              </>
-            ) : null}
-            .
+            {quotaStatus.matiasEmitProfileComplete ? <> · Perfil Matias completo</> : null}.
           </p>
         )}
       </CardContent>

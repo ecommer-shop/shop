@@ -6,6 +6,8 @@ import {
   CHANNEL_BILLING_CERT_DOC_CHAMBER_FIELD,
   CHANNEL_BILLING_CERT_DOC_NIT_FIELD,
   CHANNEL_BILLING_CERT_DOC_RUT_FIELD,
+  CHANNEL_BILLING_CERT_DOC_DIAN_RESOLUTION_FIELD,
+  CHANNEL_BILLING_CERT_DOC_STORE_LOGO_FIELD,
   CHANNEL_BILLING_CERT_EXPIRES_AT_FIELD,
   CHANNEL_BILLING_CERT_PAID_AT_FIELD,
   CHANNEL_BILLING_CERT_PAYMENT_STATUS_FIELD,
@@ -16,7 +18,7 @@ import {
   CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD,
   CHANNEL_INVOICE_BILLING_ACTIVE_FIELD,
   CHANNEL_INVOICE_LIMIT_REMAINING_FIELD,
-  CHANNEL_MATIAS_ACCESS_TOKEN_FIELD,
+  CHANNEL_MATIAS_COMPANY_ID_FIELD,
   CHANNEL_MATIAS_INVOICE_PREFIX_FIELD,
   CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD,
 } from '../constants';
@@ -45,12 +47,16 @@ export interface BillingPlanState {
   certificateExpiresAt: string | null;
   certificatePaidAt: string | null;
   certificateReviewNote: string | null;
-  documents: { chamber: string | null; rut: string | null; nit: string | null };
+  documents: {
+    chamber: string | null;
+    rut: string | null;
+    nit: string | null;
+    dianResolution: string | null;
+    storeLogo: string | null;
+  };
   invoicesRemaining: number;
   canBuyPlans: boolean;
-  matiasTokenConfigured: boolean;
-  matiasPrefixConfigured: boolean;
-  matiasResolutionConfigured: boolean;
+  matiasCompanyIdConfigured: boolean;
   matiasProfileComplete: boolean;
   purchaseHistory: BillingPlanPurchaseEntry[];
 }
@@ -103,7 +109,7 @@ export class BillingPlansService {
       !state.matiasProfileComplete
     ) {
       throw new Error(
-        `La tienda «${channel.code}» tiene certificado activo, pero falta configurar token, prefijo o resolución Matias.`,
+        `La tienda «${channel.code}» tiene certificado activo, pero falta configurar el Company ID de Matias.`,
       );
     }
     if (state.certificateStatus === 'EXPIRED') {
@@ -113,7 +119,7 @@ export class BillingPlansService {
     }
     if (state.certificateStatus === 'REJECTED') {
       throw new Error(
-        `El certificado de la tienda «${channel.code}» fue rechazado. Corrige documentos y vuelve a tramitar.`,
+        `El certificado de la tienda «${channel.code}» fue rechazado. Corrige los documentos en Planes de facturación y vuelve a enviarlos.`,
       );
     }
     if (state.certificateStatus === 'UNDER_REVIEW') {
@@ -178,31 +184,72 @@ export class BillingPlansService {
 
   async submitCertificateDocuments(
     ctx: RequestContext,
-    input: { chamber: string; rut: string; nit: string; certificateType: BillingCertificateType },
+    input: {
+      chamber: string;
+      rut: string;
+      nit: string;
+      dianResolution: string;
+      storeLogo: string;
+      certificateType: BillingCertificateType;
+    },
   ): Promise<BillingPlanState> {
     const channel = await this.getCurrentSellerChannel(ctx);
     const cf = (channel.customFields as ChannelCustomFields) ?? {};
+    if (!input.dianResolution.trim()) {
+      throw new UserInputError('Debes subir el documento de resolución DIAN.');
+    }
+    if (!input.storeLogo.trim()) {
+      throw new UserInputError('Debes subir el logo de la tienda.');
+    }
     const prevStatus = String(cf[CHANNEL_BILLING_CERT_STATUS_FIELD] ?? 'NONE');
-    const isRenewal = prevStatus === 'EXPIRED' || prevStatus === 'REJECTED';
+    const prevPayment = String(
+      cf[CHANNEL_BILLING_CERT_PAYMENT_STATUS_FIELD] ?? 'UNPAID',
+    ) as BillingCertificatePaymentStatus;
+    const isExpiredRenewal = prevStatus === 'EXPIRED';
+    const isRejectedResubmit = prevStatus === 'REJECTED';
+    const paymentAlreadyMade = prevPayment === 'PAID';
+
     const customFields: ChannelCustomFields = {
       ...cf,
       [CHANNEL_BILLING_CERT_DOC_CHAMBER_FIELD]: input.chamber.trim(),
       [CHANNEL_BILLING_CERT_DOC_RUT_FIELD]: input.rut.trim(),
       [CHANNEL_BILLING_CERT_DOC_NIT_FIELD]: input.nit.trim(),
+      [CHANNEL_BILLING_CERT_DOC_DIAN_RESOLUTION_FIELD]: input.dianResolution.trim(),
+      [CHANNEL_BILLING_CERT_DOC_STORE_LOGO_FIELD]: input.storeLogo.trim(),
       [CHANNEL_BILLING_CERT_TYPE_FIELD]: input.certificateType,
-      [CHANNEL_BILLING_CERT_STATUS_FIELD]: 'PENDING_PAYMENT',
-      [CHANNEL_BILLING_CERT_PAYMENT_STATUS_FIELD]: 'UNPAID',
-      [CHANNEL_BILLING_CERT_REVIEW_NOTE_FIELD]: isRenewal ? null : cf[CHANNEL_BILLING_CERT_REVIEW_NOTE_FIELD] ?? null,
-      [CHANNEL_BILLING_CERT_EXPIRES_AT_FIELD]: null,
-      [CHANNEL_BILLING_CERT_PAID_AT_FIELD]: null,
     };
-    await this.channelService.update(ctx, { id: channel.id, customFields });
-    return this.getCurrentChannelPlanState(ctx);
-  }
 
-  async confirmCertificatePayment(ctx: RequestContext): Promise<BillingPlanState> {
-    const channel = await this.getCurrentSellerChannel(ctx);
-    await this.applyCertificatePaymentByChannelId(ctx, String(channel.id));
+    if (isRejectedResubmit && paymentAlreadyMade) {
+      // Documentos rechazados pero pago ya confirmado: vuelve a cola de revisión sin cobrar de nuevo.
+      customFields[CHANNEL_BILLING_CERT_STATUS_FIELD] = 'UNDER_REVIEW';
+      customFields[CHANNEL_BILLING_CERT_PAYMENT_STATUS_FIELD] = 'PAID';
+      customFields[CHANNEL_BILLING_CERT_REVIEW_NOTE_FIELD] = null;
+    } else if (isExpiredRenewal || isRejectedResubmit) {
+      customFields[CHANNEL_BILLING_CERT_STATUS_FIELD] = 'PENDING_PAYMENT';
+      customFields[CHANNEL_BILLING_CERT_PAYMENT_STATUS_FIELD] = 'UNPAID';
+      customFields[CHANNEL_BILLING_CERT_REVIEW_NOTE_FIELD] = null;
+      customFields[CHANNEL_BILLING_CERT_EXPIRES_AT_FIELD] = null;
+      customFields[CHANNEL_BILLING_CERT_PAID_AT_FIELD] = null;
+    } else {
+      customFields[CHANNEL_BILLING_CERT_STATUS_FIELD] = 'PENDING_PAYMENT';
+      customFields[CHANNEL_BILLING_CERT_PAYMENT_STATUS_FIELD] = 'UNPAID';
+      customFields[CHANNEL_BILLING_CERT_REVIEW_NOTE_FIELD] =
+        cf[CHANNEL_BILLING_CERT_REVIEW_NOTE_FIELD] ?? null;
+      customFields[CHANNEL_BILLING_CERT_EXPIRES_AT_FIELD] = null;
+      customFields[CHANNEL_BILLING_CERT_PAID_AT_FIELD] = null;
+    }
+    await this.channelService.update(ctx, { id: channel.id, customFields });
+    const fresh = await this.connection.getRepository(ctx, Channel).findOne({
+      where: { id: channel.id },
+      relations: ['seller'],
+    });
+    if (fresh) {
+      void this.certificateNotifications.notifySuperAdminCertificateEvent(
+        ctx,
+        fresh,
+        isRejectedResubmit && paymentAlreadyMade ? 'documents_resubmitted' : 'documents_uploaded',
+      );
+    }
     return this.getCurrentChannelPlanState(ctx);
   }
 
@@ -221,6 +268,12 @@ export class BillingPlansService {
     const paymentStatus = String(cf[CHANNEL_BILLING_CERT_PAYMENT_STATUS_FIELD] ?? 'UNPAID');
     if (input.approve && paymentStatus !== 'PAID') {
       throw new UserInputError('No se puede aprobar certificado sin pago confirmado.');
+    }
+    if (!input.approve) {
+      const rejectionNote = input.note?.trim();
+      if (!rejectionNote) {
+        throw new UserInputError('Debes indicar el motivo del rechazo para que el vendedor pueda corregir los documentos.');
+      }
     }
     const certType = String(cf[CHANNEL_BILLING_CERT_TYPE_FIELD] ?? 'ANNUAL') as BillingCertificateType;
     const now = new Date();
@@ -260,7 +313,6 @@ export class BillingPlansService {
     await this.connection.withTransaction(ctx, async (txCtx) => {
       const channel = await this.connection.getRepository(txCtx, Channel).findOne({
         where: { code: channelCode, sellerId: Not(IsNull()) },
-        relations: ['seller'],
         lock: { mode: 'pessimistic_write' },
       });
       if (!channel) return;
@@ -287,58 +339,6 @@ export class BillingPlansService {
       );
       await this.channelService.update(txCtx, { id: channel.id, customFields });
     });
-  }
-
-  async confirmPlanPayment(
-    ctx: RequestContext,
-    input: { planCode: string; channelId?: string | null },
-  ): Promise<BillingPlanState> {
-    const plan = this.getPlanByCode(input.planCode);
-    let updatedChannelId: string | null = null;
-    await this.connection.withTransaction(ctx, async (txCtx) => {
-      const channel =
-        input.channelId != null
-          ? await this.connection.getRepository(txCtx, Channel).findOne({
-            where: { id: input.channelId, sellerId: Not(IsNull()) },
-            relations: ['seller'],
-            lock: { mode: 'pessimistic_write' },
-          })
-          : await this.connection.getRepository(txCtx, Channel).findOne({
-            where: { id: txCtx.channelId, sellerId: Not(IsNull()) },
-            relations: ['seller'],
-            lock: { mode: 'pessimistic_write' },
-          });
-      if (!channel) {
-        throw new UserInputError('Canal vendedor no encontrado.');
-      }
-      const state = this.toState(channel);
-      if (!state.canBuyPlans) {
-        throw new UserInputError(
-          'Debes tener certificado activo y pago confirmado para comprar planes de facturación.',
-        );
-      }
-
-      await this.globalPool.applySellableDelta(txCtx, plan.invoices);
-      const cf = (channel.customFields as ChannelCustomFields) ?? {};
-      const customFields = this.buildPlanPurchaseCustomFields(
-        cf,
-        state.invoicesRemaining,
-        plan,
-        null,
-        'admin',
-      );
-      await this.channelService.update(txCtx, { id: channel.id, customFields });
-      updatedChannelId = String(channel.id);
-    });
-    if (!updatedChannelId) {
-      throw new Error('No se pudo actualizar el cupo del canal.');
-    }
-    const fresh = await this.connection.getRepository(ctx, Channel).findOne({
-      where: { id: updatedChannelId },
-      relations: ['seller'],
-    });
-    if (!fresh) throw new Error('No se pudo recargar canal.');
-    return this.toState(fresh);
   }
 
   async applyCertificatePaymentByChannelCode(ctx: RequestContext, channelCode: string): Promise<void> {
@@ -374,6 +374,13 @@ export class BillingPlansService {
       [CHANNEL_BILLING_CERT_PAID_AT_FIELD]: new Date(),
     };
     await this.channelService.update(ctx, { id: channel.id, customFields: updatedCf });
+    const fresh = await this.connection.getRepository(ctx, Channel).findOne({
+      where: { id: channel.id },
+      relations: ['seller'],
+    });
+    if (fresh) {
+      void this.certificateNotifications.notifySuperAdminCertificateEvent(ctx, fresh, 'ready_for_review');
+    }
   }
 
   private async getCurrentSellerChannel(ctx: RequestContext): Promise<Channel> {
@@ -404,11 +411,11 @@ export class BillingPlansService {
     const isExpired = certStatus === 'ACTIVE' && expiresAt != null && expiresAt.getTime() < Date.now();
     const normalizedStatus: BillingCertificateStatus = isExpired ? 'EXPIRED' : certStatus;
     const remaining = Number(cf[CHANNEL_INVOICE_LIMIT_REMAINING_FIELD] ?? 0);
-    const matiasTokenConfigured = this.hasText(cf[CHANNEL_MATIAS_ACCESS_TOKEN_FIELD]);
-    const matiasPrefixConfigured = this.hasText(cf[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD]);
-    const matiasResolutionConfigured = this.hasText(cf[CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD]);
+    const matiasCompanyIdConfigured = this.hasText(cf[CHANNEL_MATIAS_COMPANY_ID_FIELD]);
     const matiasProfileComplete =
-      matiasTokenConfigured && matiasPrefixConfigured && matiasResolutionConfigured;
+      matiasCompanyIdConfigured &&
+      this.hasText(cf[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD]) &&
+      this.hasText(cf[CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD]);
     const certificateReady = normalizedStatus === 'ACTIVE' && certPayment === 'PAID';
     return {
       channelId: String(channel.id),
@@ -426,12 +433,12 @@ export class BillingPlansService {
         chamber: (cf[CHANNEL_BILLING_CERT_DOC_CHAMBER_FIELD] as string | null) ?? null,
         rut: (cf[CHANNEL_BILLING_CERT_DOC_RUT_FIELD] as string | null) ?? null,
         nit: (cf[CHANNEL_BILLING_CERT_DOC_NIT_FIELD] as string | null) ?? null,
+        dianResolution: (cf[CHANNEL_BILLING_CERT_DOC_DIAN_RESOLUTION_FIELD] as string | null) ?? null,
+        storeLogo: (cf[CHANNEL_BILLING_CERT_DOC_STORE_LOGO_FIELD] as string | null) ?? null,
       },
       invoicesRemaining: Number.isFinite(remaining) ? remaining : 0,
       canBuyPlans: certificateReady && matiasProfileComplete,
-      matiasTokenConfigured,
-      matiasPrefixConfigured,
-      matiasResolutionConfigured,
+      matiasCompanyIdConfigured,
       matiasProfileComplete,
       purchaseHistory: this.parsePurchaseHistory(cf[CHANNEL_BILLING_PLAN_PURCHASE_HISTORY_FIELD]),
     };
