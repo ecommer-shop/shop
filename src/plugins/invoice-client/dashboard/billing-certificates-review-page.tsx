@@ -6,14 +6,23 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     Input,
+    Label,
     Page,
     PageBlock,
     PageLayout,
     PageTitle,
+    Textarea,
 } from '@vendure/dashboard';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { BillingCertificateAssetView, type BillingCertAsset } from './components/billing-certificate-asset-view';
 
 const QUERY = `
 query BillingCertificateReviewPage {
@@ -24,7 +33,7 @@ query BillingCertificateReviewPage {
     certificateStatus
     certificatePaymentStatus
     certificateReviewNote
-    documents { chamber rut nit }
+    documents { chamber rut nit dianResolution storeLogo }
   }
 }
 `;
@@ -46,6 +55,9 @@ query GetAssetsByIdsForBillingReview($options: AssetListOptions) {
       id
       name
       preview
+      source
+      mimeType
+      type
     }
   }
 }
@@ -58,33 +70,23 @@ type ReviewRow = {
     certificateStatus: string;
     certificatePaymentStatus: string;
     certificateReviewNote: string | null;
-    documents?: { chamber?: string | null; rut?: string | null; nit?: string | null };
+    documents?: {
+        chamber?: string | null;
+        rut?: string | null;
+        nit?: string | null;
+        dianResolution?: string | null;
+        storeLogo?: string | null;
+    };
 };
 
-type AssetRow = { id: string; name: string; preview?: string | null };
 type StatusFilter = 'ALL' | 'UNDER_REVIEW' | 'ACTIVE' | 'REJECTED' | 'EXPIRED';
 
-function AssetThumb({ id, assetsById }: { id: string | null | undefined; assetsById: Record<string, AssetRow> }) {
-    if (!id) return <span className="text-xs text-muted-foreground">Sin documento</span>;
-    const asset = assetsById[id];
-    if (!asset) return <span className="text-xs font-mono">{id}</span>;
-    return (
-        <div className="flex items-center gap-2">
-            {asset.preview ? (
-                <img src={asset.preview} alt={asset.name} className="h-8 w-8 rounded border object-cover" />
-            ) : null}
-            <div className="min-w-0">
-                <p className="truncate text-xs font-medium">{asset.name}</p>
-                <p className="text-[10px] text-muted-foreground font-mono">{asset.id}</p>
-            </div>
-        </div>
-    );
-}
-
 export function BillingCertificatesReviewPage() {
-    const [note, setNote] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
     const [storeSearch, setStoreSearch] = useState('');
+    const [rejectTarget, setRejectTarget] = useState<{ channelId: string; channelCode: string } | null>(null);
+    const [rejectNote, setRejectNote] = useState('');
+    const [rejectError, setRejectError] = useState<string | null>(null);
     const { data, refetch } = useQuery({
         queryKey: ['billing-certs-review'],
         queryFn: () => api.query<any>(QUERY),
@@ -111,6 +113,8 @@ export function BillingCertificatesReviewPage() {
             r.documents?.chamber ?? null,
             r.documents?.rut ?? null,
             r.documents?.nit ?? null,
+            r.documents?.dianResolution ?? null,
+            r.documents?.storeLogo ?? null,
         ]);
         return Array.from(new Set(values.filter((v): v is string => !!v)));
     }, [rows]);
@@ -120,7 +124,7 @@ export function BillingCertificatesReviewPage() {
         enabled: assetIds.length > 0,
         queryFn: async () =>
             api.query<{
-                assets: { items: AssetRow[] };
+                assets: { items: BillingCertAsset[] };
             }>(GET_ASSETS_BY_IDS, {
                 options: {
                     take: assetIds.length,
@@ -129,7 +133,7 @@ export function BillingCertificatesReviewPage() {
             }),
     });
     const assetsById = useMemo(() => {
-        const map: Record<string, AssetRow> = {};
+        const map: Record<string, BillingCertAsset> = {};
         for (const a of assetsData?.assets?.items ?? []) {
             map[a.id] = a;
         }
@@ -137,10 +141,38 @@ export function BillingCertificatesReviewPage() {
     }, [assetsData]);
 
     const approveMutation = useMutation({
-        mutationFn: (input: { channelId: string; approve: boolean }) =>
-            api.mutate(APPROVE_CERT, { input: { ...input, note: note || null } }),
-        onSuccess: () => refetch(),
+        mutationFn: (input: { channelId: string; approve: boolean; note?: string | null }) =>
+            api.mutate(APPROVE_CERT, { input }),
+        onSuccess: () => {
+            setRejectTarget(null);
+            setRejectNote('');
+            setRejectError(null);
+            void refetch();
+        },
+        onError: (err: unknown) => {
+            setRejectError(err instanceof Error ? err.message : String(err));
+        },
     });
+
+    const openRejectDialog = (row: ReviewRow) => {
+        setRejectTarget({ channelId: row.channelId, channelCode: row.channelCode });
+        setRejectNote('');
+        setRejectError(null);
+    };
+
+    const confirmReject = () => {
+        if (!rejectTarget) return;
+        const trimmed = rejectNote.trim();
+        if (!trimmed) {
+            setRejectError('Escribe el motivo del rechazo para que el vendedor sepa qué corregir.');
+            return;
+        }
+        approveMutation.mutate({
+            channelId: rejectTarget.channelId,
+            approve: false,
+            note: trimmed,
+        });
+    };
 
     return (
         <Page pageId="billing-certificates-review">
@@ -154,17 +186,16 @@ export function BillingCertificatesReviewPage() {
                                 Revisa documentos cargados por tienda y aprueba/rechaza la emisión de certificado.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-4 min-w-0">
                             <Input
                                 placeholder="Buscar por código de canal o nombre de tienda"
                                 value={storeSearch}
                                 onChange={(e) => setStoreSearch(e.target.value)}
                             />
-                            <Input
-                                placeholder="Nota de revisión (se guarda al aprobar/rechazar)"
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                            />
+                            <p className="text-xs text-muted-foreground break-words">
+                                Al rechazar, debes indicar el motivo. El vendedor lo verá en Planes de facturacion y debera
+                                volver a cargar los documentos.
+                            </p>
                             <div className="flex flex-wrap gap-2">
                                 {[
                                     { key: 'ALL', label: 'Todos' },
@@ -184,18 +215,19 @@ export function BillingCertificatesReviewPage() {
                                 ))}
                             </div>
                             {filteredRows.map((row) => (
-                                <div key={row.channelId} className="rounded-lg border p-4 space-y-3">
-                                    <div className="flex flex-wrap items-start justify-between gap-2">
-                                        <div>
-                                            <p className="font-semibold">{row.channelCode}</p>
-                                            <p className="text-xs text-muted-foreground">
+                                <div key={row.channelId} className="rounded-lg border p-3 sm:p-4 space-y-3 min-w-0">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="min-w-0">
+                                            <p className="font-semibold break-words">{row.channelCode}</p>
+                                            <p className="text-xs text-muted-foreground break-words">
                                                 {row.sellerName ?? 'Sin nombre'} · Estado: {row.certificateStatus} · Pago:{' '}
                                                 {row.certificatePaymentStatus}
                                             </p>
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row sm:shrink-0">
                                             <Button
                                                 size="sm"
+                                                className="w-full sm:w-auto"
                                                 onClick={() =>
                                                     approveMutation.mutate({ channelId: row.channelId, approve: true })
                                                 }
@@ -206,27 +238,60 @@ export function BillingCertificatesReviewPage() {
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                onClick={() =>
-                                                    approveMutation.mutate({ channelId: row.channelId, approve: false })
-                                                }
+                                                className="w-full sm:w-auto"
+                                                onClick={() => openRejectDialog(row)}
                                                 disabled={approveMutation.isPending}
                                             >
                                                 Rechazar
                                             </Button>
                                         </div>
                                     </div>
-                                    <div className="grid gap-3 md:grid-cols-3">
+                                    {row.certificateStatus === 'REJECTED' && row.certificateReviewNote ? (
+                                        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                                            <p className="text-xs font-medium text-destructive mb-1">Motivo del rechazo</p>
+                                            <p className="text-sm whitespace-pre-wrap">{row.certificateReviewNote}</p>
+                                        </div>
+                                    ) : null}
+                                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                                         <div>
                                             <p className="text-xs text-muted-foreground mb-1">Cámara y Comercio</p>
-                                            <AssetThumb id={row.documents?.chamber} assetsById={assetsById} />
+                                            <BillingCertificateAssetView
+                                                assetId={row.documents?.chamber}
+                                                assetsById={assetsById}
+                                                compact
+                                            />
                                         </div>
                                         <div>
                                             <p className="text-xs text-muted-foreground mb-1">RUT</p>
-                                            <AssetThumb id={row.documents?.rut} assetsById={assetsById} />
+                                            <BillingCertificateAssetView
+                                                assetId={row.documents?.rut}
+                                                assetsById={assetsById}
+                                                compact
+                                            />
                                         </div>
                                         <div>
                                             <p className="text-xs text-muted-foreground mb-1">NIT</p>
-                                            <AssetThumb id={row.documents?.nit} assetsById={assetsById} />
+                                            <BillingCertificateAssetView
+                                                assetId={row.documents?.nit}
+                                                assetsById={assetsById}
+                                                compact
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground mb-1">Resolución DIAN</p>
+                                            <BillingCertificateAssetView
+                                                assetId={row.documents?.dianResolution}
+                                                assetsById={assetsById}
+                                                compact
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground mb-1">Logo de la tienda</p>
+                                            <BillingCertificateAssetView
+                                                assetId={row.documents?.storeLogo}
+                                                assetsById={assetsById}
+                                                compact
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -238,6 +303,65 @@ export function BillingCertificatesReviewPage() {
                     </Card>
                 </PageBlock>
             </PageLayout>
+
+            <Dialog
+                open={!!rejectTarget}
+                onOpenChange={(open) => {
+                    if (!open && !approveMutation.isPending) {
+                        setRejectTarget(null);
+                        setRejectNote('');
+                        setRejectError(null);
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Rechazar certificado</DialogTitle>
+                        <DialogDescription>
+                            {rejectTarget
+                                ? `Indica por qué se rechazan los documentos de «${rejectTarget.channelCode}». El vendedor verá este mensaje y deberá volver a cargar los archivos.`
+                                : 'Indica el motivo del rechazo.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="reject-note">Motivo del rechazo</Label>
+                        <Textarea
+                            id="reject-note"
+                            value={rejectNote}
+                            onChange={(e) => {
+                                setRejectNote(e.target.value);
+                                if (rejectError) setRejectError(null);
+                            }}
+                            placeholder="Ej.: El RUT está vencido; la resolución DIAN no coincide con el NIT registrado…"
+                            rows={5}
+                            disabled={approveMutation.isPending}
+                        />
+                        {rejectError ? <p className="text-xs text-destructive">{rejectError}</p> : null}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={approveMutation.isPending}
+                            onClick={() => {
+                                setRejectTarget(null);
+                                setRejectNote('');
+                                setRejectError(null);
+                            }}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={approveMutation.isPending || !rejectNote.trim()}
+                            onClick={confirmReject}
+                        >
+                            {approveMutation.isPending ? 'Rechazando…' : 'Confirmar rechazo'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Page>
     );
 }

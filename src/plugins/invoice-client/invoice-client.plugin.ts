@@ -16,6 +16,7 @@ import { BillingPlansService } from './services/billing-plans.service';
 import { BillingCertificateNotificationService } from './services/billing-certificate-notification.service';
 import { BillingCertificateJobService } from './services/billing-certificate-job.service';
 import { InvoicePlanWompiPaymentService } from './services/invoice-plan-wompi-payment.service';
+import { BillingCertificateWompiPaymentService } from './services/billing-certificate-wompi-payment.service';
 import { ClickwrapAcceptanceService } from './services/clickwrap-acceptance.service';
 import { ClickwrapAcceptance } from './entities/clickwrap-acceptance.entity';
 import { adminApiExtensions, shopApiExtensions } from './api/api-extensions';
@@ -43,6 +44,7 @@ import { InvoiceShopResolver } from './api/invoice-shop.resolver';
     BillingCertificateNotificationService,
     BillingCertificateJobService,
     InvoicePlanWompiPaymentService,
+    BillingCertificateWompiPaymentService,
     ClickwrapAcceptanceService,
     InvoiceSubscriber,
   ],

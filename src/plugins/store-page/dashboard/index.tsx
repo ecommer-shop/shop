@@ -16,6 +16,8 @@ defineDashboardExtension({
     customFormComponents: {
         customFields: [
             { id: 'ecommer-store-featured-star', component: StoreFeaturedStarInput },
+            { id: 'ecommer-store-logo-asset-picker', component: StoreBannerAssetPickerInput },
+            { id: 'ecommer-store-header-banner-asset-picker', component: StoreBannerAssetPickerInput },
             { id: 'ecommer-store-banner-asset-picker', component: StoreBannerAssetPickerInput },
             { id: 'ecommer-store-pickup-map-preview', component: StorePickupMapPreviewInput },
             { id: 'ecommer-store-pickup-address-input', component: StorePickupAddressInput },

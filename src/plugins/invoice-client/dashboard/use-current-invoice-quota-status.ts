@@ -1,32 +1,27 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@vendure/dashboard';
 import {
-  CURRENT_INVOICE_QUOTA_STATUS_QUERY,
+  CURRENT_INVOICE_QUOTA_QUERY,
   type CurrentInvoiceQuotaStatusPayload,
 } from './current-invoice-quota-query';
 
-const emptyQuota: CurrentInvoiceQuotaStatusPayload['currentInvoiceQuotaStatus'] = {
+const EMPTY: CurrentInvoiceQuotaStatusPayload['currentInvoiceQuotaStatus'] = {
   channelId: '',
   channelCode: '',
   billingActive: false,
   remaining: null,
   hasPlan: false,
   isBlocked: true,
-  matiasTokenConfigured: false,
-  matiasPrefixConfigured: false,
-  matiasResolutionConfigured: false,
-  matiasInvoicePrefix: null,
+  matiasCompanyIdConfigured: false,
+  matiasCompanyId: null,
+  matiasEmitProfileComplete: false,
 };
 
 export function useCurrentInvoiceQuotaStatus() {
   return useQuery({
     queryKey: ['current-invoice-quota-status'],
-    queryFn: async (): Promise<CurrentInvoiceQuotaStatusPayload> => {
-      try {
-        return await api.query<CurrentInvoiceQuotaStatusPayload>(CURRENT_INVOICE_QUOTA_STATUS_QUERY);
-      } catch {
-        return { currentInvoiceQuotaStatus: emptyQuota };
-      }
-    },
+    queryFn: () =>
+      api.query<CurrentInvoiceQuotaStatusPayload>(CURRENT_INVOICE_QUOTA_QUERY),
+    select: (data) => data.currentInvoiceQuotaStatus ?? EMPTY,
   });
 }

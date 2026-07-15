@@ -103,6 +103,45 @@ export const customFields: VendureConfig['customFields'] = {
         },
       ],
     },
+    {
+      name: 'dni',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.es, value: 'Documento / NIT' },
+        { languageCode: LanguageCode.en, value: 'Document ID / NIT' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'Documento fiscal usado para facturación electrónica de esta dirección.',
+        },
+      ],
+    },
+    {
+      name: 'identityDocumentId',
+      type: 'string',
+      nullable: true,
+      public: true,
+      options: [
+        { value: '1', label: [{ languageCode: LanguageCode.es, value: 'Cédula Ciudadanía' }] },
+        { value: '2', label: [{ languageCode: LanguageCode.es, value: 'Cédula Extranjería' }] },
+        { value: '3', label: [{ languageCode: LanguageCode.es, value: 'NIT' }] },
+        { value: '4', label: [{ languageCode: LanguageCode.es, value: 'Tarjeta Identidad' }] },
+        { value: '5', label: [{ languageCode: LanguageCode.es, value: 'Pasaporte' }] },
+      ],
+      label: [
+        { languageCode: LanguageCode.es, value: 'Tipo de documento' },
+        { languageCode: LanguageCode.en, value: 'Identity document type' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'Tipo de documento fiscal usado para facturación electrónica de esta dirección.',
+        },
+      ],
+    },
   ],
   Administrator: [
     {
@@ -126,6 +165,29 @@ export const customFields: VendureConfig['customFields'] = {
       ],
     },
     {
+      name: 'storeHeaderBannerUrl',
+      type: 'relation',
+      entity: Asset,
+      nullable: true,
+      public: true,
+      eager: true,
+      ui: { component: 'ecommer-store-header-banner-asset-picker', fullWidth: true },
+      label: [
+        { languageCode: LanguageCode.en, value: 'Store header image' },
+        { languageCode: LanguageCode.es, value: 'Imagen de cabecera' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Wide banner shown at the top of your public store page',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Imagen ancha mostrada en la parte superior de tu tienda pública',
+        },
+      ],
+    },
+    {
       name: 'storeBannerUrl',
       type: 'relation',
       entity: Asset,
@@ -134,17 +196,17 @@ export const customFields: VendureConfig['customFields'] = {
       eager: true,
       ui: { component: 'ecommer-store-banner-asset-picker', fullWidth: true },
       label: [
-        { languageCode: LanguageCode.en, value: 'Store banner' },
-        { languageCode: LanguageCode.es, value: 'Banner de la tienda' },
+        { languageCode: LanguageCode.en, value: 'Store logo' },
+        { languageCode: LanguageCode.es, value: 'Logo de la tienda' },
       ],
       description: [
         {
           languageCode: LanguageCode.en,
-          value: 'Banner image for the public store page (Admin profile)',
+          value: 'Square logo shown on your public store page profile card',
         },
         {
           languageCode: LanguageCode.es,
-          value: 'Imagen de banner para la tienda pública (perfil de administrador)',
+          value: 'Logo cuadrado mostrado en la tarjeta de perfil de tu tienda pública',
         },
       ],
     },
@@ -392,9 +454,37 @@ export const customFields: VendureConfig['customFields'] = {
   Channel: [
     { name: 'invoiceBillingActive', type: 'boolean', defaultValue: false },
     { name: 'invoiceLimitRemaining', type: 'int', nullable: true },
+    {
+      name: 'matiasCompanyId',
+      type: 'string',
+      nullable: true,
+      label: [{ languageCode: LanguageCode.es, value: 'Matias Company ID (UUID)' }],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'UUID del cliente en Matias (Casa de Software).',
+        },
+      ],
+    },
     { name: 'matiasAccessToken', type: 'string', nullable: true, ui: { component: 'password-form-input' } },
-    { name: 'matiasInvoicePrefix', type: 'string', nullable: true },
-    { name: 'matiasResolutionNumber', type: 'string', nullable: true },
+    {
+      name: 'matiasInvoicePrefix',
+      type: 'string',
+      nullable: true,
+      label: [{ languageCode: LanguageCode.es, value: 'Prefijo de factura Matias' }],
+    },
+    {
+      name: 'matiasResolutionNumber',
+      type: 'string',
+      nullable: true,
+      label: [{ languageCode: LanguageCode.es, value: 'Número de resolución DIAN' }],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'Obligatorio para que Matias sepa qué rango de numeración aplicar.',
+        },
+      ],
+    },
     { name: 'matiasGlobalPoolTotal', type: 'int', nullable: true, public: false },
     { name: 'matiasGlobalPoolSellable', type: 'int', nullable: true, public: false },
     { name: 'billingCertificateStatus', type: 'string', nullable: true },
@@ -405,6 +495,30 @@ export const customFields: VendureConfig['customFields'] = {
     { name: 'billingCertificateDocChamber', type: 'string', nullable: true },
     { name: 'billingCertificateDocRut', type: 'string', nullable: true },
     { name: 'billingCertificateDocNit', type: 'string', nullable: true },
+    {
+      name: 'billingCertificateDocDianResolution',
+      type: 'string',
+      nullable: true,
+      label: [{ languageCode: LanguageCode.es, value: 'Resolución DIAN (documento)' }],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'Archivo de la resolución DIAN de facturación electrónica.',
+        },
+      ],
+    },
+    {
+      name: 'billingCertificateDocStoreLogo',
+      type: 'string',
+      nullable: true,
+      label: [{ languageCode: LanguageCode.es, value: 'Logo de la tienda' }],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'Asset ID del logo de la tienda subido con la solicitud de certificado.',
+        },
+      ],
+    },
     { name: 'billingCertificateReviewNote', type: 'string', nullable: true },
     { name: 'billingPlanLastPurchasedAt', type: 'datetime', nullable: true },
     {

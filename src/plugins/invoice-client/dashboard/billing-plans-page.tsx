@@ -22,39 +22,62 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { CONTRACT_VERSION } from '../../wompi-subscription/contract-constants';
 import { BillingCertificateDocField } from './components/billing-certificate-doc-field';
+import { BillingCertificateRejectionAlert } from './components/billing-certificate-rejection-alert';
 import { CertificateStatusSteps } from './components/certificate-status-steps';
 import { InvoicePlanCard, type InvoicePlanCardPlan } from './components/invoice-plan-card';
 import { InvoicePlanPaymentStep } from './invoice-plan-payment-step';
 import {
+    CHECK_BILLING_CERTIFICATE_PAYMENT_STATUS,
+    CHECK_INVOICE_PLAN_PURCHASE_STATUS,
+    CREATE_PENDING_BILLING_CERTIFICATE,
     CREATE_PENDING_INVOICE_PLAN,
+    PURCHASE_BILLING_CERTIFICATE_WITH_PAYMENT,
     PURCHASE_INVOICE_PLAN_WITH_PAYMENT,
     type InvoicePlanPendingResult,
 } from './invoice-plan-payment-queries';
 
 const WOMPI_PENDING_KEY = 'billing-wompi-pending-ref';
 
+type PendingWompiPayment = {
+    reference: string;
+    transactionId: string | null;
+    invoicesBefore: number | null;
+};
+
 const CERT_ANNUAL_PRICE_COP = 199_000;
 
-/** Qu? debe subir el vendedor en cada campo (visible en el paso de certificado). */
+/** Qué debe subir el vendedor en cada campo (visible en el paso de certificado). */
 const CERTIFICATE_DOCUMENTS_GUIDE: {
-    key: 'chamber' | 'rut' | 'nit';
+    key: 'chamber' | 'rut' | 'nit' | 'dianResolution' | 'storeLogo';
     label: string;
     hint: string;
+    accept?: string;
 }[] = [
         {
             key: 'chamber',
-            label: 'C?mara de Comercio',
-            hint: 'Certificado de existencia y representaci?n legal vigente (PDF o imagen legible).',
+            label: 'Cámara de Comercio',
+            hint: 'Certificado de existencia y representación legal vigente (PDF o imagen legible).',
         },
         {
             key: 'rut',
             label: 'RUT',
-            hint: 'Registro ?nico Tributario actualizado de la empresa o persona jur?dica (PDF/imagen).',
+            hint: 'Registro único Tributario actualizado de la empresa o persona jurídica (PDF/imagen).',
         },
         {
             key: 'nit',
             label: 'NIT',
-            hint: 'Documento o pantallazo donde se vea el NIT de la tienda, coincidente con el registrado en Matias.',
+            hint: 'Documento o pantallazo donde se vea el NIT de la tienda',
+        },
+        {
+            key: 'dianResolution',
+            label: 'Resolución DIAN',
+            hint: 'Documento PDF o imagen de la resolución DIAN de facturación electrónica vigente.',
+        },
+        {
+            key: 'storeLogo',
+            label: 'Logo de la tienda',
+            hint: 'Imagen del logo de la tienda (JPG, PNG o WebP). Se usa para identificar la marca en el proceso.',
+            accept: '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp',
         },
     ];
 
@@ -70,12 +93,10 @@ query BillingPlansDashboardData {
     certificateExpiresAt
     certificatePaidAt
     certificateReviewNote
-    documents { chamber rut nit }
+    documents { chamber rut nit dianResolution storeLogo }
     invoicesRemaining
     canBuyPlans
-    matiasTokenConfigured
-    matiasPrefixConfigured
-    matiasResolutionConfigured
+    matiasCompanyIdConfigured
     matiasProfileComplete
     purchaseHistory {
       purchasedAt
@@ -102,27 +123,18 @@ mutation SubmitBillingCertificate($input: SubmitBillingCertificateInput!) {
     channelId
     certificateStatus
     certificatePaymentStatus
-    documents { chamber rut nit }
+    documents { chamber rut nit dianResolution storeLogo }
   }
 }
 `;
 
-const CONFIRM_CERT_PAYMENT = `
-mutation ConfirmCertPayment {
-  confirmMyBillingCertificatePayment {
-    channelId
-    certificateStatus
-    certificatePaymentStatus
-    certificatePaidAt
-  }
-}
-`;
-
-const GET_PAYMENT_SIGNATURE = `
-query BillingWompiPaymentSignature($amountInCents: Int!, $paymentReference: String!) {
-  billingWompiPaymentSignature(amountInCents: $amountInCents, paymentReference: $paymentReference)
-}
-`;
+const CERTIFICATE_PAYMENT_PLAN: InvoicePlanCardPlan = {
+    code: 'certificate-annual',
+    name: 'Certificado anual',
+    invoices: 0,
+    priceCop: CERT_ANNUAL_PRICE_COP,
+    detailLine: 'Pago único anual del certificado de facturación',
+};
 
 type BillingPlanState = {
     channelId: string;
@@ -134,12 +146,16 @@ type BillingPlanState = {
     certificateExpiresAt: string | null;
     certificatePaidAt: string | null;
     certificateReviewNote: string | null;
-    documents: { chamber: string | null; rut: string | null; nit: string | null };
+    documents: {
+        chamber: string | null;
+        rut: string | null;
+        nit: string | null;
+        dianResolution: string | null;
+        storeLogo: string | null;
+    };
     invoicesRemaining: number;
     canBuyPlans: boolean;
-    matiasTokenConfigured: boolean;
-    matiasPrefixConfigured: boolean;
-    matiasResolutionConfigured: boolean;
+    matiasCompanyIdConfigured: boolean;
     matiasProfileComplete: boolean;
     purchaseHistory: {
         purchasedAt: string;
@@ -152,14 +168,14 @@ type BillingPlanState = {
     }[];
 };
 
-type Step = 'overview' | 'certificate' | 'plans' | 'payment';
+type Step = 'overview' | 'certificate' | 'certificate-payment' | 'plans' | 'payment';
 
 function statusBadge(status: string, payment: string) {
     if (status === 'ACTIVE' && payment === 'PAID') {
         return { label: 'Certificado activo', className: 'bg-emerald-500/15 text-emerald-700' };
     }
     if (status === 'UNDER_REVIEW') {
-        return { label: 'En revisi?n (super admin)', className: 'bg-blue-500/15 text-blue-700' };
+        return { label: 'En revisión', className: 'bg-blue-500/15 text-blue-700' };
     }
     if (status === 'REJECTED') {
         return { label: 'Certificado rechazado', className: 'bg-destructive/15 text-destructive' };
@@ -184,11 +200,22 @@ export function BillingPlansPage() {
     const [chamberRef, setChamberRef] = useState('');
     const [rutRef, setRutRef] = useState('');
     const [nitRef, setNitRef] = useState('');
+    const [dianResolutionRef, setDianResolutionRef] = useState('');
+    const [storeLogoRef, setStoreLogoRef] = useState('');
     const [paymentRef, setPaymentRef] = useState<string | null>(null);
+    const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
     const [wompiPolling, setWompiPolling] = useState(false);
     const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
     const pollCountRef = useRef(0);
     const invoicesBeforePlanPayRef = useRef<number | null>(null);
+
+    const savePendingPayment = (payment: PendingWompiPayment) => {
+        sessionStorage.setItem(WOMPI_PENDING_KEY, JSON.stringify(payment));
+    };
+
+    const clearPendingPayment = () => {
+        sessionStorage.removeItem(WOMPI_PENDING_KEY);
+    };
 
     const { data, refetch, isLoading, error } = useQuery({
         queryKey: ['billing-plans-dashboard'],
@@ -200,26 +227,53 @@ export function BillingPlansPage() {
     const canBuyPlans = !!state?.canBuyPlans;
     const certificateReady = state?.certificateStatus === 'ACTIVE' && state.certificatePaymentStatus === 'PAID';
     const waitingMatiasProfile = !!certificateReady && !state?.matiasProfileComplete;
-    const docsComplete = !!(chamberRef.trim() && rutRef.trim() && nitRef.trim());
+    const docsComplete = !!(
+        chamberRef.trim() &&
+        rutRef.trim() &&
+        nitRef.trim() &&
+        dianResolutionRef.trim() &&
+        storeLogoRef.trim()
+    );
     const docsSavedOnServer =
         !!state?.documents?.chamber?.trim() &&
         !!state?.documents?.rut?.trim() &&
-        !!state?.documents?.nit?.trim();
+        !!state?.documents?.nit?.trim() &&
+        !!state?.documents?.dianResolution?.trim() &&
+        !!state?.documents?.storeLogo?.trim();
     const needsRenewal = state?.certificateStatus === 'EXPIRED' || state?.certificateStatus === 'REJECTED';
+    const isRejected = state?.certificateStatus === 'REJECTED';
+    const rejectionNote = state?.certificateReviewNote?.trim() ?? '';
+    const certPaymentAlreadyMade = state?.certificatePaymentStatus === 'PAID';
+    const rejectedResubmitWithoutPayment = isRejected && certPaymentAlreadyMade;
 
     useEffect(() => {
         if (!state?.documents) return;
         setChamberRef(state.documents.chamber ?? '');
         setRutRef(state.documents.rut ?? '');
         setNitRef(state.documents.nit ?? '');
+        setDianResolutionRef(state.documents.dianResolution ?? '');
+        setStoreLogoRef(state.documents.storeLogo ?? '');
     }, [state?.documents]);
 
     useEffect(() => {
-        const pending = sessionStorage.getItem(WOMPI_PENDING_KEY);
-        if (pending) {
-            setPaymentRef(pending);
+        const raw = sessionStorage.getItem(WOMPI_PENDING_KEY);
+        if (raw) {
+            let pending: PendingWompiPayment;
+            try {
+                const parsed = JSON.parse(raw) as PendingWompiPayment;
+                pending = {
+                    reference: parsed.reference,
+                    transactionId: parsed.transactionId ?? null,
+                    invoicesBefore: parsed.invoicesBefore ?? null,
+                };
+            } catch {
+                pending = { reference: raw, transactionId: null, invoicesBefore: null };
+            }
+            setPaymentRef(pending.reference);
+            setPaymentTransactionId(pending.transactionId);
+            invoicesBeforePlanPayRef.current = pending.invoicesBefore;
             setWompiPolling(true);
-            setPaymentNotice('Verificando pago con Wompi?');
+            setPaymentNotice('Verificando pago con Wompi…');
             pollCountRef.current = 0;
         }
     }, []);
@@ -228,24 +282,61 @@ export function BillingPlansPage() {
         if (!wompiPolling) return;
         const id = setInterval(() => {
             pollCountRef.current += 1;
-            void refetch().then((result) => {
-                const st = result.data?.myBillingPlanState;
-                if (paymentRef?.startsWith('CERT-') && st?.certificatePaymentStatus === 'PAID') {
-                    setWompiPolling(false);
-                    sessionStorage.removeItem(WOMPI_PENDING_KEY);
-                    setPaymentNotice('Pago del certificado confirmado. Tu tr?mite est? en revisi?n.');
+            void (async () => {
+                if (paymentRef?.startsWith('PLAN') && paymentTransactionId) {
+                    const data = await api.mutate<{
+                        checkInvoicePlanPurchaseStatus: InvoicePlanPendingResult;
+                    }>(CHECK_INVOICE_PLAN_PURCHASE_STATUS, {
+                        reference: paymentRef,
+                        transactionId: paymentTransactionId,
+                    });
+                    if (data.checkInvoicePlanPurchaseStatus.applied) {
+                        setWompiPolling(false);
+                        clearPendingPayment();
+                        setPaymentNotice('Paquete de facturas acreditado correctamente.');
+                        await refetch();
+                        return;
+                    }
                 }
+                if (paymentRef?.startsWith('CERT') && paymentTransactionId) {
+                    const data = await api.mutate<{
+                        checkBillingCertificatePaymentStatus: InvoicePlanPendingResult;
+                    }>(CHECK_BILLING_CERTIFICATE_PAYMENT_STATUS, {
+                        reference: paymentRef,
+                        transactionId: paymentTransactionId,
+                    });
+                    if (data.checkBillingCertificatePaymentStatus.applied) {
+                        setWompiPolling(false);
+                        clearPendingPayment();
+                        setPaymentNotice('Pago del certificado confirmado. Tu trámite está en revisión.');
+                        setStep('certificate');
+                        await refetch();
+                        return;
+                    }
+                }
+                const result = await refetch();
+                const st = result.data?.myBillingPlanState;
+                if (paymentRef?.startsWith('CERT') && st?.certificatePaymentStatus === 'PAID') {
+                    setWompiPolling(false);
+                    clearPendingPayment();
+                    setPaymentNotice('Pago del certificado confirmado. Tu trámite está en revisión.');
+                    setStep('certificate');
+                }
+                const purchasedByReference =
+                    !!paymentRef &&
+                    st?.purchaseHistory?.some((row) => row.paymentReference === paymentRef);
                 const before = invoicesBeforePlanPayRef.current;
                 if (
-                    paymentRef?.startsWith('PLAN-') &&
+                    paymentRef?.startsWith('PLAN') &&
                     st &&
-                    before != null &&
-                    st.invoicesRemaining > before
+                    (purchasedByReference || (before != null && st.invoicesRemaining > before))
                 ) {
                     setWompiPolling(false);
-                    sessionStorage.removeItem(WOMPI_PENDING_KEY);
+                    clearPendingPayment();
                     setPaymentNotice('Paquete de facturas acreditado correctamente.');
                 }
+            })().catch((e) => {
+                setPaymentNotice(e instanceof Error ? e.message : 'No se pudo verificar el pago con Wompi.');
             });
             if (pollCountRef.current >= 40) {
                 setWompiPolling(false);
@@ -255,54 +346,136 @@ export function BillingPlansPage() {
             }
         }, 3000);
         return () => clearInterval(id);
-    }, [wompiPolling, paymentRef, refetch]);
+    }, [wompiPolling, paymentRef, paymentTransactionId, refetch]);
 
     const submitCert = useMutation({
         mutationFn: async () => {
-            await api.mutate(SUBMIT_CERT, {
+            const result = await api.mutate<{ submitBillingCertificate: BillingPlanState }>(SUBMIT_CERT, {
                 input: {
                     chamber: chamberRef.trim(),
                     rut: rutRef.trim(),
                     nit: nitRef.trim(),
+                    dianResolution: dianResolutionRef.trim(),
+                    storeLogo: storeLogoRef.trim(),
                     certificateType: 'ANNUAL',
                 },
             });
+            return result.submitBillingCertificate;
         },
-        onSuccess: () => {
+        onSuccess: (updated) => {
             setStep('certificate');
-            setPaymentNotice('Documentos guardados. Ya puedes pagar el certificado.');
+            const backToReview =
+                updated.certificateStatus === 'UNDER_REVIEW' && updated.certificatePaymentStatus === 'PAID';
+            setPaymentNotice(
+                backToReview
+                    ? 'Documentos guardados. Tu trámite volvió a revisión del super admin. No necesitas pagar de nuevo.'
+                    : 'Documentos guardados. Ya puedes pagar el certificado.',
+            );
             refetch();
         },
     });
 
-    const confirmCertPay = useMutation({
-        mutationFn: async () => api.mutate(CONFIRM_CERT_PAYMENT, {}),
-        onSuccess: () => refetch(),
-    });
-
-    const openWompiCheckout = async (amountCop: number, reference: string) => {
-        setPaymentRef(reference);
-        sessionStorage.setItem(WOMPI_PENDING_KEY, reference);
-        setWompiPolling(true);
-        pollCountRef.current = 0;
-        setPaymentNotice('Redirigiendo a Wompi. Al volver, actualizaremos el estado autom?ticamente.');
-        const res = await api.query<{ billingWompiPaymentSignature: string }>(GET_PAYMENT_SIGNATURE, {
-            amountInCents: amountCop * 100,
-            paymentReference: reference,
-        });
-        const base = (window as unknown as { __WOMPI_PUBLIC_KEY__?: string }).__WOMPI_PUBLIC_KEY__?.startsWith('pub_test_')
-            ? 'https://checkout.wompi.co/l'
-            : 'https://checkout.wompi.co/l';
-        window.open(
-            `${base}/${res.billingWompiPaymentSignature}?redirect-url=${encodeURIComponent(window.location.href)}`,
-            '_blank',
-        );
+    const startCertificatePaymentStep = () => {
+        if (!state?.channelCode || !docsSavedOnServer) return;
+        setStep('certificate-payment');
+        setPlanPendingResult(null);
+        setShowTokenForm(false);
+        setSelectedMethod(null);
+        setPaymentNotice(null);
     };
 
-    const startWompiCertificatePayment = async () => {
-        if (!state?.channelCode) return;
-        const reference = `CERT-${state.channelCode}-${Date.now()}`;
-        await openWompiCheckout(CERT_ANNUAL_PRICE_COP, reference);
+    const handleCertificatePayment = async () => {
+        if (!selectedMethod) return;
+        const isTokenFlow = ['CARD', 'NEQUI', 'DAVIPLATA', 'BANCOLOMBIA_TRANSFER'].includes(selectedMethod);
+        if (isTokenFlow) {
+            setShowTokenForm(true);
+            return;
+        }
+        setPaymentProcessing(true);
+        setPaymentNotice(null);
+        try {
+            const data = await api.mutate<{
+                createPendingBillingCertificatePayment: InvoicePlanPendingResult;
+            }>(CREATE_PENDING_BILLING_CERTIFICATE, {
+                paymentMethod: selectedMethod,
+                clickwrapAccepted: true,
+                contractVersion: CONTRACT_VERSION,
+            });
+            const result = data.createPendingBillingCertificatePayment;
+            setPlanPendingResult(result);
+            setPaymentRef(result.reference);
+            setPaymentTransactionId(result.transactionId ?? null);
+            if (result.reference) {
+                savePendingPayment({
+                    reference: result.reference,
+                    transactionId: result.transactionId ?? null,
+                    invoicesBefore: null,
+                });
+            }
+            if (result.applied) {
+                clearPendingPayment();
+                setPaymentNotice('Pago del certificado confirmado. Tu trámite está en revisión.');
+                await refetch();
+            } else if (!result.asyncPaymentUrl && !result.qrImage) {
+                setWompiPolling(true);
+                setPaymentNotice('Pago en proceso. Actualizaremos el estado al confirmarse.');
+            }
+        } catch (e: unknown) {
+            setPaymentNotice(e instanceof Error ? e.message : 'Error al iniciar el pago del certificado.');
+        } finally {
+            setPaymentProcessing(false);
+        }
+    };
+
+    const handleCertificateTokenReceived = async (token: string, sessionId?: string, deviceId?: string) => {
+        if (!selectedMethod) return;
+        setPaymentProcessing(true);
+        try {
+            const data = await api.mutate<{
+                purchaseBillingCertificateWithPayment: InvoicePlanPendingResult;
+            }>(PURCHASE_BILLING_CERTIFICATE_WITH_PAYMENT, {
+                paymentMethod: selectedMethod,
+                token,
+                clickwrapAccepted: true,
+                contractVersion: CONTRACT_VERSION,
+                sessionId: sessionId ?? null,
+                deviceId: deviceId ?? null,
+            });
+            const result = data.purchaseBillingCertificateWithPayment;
+            setPlanPendingResult(result);
+            setShowTokenForm(false);
+            setPaymentRef(result.reference);
+            setPaymentTransactionId(result.transactionId ?? null);
+            if (result.reference) {
+                savePendingPayment({
+                    reference: result.reference,
+                    transactionId: result.transactionId ?? null,
+                    invoicesBefore: null,
+                });
+            }
+            if (result.applied) {
+                clearPendingPayment();
+                setPaymentNotice('Pago del certificado confirmado. Tu trámite está en revisión.');
+                await refetch();
+            } else {
+                setWompiPolling(true);
+                setPaymentNotice('Pago en proceso. Actualizaremos el estado al confirmarse.');
+            }
+        } catch (e: unknown) {
+            setPaymentNotice(e instanceof Error ? e.message : 'Error al procesar el pago del certificado.');
+        } finally {
+            setPaymentProcessing(false);
+        }
+    };
+
+    const handleCertificatePaymentSuccess = async () => {
+        setWompiPolling(true);
+        pollCountRef.current = 0;
+        setStep('certificate');
+        setPlanPendingResult(null);
+        setShowTokenForm(false);
+        setSelectedMethod(null);
+        await refetch();
     };
 
     const handleSelectPlan = (plan: InvoicePlanCardPlan) => {
@@ -337,10 +510,16 @@ export function BillingPlansPage() {
             const result = data.createPendingInvoicePlanPurchase;
             setPlanPendingResult(result);
             setPaymentRef(result.reference);
+            setPaymentTransactionId(result.transactionId ?? null);
             if (result.reference) {
-                sessionStorage.setItem(WOMPI_PENDING_KEY, result.reference);
+                savePendingPayment({
+                    reference: result.reference,
+                    transactionId: result.transactionId ?? null,
+                    invoicesBefore: invoicesBeforePlanPayRef.current,
+                });
             }
             if (result.applied) {
+                clearPendingPayment();
                 setPaymentNotice('Paquete de facturas acreditado correctamente.');
                 await refetch();
             } else if (!result.asyncPaymentUrl && !result.qrImage) {
@@ -372,10 +551,16 @@ export function BillingPlansPage() {
             const result = data.purchaseInvoicePlanWithPayment;
             setPlanPendingResult(result);
             setPaymentRef(result.reference);
+            setPaymentTransactionId(result.transactionId ?? null);
             if (result.reference) {
-                sessionStorage.setItem(WOMPI_PENDING_KEY, result.reference);
+                savePendingPayment({
+                    reference: result.reference,
+                    transactionId: result.transactionId ?? null,
+                    invoicesBefore: invoicesBeforePlanPayRef.current,
+                });
             }
             if (result.applied) {
+                clearPendingPayment();
                 setPaymentNotice('Paquete de facturas acreditado correctamente.');
                 setSelectedPlan(null);
                 setStep('overview');
@@ -414,8 +599,8 @@ export function BillingPlansPage() {
     if (isLoading) {
         return (
             <Page pageId="billing-plans">
-                <PageTitle>Planes de facturaci?n</PageTitle>
-                <p className="text-sm text-muted-foreground">Cargando?</p>
+                <PageTitle>Planes de facturación</PageTitle>
+                <p className="text-sm text-muted-foreground">Cargando...</p>
             </Page>
         );
     }
@@ -423,7 +608,7 @@ export function BillingPlansPage() {
     if (error) {
         return (
             <Page pageId="billing-plans">
-                <PageTitle>Planes de facturaci?n</PageTitle>
+                <PageTitle>Planes de facturación</PageTitle>
                 <Card className="border-destructive/50">
                     <CardContent className="py-6 text-sm text-destructive">{String(error)}</CardContent>
                 </Card>
@@ -433,18 +618,18 @@ export function BillingPlansPage() {
 
     return (
         <Page pageId="billing-plans">
-            <PageTitle>Planes de facturaci?n</PageTitle>
+            <PageTitle>Planes de facturación</PageTitle>
             <PageLayout>
                 {step !== 'plans' && (
                     <PageBlock column="main" blockId="header">
-                        <Card>
+                        <Card className="min-w-0 overflow-hidden">
                             <CardHeader>
-                                <CardTitle>Estado de facturaci?n electr?nica</CardTitle>
-                                <CardDescription>
-                                    Canal: {state?.channelCode ?? '?'} ? Cupo restante: {state?.invoicesRemaining ?? 0} facturas
+                                <CardTitle className="text-lg sm:text-xl">Estado de facturación electrónica</CardTitle>
+                                <CardDescription className="break-words">
+                                    Canal: {state?.channelCode ?? '?'} · Cupo restante: {state?.invoicesRemaining ?? 0} facturas
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="min-w-0 space-y-4">
                                 <CertificateStatusSteps
                                     certificateStatus={state?.certificateStatus ?? 'NONE'}
                                     certificatePaymentStatus={state?.certificatePaymentStatus ?? 'UNPAID'}
@@ -453,11 +638,11 @@ export function BillingPlansPage() {
                                     matiasProfileComplete={state?.matiasProfileComplete ?? false}
                                 />
                                 {paymentNotice && (
-                                    <p className="text-sm rounded-md border bg-muted/50 p-2">{paymentNotice}</p>
+                                    <p className="text-sm rounded-md border bg-muted/50 p-3 break-words leading-relaxed">{paymentNotice}</p>
                                 )}
-                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                                     {badge && (
-                                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${badge.className}`}>
+                                        <span className={`max-w-full rounded-full px-3 py-1.5 text-xs font-medium break-words text-center sm:text-left ${badge.className}`}>
                                             {badge.label}
                                         </span>
                                     )}
@@ -472,9 +657,19 @@ export function BillingPlansPage() {
                                         Tu certificado mensual vence pronto. Renueva el pago para seguir emitiendo facturas.
                                     </p>
                                 )}
-                                {state?.certificateReviewNote && (
-                                    <p className="text-sm text-muted-foreground max-w-xl">{state.certificateReviewNote}</p>
-                                )}
+                                {isRejected && rejectionNote ? (
+                                    <BillingCertificateRejectionAlert
+                                        note={rejectionNote}
+                                        paymentAlreadyMade={certPaymentAlreadyMade}
+                                    />
+                                ) : null}
+                                {isRejected && !rejectionNote ? (
+                                    <p className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/10 p-3">
+                                        Tu certificado fue rechazado. Debes volver a subir los documentos y pulsar
+                                        «Guardar documentos».
+                                        {certPaymentAlreadyMade ? ' No necesitas pagar de nuevo.' : null}
+                                    </p>
+                                ) : null}
                             </CardContent>
                         </Card>
                     </PageBlock>
@@ -487,17 +682,31 @@ export function BillingPlansPage() {
                                 <Card className="border-amber-500/30 bg-amber-500/5">
                                     <CardHeader>
                                         <CardTitle>
-                                            {needsRenewal ? 'Renueva tu certificado' : 'Primero adquiere tu certificado'}
+                                            {isRejected
+                                                ? 'Certificado rechazado — corrige tus documentos'
+                                                : needsRenewal
+                                                  ? 'Renueva tu certificado'
+                                                  : 'Primero adquiere tu certificado'}
                                         </CardTitle>
                                         <CardDescription>
-                                            Para emitir facturas con Matias necesitas certificado activo. Debes subir:{' '}
-                                            {CERTIFICATE_DOCUMENTS_GUIDE.map((d) => d.label).join(', ')}; pagar el certificado
-                                            anual (${CERT_ANNUAL_PRICE_COP.toLocaleString('es-CO')}) y esperar validaci?n del super
-                                            admin.
+                                            {isRejected
+                                                ? certPaymentAlreadyMade
+                                                    ? 'Corrige los documentos según el motivo del rechazo. No necesitas pagar de nuevo.'
+                                                    : 'Corrige los documentos según el motivo del rechazo y vuelve a tramitar el certificado.'
+                                                : `Para emitir facturas necesitas certificado activo. Debes subir: ${CERTIFICATE_DOCUMENTS_GUIDE.map((d) => d.label).join(', ')}; pagar el certificado anual ($${CERT_ANNUAL_PRICE_COP.toLocaleString('es-CO')}) y esperar validación del super admin.`}
                                         </CardDescription>
                                     </CardHeader>
-                                    <CardContent>
-                                        <Button onClick={() => setStep('certificate')}>Iniciar certificado</Button>
+                                    <CardContent className="space-y-3">
+                                        {isRejected && rejectionNote ? (
+                                            <BillingCertificateRejectionAlert
+                                                note={rejectionNote}
+                                                compact
+                                                paymentAlreadyMade={certPaymentAlreadyMade}
+                                            />
+                                        ) : null}
+                                        <Button className="w-full sm:w-auto" onClick={() => setStep('certificate')}>
+                                            {isRejected ? 'Corregir documentos' : 'Iniciar certificado'}
+                                        </Button>
                                     </CardContent>
                                 </Card>
                             </PageBlock>
@@ -509,14 +718,19 @@ export function BillingPlansPage() {
                                     <CardHeader>
                                         <CardTitle>En espera de asignación Matias</CardTitle>
                                         <CardDescription>
-                                            Tu certificado ya está aprobado. Falta que el superadmin configure el token,
-                                            prefijo y resolución Matias para habilitar la compra de paquetes.
+                                            Tu certificado ya está aprobado. Configuraremos tu perfil para habilitar la compra de
+                                            paquetes.
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent className="space-y-2 text-sm">
-                                        <p>Token: {state?.matiasTokenConfigured ? 'configurado' : 'pendiente'}</p>
-                                        <p>Prefijo: {state?.matiasPrefixConfigured ? 'configurado' : 'pendiente'}</p>
-                                        <p>Resolución: {state?.matiasResolutionConfigured ? 'configurada' : 'pendiente'}</p>
+                                        <p>
+                                            Perfil Matias:{' '}
+                                            {state?.matiasProfileComplete ? 'completo' : 'pendiente'}
+                                        </p>
+                                        <p>
+                                            Company ID:{' '}
+                                            {state?.matiasCompanyIdConfigured ? 'configurado' : 'pendiente'}
+                                        </p>
                                     </CardContent>
                                 </Card>
                             </PageBlock>
@@ -532,7 +746,7 @@ export function BillingPlansPage() {
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        <Button onClick={() => setStep('plans')}>Ver planes y comprar</Button>
+                                        <Button className="w-full sm:w-auto" onClick={() => setStep('plans')}>Ver planes y comprar</Button>
                                     </CardContent>
                                 </Card>
                             </PageBlock>
@@ -545,8 +759,9 @@ export function BillingPlansPage() {
                                         <CardTitle>Historial de compras</CardTitle>
                                         <CardDescription>?ltimos paquetes de facturas adquiridos.</CardDescription>
                                     </CardHeader>
-                                    <CardContent>
-                                        <Table>
+                                    <CardContent className="min-w-0">
+                                        <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+                                            <Table>
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>Fecha</TableHead>
@@ -570,6 +785,7 @@ export function BillingPlansPage() {
                                                 ))}
                                             </TableBody>
                                         </Table>
+                                        </div>
                                     </CardContent>
                                 </Card>
                             </PageBlock>
@@ -579,23 +795,39 @@ export function BillingPlansPage() {
 
                 {step === 'certificate' && (
                     <PageBlock column="main" blockId="certificate-flow">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => setStep('overview')}>
+                        <Card className="min-w-0 overflow-hidden">
+                            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                                <Button variant="ghost" size="icon" className="shrink-0 self-start" onClick={() => setStep('overview')}>
                                     <ArrowLeft className="h-4 w-4" />
                                 </Button>
-                                <div>
-                                    <CardTitle>Certificado de facturaci?n electr?nica</CardTitle>
-                                    <CardDescription>
-                                        Documentos obligatorios y pago anual. Tras el pago, un super admin valida y activa el certificado.
+                                <div className="min-w-0 flex-1">
+                                    <CardTitle className="text-lg sm:text-xl">Certificado de facturación electrónica</CardTitle>
+                                    <CardDescription className="break-words mt-1">
+                                            {isRejected
+                                                ? certPaymentAlreadyMade
+                                                    ? 'Corrige los documentos indicados y guárdalos. Tu pago ya está confirmado.'
+                                                    : 'Corrige los documentos indicados, guárdalos y completa el pago del certificado.'
+                                                : 'Documentos obligatorios y pago anual. Tras el pago, se valida y activa el certificado.'}
                                     </CardDescription>
                                 </div>
                             </CardHeader>
-                            <CardContent className="space-y-6">
-                                {needsRenewal && (
+                            <CardContent className="min-w-0 space-y-6">
+                                {isRejected && rejectionNote ? (
+                                    <BillingCertificateRejectionAlert
+                                        note={rejectionNote}
+                                        compact
+                                        paymentAlreadyMade={certPaymentAlreadyMade}
+                                    />
+                                ) : null}
+                                {needsRenewal && !isRejected && (
                                     <p className="text-sm text-amber-800 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-                                        Tu certificado est? {state?.certificateStatus === 'EXPIRED' ? 'vencido' : 'rechazado'}.
-                                        Vuelve a subir documentos, guardar y pagar el certificado anual.
+                                        Tu certificado está vencido. Vuelve a subir documentos, guardar y pagar el certificado anual.
+                                    </p>
+                                )}
+                                {needsRenewal && isRejected && !rejectionNote && (
+                                    <p className="text-sm text-amber-800 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+                                        Tu certificado fue rechazado. Vuelve a subir documentos y pulsa «Guardar documentos».
+                                        {certPaymentAlreadyMade ? ' No necesitas pagar de nuevo.' : ' Luego completa el pago del certificado.'}
                                     </p>
                                 )}
 
@@ -613,75 +845,95 @@ export function BillingPlansPage() {
                                         <div className="space-y-2 text-sm">
                                             <p className="font-medium">Documentos que debes subir</p>
                                             <p className="text-muted-foreground">
-                                                Usa ?Subir archivo? en cada campo (PDF, JPG o PNG). Luego pulsa ?Guardar
-                                                documentos? antes de pagar con Wompi.
+                                                Usa «Subir archivo» en cada campo (PDF, JPG o PNG). Luego pulsa «Guardar
+                                                documentos»
+                                                {rejectedResubmitWithoutPayment
+                                                    ? '. Tu pago ya está confirmado; no necesitas pagar otra vez.'
+                                                    : ' antes de pagar con Wompi.'}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-3">
-                                    <BillingCertificateDocField
-                                        label={CERTIFICATE_DOCUMENTS_GUIDE[0].label}
-                                        hint={CERTIFICATE_DOCUMENTS_GUIDE[0].hint}
-                                        assetId={chamberRef}
-                                        onAssetIdChange={setChamberRef}
-                                    />
-                                    <BillingCertificateDocField
-                                        label={CERTIFICATE_DOCUMENTS_GUIDE[1].label}
-                                        hint={CERTIFICATE_DOCUMENTS_GUIDE[1].hint}
-                                        assetId={rutRef}
-                                        onAssetIdChange={setRutRef}
-                                    />
-                                    <BillingCertificateDocField
-                                        label={CERTIFICATE_DOCUMENTS_GUIDE[2].label}
-                                        hint={CERTIFICATE_DOCUMENTS_GUIDE[2].hint}
-                                        assetId={nitRef}
-                                        onAssetIdChange={setNitRef}
-                                    />
+                                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+                                    {CERTIFICATE_DOCUMENTS_GUIDE.map((doc) => {
+                                        const valueByKey = {
+                                            chamber: chamberRef,
+                                            rut: rutRef,
+                                            nit: nitRef,
+                                            dianResolution: dianResolutionRef,
+                                            storeLogo: storeLogoRef,
+                                        } as const;
+                                        const setterByKey = {
+                                            chamber: setChamberRef,
+                                            rut: setRutRef,
+                                            nit: setNitRef,
+                                            dianResolution: setDianResolutionRef,
+                                            storeLogo: setStoreLogoRef,
+                                        } as const;
+                                        return (
+                                            <BillingCertificateDocField
+                                                key={doc.key}
+                                                label={doc.label}
+                                                hint={doc.hint}
+                                                assetId={valueByKey[doc.key]}
+                                                onAssetIdChange={setterByKey[doc.key]}
+                                                accept={doc.accept}
+                                            />
+                                        );
+                                    })}
                                 </div>
 
                                 <div className="rounded-lg border bg-muted/40 p-4">
-                                    <p className="text-sm font-medium">Certificado anual</p>
-                                    <p className="text-2xl font-bold">${CERT_ANNUAL_PRICE_COP.toLocaleString('es-CO')} COP</p>
+                                    {rejectedResubmitWithoutPayment ? (
+                                        <>
+                                            <p className="text-sm font-medium text-emerald-700">Pago del certificado confirmado</p>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                Ya pagaste el certificado anual. Solo debes corregir los documentos y guardarlos
+                                                para volver a revisión.
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm font-medium">Certificado anual</p>
+                                            <p className="text-2xl font-bold">${CERT_ANNUAL_PRICE_COP.toLocaleString('es-CO')} COP</p>
+                                        </>
+                                    )}
                                 </div>
 
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                                     <Button
                                         variant="outline"
+                                        className="h-auto min-h-9 w-full whitespace-normal py-2 text-left sm:w-auto sm:text-center"
                                         onClick={() => submitCert.mutate()}
                                         disabled={submitCert.isPending || !docsComplete}
                                     >
-                                        Guardar documentos
+                                        {rejectedResubmitWithoutPayment ? 'Guardar y reenviar a revisión' : 'Guardar documentos'}
                                     </Button>
-                                    <Button
-                                        onClick={startWompiCertificatePayment}
-                                        disabled={
-                                            !state?.channelCode ||
-                                            !docsSavedOnServer ||
-                                            state?.certificatePaymentStatus === 'PAID' ||
-                                            wompiPolling
-                                        }
-                                        title={
-                                            !docsSavedOnServer
-                                                ? 'Primero guarda los tres documentos'
-                                                : undefined
-                                        }
-                                    >
-                                        <Wallet className="mr-2 h-4 w-4" />
-                                        Pagar con Wompi (checkout)
-                                    </Button>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => confirmCertPay.mutate()}
-                                        disabled={confirmCertPay.isPending || state?.certificatePaymentStatus === 'PAID'}
-                                    >
-                                        Marcar pago confirmado (admin / pruebas)
-                                    </Button>
+                                    {!rejectedResubmitWithoutPayment ? (
+                                        <Button
+                                            className="h-auto min-h-9 w-full whitespace-normal py-2 sm:w-auto"
+                                            onClick={startCertificatePaymentStep}
+                                            disabled={
+                                                !state?.channelCode ||
+                                                !docsSavedOnServer ||
+                                                state?.certificatePaymentStatus === 'PAID' ||
+                                                wompiPolling
+                                            }
+                                            title={
+                                                !docsSavedOnServer
+                                                    ? 'Primero guarda todos los documentos y el logo'
+                                                    : undefined
+                                            }
+                                        >
+                                            <Wallet className="mr-2 h-4 w-4 shrink-0" />
+                                            Pagar con Wompi
+                                        </Button>
+                                    ) : null}
                                 </div>
 
-                                {paymentRef && (
-                                    <p className="text-xs text-muted-foreground">
+                                {paymentRef?.startsWith('CERT') && (
+                                    <p className="text-xs text-muted-foreground break-all">
                                         Referencia de pago: <span className="font-mono">{paymentRef}</span>
                                     </p>
                                 )}
@@ -690,18 +942,49 @@ export function BillingPlansPage() {
                     </PageBlock>
                 )}
 
+                {step === 'certificate-payment' && (
+                    <PageBlock column="main" blockId="certificate-payment">
+                        {paymentNotice && (
+                            <p className="text-sm rounded-md border bg-muted/50 p-3 mb-4 break-words leading-relaxed">{paymentNotice}</p>
+                        )}
+                        <InvoicePlanPaymentStep
+                            plan={CERTIFICATE_PAYMENT_PLAN}
+                            productKind="certificate"
+                            paymentTab={paymentTab}
+                            setPaymentTab={setPaymentTab}
+                            selectedMethod={selectedMethod}
+                            setSelectedMethod={setSelectedMethod}
+                            onPay={handleCertificatePayment}
+                            paymentProcessing={paymentProcessing}
+                            showTokenForm={showTokenForm}
+                            onCloseTokenForm={() => setShowTokenForm(false)}
+                            onTokenReceived={handleCertificateTokenReceived}
+                            pendingResult={planPendingResult}
+                            onSuccess={handleCertificatePaymentSuccess}
+                            onBack={() => {
+                                setStep('certificate');
+                                setPlanPendingResult(null);
+                                setShowTokenForm(false);
+                                setSelectedMethod(null);
+                            }}
+                        />
+                    </PageBlock>
+                )}
+
                 {step === 'plans' && (
                     <PageBlock column="main" blockId="plans-grid">
-                        <div className="mb-4 flex items-center gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => setStep('overview')}>
-                                <ArrowLeft className="h-4 w-4" />
-                            </Button>
-                            <h2 className="text-lg font-semibold">Elige un paquete de facturas</h2>
-                            <p className="text-sm text-muted-foreground">
+                        <div className="mb-4 flex flex-col gap-3 min-w-0">
+                            <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setStep('overview')}>
+                                    <ArrowLeft className="h-4 w-4" />
+                                </Button>
+                                <h2 className="text-base font-semibold sm:text-lg">Elige un paquete de facturas</h2>
+                            </div>
+                            <p className="text-sm text-muted-foreground break-words leading-relaxed">
                                 El saldo se acumula. Puedes comprar otro paquete aunque tengas facturas restantes.
                             </p>
                         </div>
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                             {plans.map((plan) => (
                                 <InvoicePlanCard
                                     key={plan.code}
@@ -717,7 +1000,7 @@ export function BillingPlansPage() {
                 {step === 'payment' && selectedPlan && (
                     <PageBlock column="main" blockId="plan-payment">
                         {paymentNotice && (
-                            <p className="text-sm rounded-md border bg-muted/50 p-2 mb-4">{paymentNotice}</p>
+                            <p className="text-sm rounded-md border bg-muted/50 p-3 mb-4 break-words leading-relaxed">{paymentNotice}</p>
                         )}
                         <InvoicePlanPaymentStep
                             plan={selectedPlan}

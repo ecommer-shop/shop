@@ -1,5 +1,4 @@
-/** Query Admin API: cupo según el canal activo en el panel. */
-export const CURRENT_INVOICE_QUOTA_STATUS_QUERY = `
+export const CURRENT_INVOICE_QUOTA_QUERY = `
   query CurrentInvoiceQuotaStatus {
     currentInvoiceQuotaStatus {
       channelId
@@ -8,13 +7,12 @@ export const CURRENT_INVOICE_QUOTA_STATUS_QUERY = `
       remaining
       hasPlan
       isBlocked
-      matiasTokenConfigured
-      matiasPrefixConfigured
-      matiasResolutionConfigured
-      matiasInvoicePrefix
+      matiasCompanyIdConfigured
+      matiasCompanyId
+      matiasEmitProfileComplete
     }
   }
-` as const;
+`;
 
 export type CurrentInvoiceQuotaStatusPayload = {
   currentInvoiceQuotaStatus: {
@@ -24,9 +22,8 @@ export type CurrentInvoiceQuotaStatusPayload = {
     remaining: number | null;
     hasPlan: boolean;
     isBlocked: boolean;
-    matiasTokenConfigured: boolean;
-    matiasPrefixConfigured: boolean;
-    matiasResolutionConfigured: boolean;
-    matiasInvoicePrefix: string | null;
+    matiasCompanyIdConfigured: boolean;
+    matiasCompanyId: string | null;
+    matiasEmitProfileComplete: boolean;
   };
 };

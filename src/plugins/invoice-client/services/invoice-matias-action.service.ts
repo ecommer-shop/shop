@@ -36,7 +36,7 @@ export class InvoiceMatiasActionService {
   ): Promise<InvoiceMatiasActionResult> {
     await this.assertInvoiceBelongsToOrder(invoiceId, orderCode);
     const emitConfig = await this.invoiceQuota.getSellerEmitConfigForOrder(ctx, orderCode);
-    const d = await this.invoiceClient.fetchInvoiceMatiasStatus(invoiceId, emitConfig.matiasBearerToken);
+    const d = await this.invoiceClient.fetchInvoiceMatiasStatus(invoiceId, emitConfig.matiasCompanyId);
     return {
       success: true,
       message: 'Estado actualizado desde Matias.',
@@ -64,7 +64,7 @@ export class InvoiceMatiasActionService {
     const d = await this.invoiceClient.resendInvoiceMatiasEmail(
       invoiceId,
       email.trim(),
-      emitConfig.matiasBearerToken,
+      emitConfig.matiasCompanyId,
     );
     return {
       success: true,

@@ -8,6 +8,7 @@ import { Client } from 'pg';
 const CHANNEL_COLUMNS = [
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsInvoicebillingactive" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsInvoicelimitremaining" integer`,
+  `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiascompanyid" character varying`,
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasaccesstoken" character varying`,
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasinvoiceprefix" character varying`,
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasresolutionnumber" character varying`,
@@ -21,16 +22,40 @@ const CHANNEL_COLUMNS = [
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocchamber" character varying`,
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocrut" character varying`,
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocnit" character varying`,
+  `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocdianresolution" character varying`,
+  `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocstorelogo" character varying`,
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatereviewnote" character varying`,
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingplanlastpurchasedat" TIMESTAMP`,
   `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingplanpurchasehistory" text`,
 ];
 
+const CUSTOMER_COLUMNS = [
+  `ALTER TABLE "customer" ADD COLUMN IF NOT EXISTS "customFieldsDni" character varying`,
+  `ALTER TABLE "customer" ADD COLUMN IF NOT EXISTS "customFieldsIdentitydocumentid" character varying`,
+];
+
+const ADDRESS_COLUMNS = [
+  `ALTER TABLE "address" ADD COLUMN IF NOT EXISTS "customFieldsMatiascityid" character varying`,
+  `ALTER TABLE "address" ADD COLUMN IF NOT EXISTS "customFieldsDni" character varying`,
+  `ALTER TABLE "address" ADD COLUMN IF NOT EXISTS "customFieldsIdentitydocumentid" character varying`,
+];
+
 async function main() {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  });
   await client.connect();
   console.info('[repair] Aplicando columnas en channel…');
   for (const sql of CHANNEL_COLUMNS) {
+    await client.query(sql);
+  }
+  console.info('[repair] Aplicando columnas fiscales en customer…');
+  for (const sql of CUSTOMER_COLUMNS) {
+    await client.query(sql);
+  }
+  console.info('[repair] Aplicando columnas Matias en address…');
+  for (const sql of ADDRESS_COLUMNS) {
     await client.query(sql);
   }
   await client.query(
@@ -42,7 +67,13 @@ async function main() {
   if (check.rows.length === 0) {
     throw new Error('No se creó customFieldsInvoicebillingactive');
   }
-  console.info('[repair] OK — columnas de facturación presentes en channel y order.');
+  const customerCheck = await client.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'customer' AND column_name = 'customFieldsDni'`,
+  );
+  if (customerCheck.rows.length === 0) {
+    throw new Error('No se creó customFieldsDni');
+  }
+  console.info('[repair] OK — columnas de facturación presentes en channel, customer, address y order.');
   await client.end();
 }
 

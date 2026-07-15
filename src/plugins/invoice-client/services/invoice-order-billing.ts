@@ -36,6 +36,28 @@ function readCustomFieldString(
   return typeof raw === 'string' ? raw.trim() : '';
 }
 
+const MATIAS_CITY_ID_BY_LEGACY_DANE_CODE: Record<string, string> = {
+  '05001000': '1',
+  '05001': '1',
+  '05266000': '47',
+  '05266': '47',
+  '08001000': '126',
+  '08001': '126',
+  '11001000': '149',
+  '11001': '149',
+  '19001000': '362',
+  '19001': '362',
+  '47001000': '657',
+  '47001': '657',
+  '76001000': '1006',
+  '76001': '1006',
+};
+
+function normalizeMatiasCityId(raw: string): string {
+  const value = raw.trim();
+  return MATIAS_CITY_ID_BY_LEGACY_DANE_CODE[value] ?? value;
+}
+
 /**
  * Datos de facturación del comprador. Falla con mensaje claro si falta DNI o ciudad Matias.
  */
@@ -46,15 +68,16 @@ export function resolveInvoiceBillingCustomer(order: Order): InvoiceBillingCusto
   }
 
   const billingAddress = order.billingAddress || order.shippingAddress;
+  const addressCustomFields = billingAddress?.customFields as Record<string, unknown> | undefined;
   const customerName =
     (customer.firstName && customer.lastName
       ? `${customer.firstName} ${customer.lastName}`
       : customer.firstName || customer.lastName) || 'Cliente';
 
-  const dniRaw = readCustomFieldString(
-    customer.customFields as Record<string, unknown> | undefined,
-    CUSTOMER_DNI_FIELD,
-  );
+  const customerCustomFields = customer.customFields as Record<string, unknown> | undefined;
+  const dniRaw =
+    readCustomFieldString(addressCustomFields, CUSTOMER_DNI_FIELD) ||
+    readCustomFieldString(customerCustomFields, CUSTOMER_DNI_FIELD);
   const dni = normalizeCustomerDni(dniRaw);
   if (isInvalidInvoiceDni(dni)) {
     throw new Error(
@@ -73,11 +96,11 @@ export function resolveInvoiceBillingCustomer(order: Order): InvoiceBillingCusto
   }
 
   const cityFromCustom = readCustomFieldString(
-    billingAddress?.customFields as Record<string, unknown> | undefined,
+    addressCustomFields,
     ADDRESS_MATIAS_CITY_ID_FIELD,
   );
   const province = billingAddress?.province?.trim() ?? '';
-  const cityId = cityFromCustom || (/^\d+$/.test(province) ? province : '');
+  const cityId = normalizeMatiasCityId(cityFromCustom || (/^\d+$/.test(province) ? province : ''));
   if (!cityId) {
     throw new Error(
       'Falta código de ciudad Matias/DIAN en la dirección (custom field «matiasCityId» en la dirección o «province» numérico).',
@@ -85,10 +108,9 @@ export function resolveInvoiceBillingCustomer(order: Order): InvoiceBillingCusto
   }
 
   const identityDocumentId =
-    readCustomFieldString(
-      customer.customFields as Record<string, unknown> | undefined,
-      CUSTOMER_IDENTITY_DOCUMENT_ID_FIELD,
-    ) || '1';
+    readCustomFieldString(addressCustomFields, CUSTOMER_IDENTITY_DOCUMENT_ID_FIELD) ||
+    readCustomFieldString(customerCustomFields, CUSTOMER_IDENTITY_DOCUMENT_ID_FIELD) ||
+    '1';
 
   if (!['1', '2', '3', '4', '5'].includes(identityDocumentId)) {
     throw new Error(

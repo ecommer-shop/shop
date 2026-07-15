@@ -5,6 +5,7 @@
     "scripts": {
         "dev:server": "nodemon --watch 'src/**/*.ts' --exec ts-node ./src/index.ts",
         "dev:worker": "ts-node ./src/index-worker.ts",
+        "dev:dashboard": "vite build --watch",
         "dev": "concurrently \"bun run dev:server\" \"bun run dev:worker\"",
         "build:server": "tsc",
         "build:dashboard": "node scripts/patch-base-ui.mjs && node scripts/patch-empty-states.mjs && node scripts/patch-seller-labels.mjs && node scripts/patch-money-input.mjs && vite build && node scripts/copy-favicons.mjs",
@@ -16,7 +17,9 @@
         "seed:prod": "node ./dist/populate/seed.js",
         "seed:dev": "ts-node ./src/populate/seed.ts",
         "migrate": "ts-node ./src/migrate.ts",
-        "repair:invoice-schema": "ts-node --transpile-only ./scripts/repair-invoice-schema.ts"
+        "repair:invoice-schema": "ts-node --transpile-only ./scripts/repair-invoice-schema.ts",
+        "repair:store-schema": "node ./scripts/repair-store-schema.mjs",
+        "predev": "node ./scripts/repair-store-schema.mjs"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "3.908.0",

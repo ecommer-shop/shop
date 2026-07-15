@@ -75,21 +75,24 @@ export class InvoiceShopResolver {
   async submitBillingCertificate(
     @Ctx() ctx: RequestContext,
     @Args('input')
-    input: { chamber: string; rut: string; nit: string; certificateType: string },
+    input: {
+      chamber: string;
+      rut: string;
+      nit: string;
+      dianResolution: string;
+      storeLogo: string;
+      certificateType: string;
+    },
   ) {
     const type = input.certificateType === 'MONTHLY' ? 'MONTHLY' : 'ANNUAL';
     return this.billingPlans.submitCertificateDocuments(ctx, {
       chamber: input.chamber,
       rut: input.rut,
       nit: input.nit,
+      dianResolution: input.dianResolution,
+      storeLogo: input.storeLogo,
       certificateType: type as BillingCertificateType,
     });
-  }
-
-  @Mutation()
-  @Allow(Permission.Authenticated)
-  async confirmMyBillingCertificatePayment(@Ctx() ctx: RequestContext) {
-    return this.billingPlans.confirmCertificatePayment(ctx);
   }
 }
 

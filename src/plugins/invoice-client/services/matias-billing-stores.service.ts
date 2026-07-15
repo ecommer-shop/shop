@@ -10,7 +10,7 @@ import { IsNull, Not } from 'typeorm';
 import {
   CHANNEL_INVOICE_BILLING_ACTIVE_FIELD,
   CHANNEL_INVOICE_LIMIT_REMAINING_FIELD,
-  CHANNEL_MATIAS_ACCESS_TOKEN_FIELD,
+  CHANNEL_MATIAS_COMPANY_ID_FIELD,
   CHANNEL_MATIAS_INVOICE_PREFIX_FIELD,
   CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD,
 } from '../constants';
@@ -22,7 +22,8 @@ export interface MatiasBillingStoreRow {
   sellerName: string | null;
   billingActive: boolean;
   remaining: number | null;
-  matiasTokenConfigured: boolean;
+  matiasCompanyId: string | null;
+  matiasCompanyIdConfigured: boolean;
   matiasInvoicePrefix: string | null;
   matiasResolutionNumber: string | null;
   matiasEmitProfileComplete: boolean;
@@ -32,12 +33,15 @@ export interface UpdateMatiasBillingStoreInput {
   channelId: string;
   billingActive: boolean;
   invoiceLimitRemaining?: number | null;
+  matiasCompanyId?: string | null;
   matiasInvoicePrefix?: string | null;
   matiasResolutionNumber?: string | null;
-  matiasAccessToken?: string | null;
 }
 
 type ChannelCustomFields = Record<string, boolean | number | string | null | undefined>;
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Listado y alta de facturación Matias por tienda (super admin).
@@ -76,24 +80,26 @@ export class MatiasBillingStoresService {
     const oldCf = channel.customFields as ChannelCustomFields | undefined;
     const oldActive = !!oldCf?.[CHANNEL_INVOICE_BILLING_ACTIVE_FIELD];
     const oldRemaining = this.readInt(oldCf?.[CHANNEL_INVOICE_LIMIT_REMAINING_FIELD]);
-    const oldPrefix =
-      typeof oldCf?.[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD] === 'string'
-        ? oldCf[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD]!.trim().toUpperCase()
-        : '';
-    const hadToken =
-      typeof oldCf?.[CHANNEL_MATIAS_ACCESS_TOKEN_FIELD] === 'string' &&
-      oldCf[CHANNEL_MATIAS_ACCESS_TOKEN_FIELD]!.trim().length > 0;
+    const oldCompanyId = this.readText(oldCf?.[CHANNEL_MATIAS_COMPANY_ID_FIELD]);
+    const oldPrefix = this.readText(oldCf?.[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD]);
+    const oldResolution = this.readText(oldCf?.[CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD]);
 
+    const companyIdTrim =
+      input.matiasCompanyId === undefined || input.matiasCompanyId === null
+        ? oldCompanyId
+        : input.matiasCompanyId.trim();
     const prefixTrim =
       input.matiasInvoicePrefix === undefined || input.matiasInvoicePrefix === null
         ? oldPrefix
-        : input.matiasInvoicePrefix.trim().toUpperCase();
+        : input.matiasInvoicePrefix.trim();
     const resolutionTrim =
       input.matiasResolutionNumber === undefined || input.matiasResolutionNumber === null
-        ? typeof oldCf?.[CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD] === 'string'
-          ? oldCf[CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD]!.trim()
-          : ''
+        ? oldResolution
         : input.matiasResolutionNumber.trim();
+
+    if (companyIdTrim && !UUID_RE.test(companyIdTrim)) {
+      throw new UserInputError('El Company ID debe ser un UUID válido (formato Matias).');
+    }
 
     const newRemaining =
       input.invoiceLimitRemaining === undefined
@@ -107,22 +113,12 @@ export class MatiasBillingStoresService {
     }
 
     const billingActive = input.billingActive;
+    const profileComplete = !!(companyIdTrim && prefixTrim && resolutionTrim);
 
-    if (billingActive) {
-      if (!prefixTrim) {
-        throw new UserInputError('El prefijo de factura es obligatorio con facturación activa.');
-      }
-      if (!resolutionTrim) {
-        throw new UserInputError('La resolución es obligatoria con facturación activa.');
-      }
-      const willHaveToken = hadToken || !!(input.matiasAccessToken?.trim());
-      if (!willHaveToken) {
-        throw new UserInputError('El token Matias es obligatorio al activar facturación.');
-      }
-    }
-
-    if (prefixTrim) {
-      await this.assertPrefixUnique(ctx, prefixTrim, String(channel.id));
+    if (billingActive && !profileComplete) {
+      throw new UserInputError(
+        'Con facturación activa son obligatorios Company ID, prefijo y número de resolución DIAN.',
+      );
     }
 
     const poolDelta = this.computePoolSellDelta(oldActive, oldRemaining, billingActive, newRemaining);
@@ -140,13 +136,10 @@ export class MatiasBillingStoresService {
       ...oldCf,
       [CHANNEL_INVOICE_BILLING_ACTIVE_FIELD]: billingActive,
       [CHANNEL_INVOICE_LIMIT_REMAINING_FIELD]: billingActive ? newRemaining : newRemaining,
+      [CHANNEL_MATIAS_COMPANY_ID_FIELD]: companyIdTrim || null,
       [CHANNEL_MATIAS_INVOICE_PREFIX_FIELD]: prefixTrim || null,
       [CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD]: resolutionTrim || null,
     };
-
-    if (input.matiasAccessToken?.trim()) {
-      newCf[CHANNEL_MATIAS_ACCESS_TOKEN_FIELD] = input.matiasAccessToken.trim();
-    }
 
     await this.connection.withTransaction(ctx, async (txCtx) => {
       await this.globalPool.applySellableDelta(txCtx, poolDelta);
@@ -166,10 +159,6 @@ export class MatiasBillingStoresService {
     return this.channelToRow(updated);
   }
 
-  /**
-   * Cupo asignado a la tienda: si desactivas facturación, el cupo deja de contar para el pool;
-   * al subir el cupo restante en el formulario, se descuenta del pool global.
-   */
   private computePoolSellDelta(
     oldActive: boolean,
     oldRemaining: number | null,
@@ -181,45 +170,14 @@ export class MatiasBillingStoresService {
     return newEff - oldEff;
   }
 
-  private async assertPrefixUnique(
-    ctx: RequestContext,
-    normalizedPrefix: string,
-    excludeChannelId: string,
-  ): Promise<void> {
-    const channels = await this.connection.getRepository(ctx, Channel).find({
-      where: { sellerId: Not(IsNull()) },
-    });
-
-    for (const ch of channels) {
-      if (String(ch.id) === excludeChannelId) {
-        continue;
-      }
-      const cf = ch.customFields as ChannelCustomFields | undefined;
-      const p =
-        typeof cf?.[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD] === 'string'
-          ? cf[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD]!.trim().toUpperCase()
-          : '';
-      if (p && p === normalizedPrefix) {
-        throw new UserInputError(
-          `El prefijo «${normalizedPrefix}» ya está asignado a la tienda «${ch.code}». Cada tienda debe tener un prefijo distinto (lo defines manualmente según Matias).`,
-        );
-      }
-    }
-  }
-
   private channelToRow(c: Channel): MatiasBillingStoreRow {
     const cf = c.customFields as Record<string, unknown> | undefined;
-    const tokenRaw = cf?.[CHANNEL_MATIAS_ACCESS_TOKEN_FIELD];
-    const token = typeof tokenRaw === 'string' ? tokenRaw.trim() : '';
-    const prefixRaw = cf?.[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD];
-    const prefix = typeof prefixRaw === 'string' ? prefixRaw.trim() : '';
-    const resolutionRaw = cf?.[CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD];
-    const resolution = typeof resolutionRaw === 'string' ? resolutionRaw.trim() : '';
+    const companyId = this.readText(cf?.[CHANNEL_MATIAS_COMPANY_ID_FIELD]);
+    const prefix = this.readText(cf?.[CHANNEL_MATIAS_INVOICE_PREFIX_FIELD]);
+    const resolution = this.readText(cf?.[CHANNEL_MATIAS_RESOLUTION_NUMBER_FIELD]);
     const remaining = this.readInt(cf?.[CHANNEL_INVOICE_LIMIT_REMAINING_FIELD]);
-
-    const matiasTokenConfigured = token.length > 0;
-    const matiasPrefixConfigured = prefix.length > 0;
-    const matiasResolutionConfigured = resolution.length > 0;
+    const matiasCompanyIdConfigured = companyId.length > 0;
+    const matiasEmitProfileComplete = !!(companyId && prefix && resolution);
 
     return {
       channelId: String(c.id),
@@ -227,12 +185,16 @@ export class MatiasBillingStoresService {
       sellerName: c.seller?.name ?? null,
       billingActive: !!cf?.[CHANNEL_INVOICE_BILLING_ACTIVE_FIELD],
       remaining,
-      matiasTokenConfigured,
+      matiasCompanyId: companyId || null,
+      matiasCompanyIdConfigured,
       matiasInvoicePrefix: prefix || null,
       matiasResolutionNumber: resolution || null,
-      matiasEmitProfileComplete:
-        matiasTokenConfigured && matiasPrefixConfigured && matiasResolutionConfigured,
+      matiasEmitProfileComplete,
     };
+  }
+
+  private readText(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
   }
 
   private readInt(value: unknown): number | null {

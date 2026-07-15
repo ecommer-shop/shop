@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Order, RequestContext, TransactionalConnection } from '@vendure/core';
 import { DataSource } from 'typeorm';
+import { humanizeInvoiceEmissionError } from './format-invoice-emission-error';
 
 export interface InvoiceCreationFailureRow {
   orderId: string;
@@ -59,7 +60,9 @@ export class InvoiceFailureQueryService {
     const items: InvoiceCreationFailureRow[] = orders.map((o) => ({
       orderId: String(o.id),
       orderCode: o.code,
-      error: String((o.customFields as { invoiceLastError?: string }).invoiceLastError ?? ''),
+      error: humanizeInvoiceEmissionError(
+        String((o.customFields as { invoiceLastError?: string }).invoiceLastError ?? ''),
+      ),
       failedAt: o.updatedAt,
     }));
 

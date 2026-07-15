@@ -12,6 +12,7 @@ import {
 } from '@vendure/core';
 import { InvoiceClientService } from '../services/invoice-client.service';
 import { InvoiceQuotaService } from '../services/invoice-quota.service';
+import { formatInvoiceEmissionError } from '../services/format-invoice-emission-error';
 
 const loggerCtx = 'InvoiceSubscriber';
 
@@ -50,6 +51,7 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
         'customer',
         'lines',
         'lines.productVariant',
+        'lines.productVariant.channels',
         'lines.productVariant.product',
         'payments',
         'shippingLines',
@@ -59,6 +61,14 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
 
       if (!order) {
         Logger.warn(`Order ${orderId} not found`, loggerCtx);
+        return;
+      }
+
+      if ((order as { aggregateOrderId?: unknown }).aggregateOrderId != null) {
+        Logger.info(
+          `Skipping invoice for seller sub-order ${order.code}; aggregate order will be invoiced once.`,
+          loggerCtx,
+        );
         return;
       }
 
@@ -72,27 +82,26 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
       const emitConfig = await this.invoiceQuotaService.reserveQuotaForOrder(ctx, order);
       reservedOrder = order;
 
-      const documentNumber = await this.invoiceClientService.fetchNextDocumentNumber(emitConfig.prefix);
       Logger.info(
-        `Generated document number ${documentNumber} for order ${order.code} (prefix ${emitConfig.prefix})`,
+        `Emitting invoice for order ${order.code} (company ${emitConfig.matiasCompanyId}); Matias asigna el consecutivo`,
         loggerCtx,
       );
 
       await this.invoiceClientService.createInvoiceFromOrder(ctx, order, {
-        resolutionNumber: emitConfig.resolutionNumber,
+        matiasCompanyId: emitConfig.matiasCompanyId,
         prefix: emitConfig.prefix,
-        documentNumber,
+        resolutionNumber: emitConfig.resolutionNumber,
         operationTypeId: 1,
         typeDocumentId: 7,
         sendEmail: 1,
-        matiasBearerToken: emitConfig.matiasBearerToken,
       });
 
       reservedOrder = null;
       await this.persistInvoiceLastError(ctx, order, null);
       Logger.info(`Invoice created successfully for order ${order.code}`, loggerCtx);
     } catch (error: any) {
-      Logger.error(`Error creating invoice for order ${orderId}: ${error.message}`, loggerCtx);
+      const readable = formatInvoiceEmissionError(error);
+      Logger.error(`Error creating invoice for order ${orderId}: ${readable}`, loggerCtx);
       if (reservedOrder && reservedCtx) {
         try {
           await this.invoiceQuotaService.releaseReservedQuotaForOrder(reservedCtx, reservedOrder);
@@ -107,7 +116,7 @@ export class InvoiceSubscriber implements OnApplicationBootstrap {
         apiType: 'admin',
         languageCode: LanguageCode.es,
       });
-      await this.persistInvoiceLastErrorById(ctx, orderId, error.message);
+      await this.persistInvoiceLastErrorById(ctx, orderId, readable);
     }
   }
 

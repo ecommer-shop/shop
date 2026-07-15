@@ -6,6 +6,8 @@ export type InvoicePlanCardPlan = {
     name: string;
     invoices: number;
     priceCop: number;
+    /** Texto bajo el precio en el paso de pago (certificado u otros). */
+    detailLine?: string;
 };
 
 const PLAN_FEATURES: { icon: typeof FileText; label: string | ((n: number) => string) }[] = [
@@ -29,7 +31,7 @@ export function InvoicePlanCard({
         <Card
             onClick={disabled ? undefined : onSelect}
             className={[
-                'relative overflow-hidden border transition-all duration-200',
+                'relative min-w-0 overflow-hidden border transition-all duration-200',
                 current ? 'ring-2 ring-primary' : '',
                 disabled ? 'cursor-not-allowed opacity-70' : onSelect ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-lg' : 'cursor-default',
             ].join(' ')}

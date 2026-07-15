@@ -616,11 +616,145 @@ function patchVendureDashboardChannelPermissions() {
                     `            customFields`,
                     `            customFields {
                 storeDescription
+                storeHeaderBannerUrl {
+                    id
+                    preview
+                }
                 storeBannerUrl {
                     id
                     preview
                 }
             }`,
+                );
+            }
+
+            // Strip Asset relation objects from customFields before GraphQL mutations (only *Id is valid).
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/framework/form-engine/use-generated-form.tsx')) {
+                nextCode = nextCode.replace(
+                    `            const onSubmitWrapper = (values: any) => {
+                let processed = convertEmptyStringsToNull(
+                    removeEmptyIdFields(values, updateFields),
+                    updateFields,
+                );
+                if (!entity) {
+                    processed = stripNullNullableFields(processed, updateFields);
+                }
+                onSubmit(processed);
+            };`,
+                    `            const onSubmitWrapper = (values: any) => {
+                let processed = convertEmptyStringsToNull(
+                    removeEmptyIdFields(values, updateFields),
+                    updateFields,
+                );
+                if (!entity) {
+                    processed = stripNullNullableFields(processed, updateFields);
+                }
+                if (processed?.customFields && typeof processed.customFields === 'object') {
+                    const cf = { ...processed.customFields } as Record<string, unknown>;
+                    for (const key of Object.keys(cf)) {
+                        if (key.endsWith('Url') && cf[\`\${key}Id\`] != null) {
+                            delete cf[key];
+                        }
+                    }
+                    delete cf.storeBannerUrl;
+                    delete cf.storeHeaderBannerUrl;
+                    processed = { ...processed, customFields: cf };
+                }
+                onSubmit(processed);
+            };`,
+                );
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/framework/form-engine/utils.ts')) {
+                nextCode = nextCode.replace(
+                    `            const relationValue = entity.customFields[propertyAccessorKey];
+            processedEntity.customFields[relationField] = relationValue === null ? null : relationValue?.id;
+            delete processedEntity.customFields[propertyAccessorKey];`,
+                    `            const relationValue = entity.customFields[propertyAccessorKey];
+            const existingId = entity.customFields[relationField];
+            if (relationValue === null || relationValue === undefined) {
+                if (existingId != null && existingId !== '') {
+                    processedEntity.customFields[relationField] = existingId;
+                } else {
+                    processedEntity.customFields[relationField] = null;
+                }
+            } else {
+                processedEntity.customFields[relationField] =
+                    typeof relationValue === 'object' ? relationValue?.id : relationValue;
+            }
+            delete processedEntity.customFields[propertyAccessorKey];`,
+                );
+            }
+
+            // Profile save: map Asset relations to *Id fields and strip object keys from mutation input
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.tsx')) {
+                nextCode = nextCode.replace(
+                    `        setValuesForUpdate: entity => {
+            return {
+                id: entity.id,
+                firstName: entity.firstName,
+                lastName: entity.lastName,
+                emailAddress: entity.emailAddress,
+                password: '',
+                customFields: entity.customFields,
+            };
+        },
+        transformUpdateInput: input => {
+            return {
+                ...input,
+                password: input.password?.length ? input.password : undefined,
+            };
+        },`,
+                    `        setValuesForUpdate: entity => {
+            const cf = (entity.customFields ?? {}) as Record<string, any>;
+            const {
+                storeBannerUrl,
+                storeHeaderBannerUrl,
+                storeBannerUrlId,
+                storeHeaderBannerUrlId,
+                ...restCustomFields
+            } = cf;
+
+            const resolveRelationId = (relation: unknown, idValue: unknown) => {
+                if (typeof idValue === 'string' && idValue) return idValue;
+                if (relation && typeof relation === 'object' && relation !== null && 'id' in relation) {
+                    const id = (relation as { id?: string | number | null }).id;
+                    if (id != null) return String(id);
+                }
+                if (typeof idValue === 'string') return idValue || null;
+                return null;
+            };
+
+            return {
+                id: entity.id,
+                firstName: entity.firstName,
+                lastName: entity.lastName,
+                emailAddress: entity.emailAddress,
+                password: '',
+                customFields: {
+                    ...restCustomFields,
+                    storeBannerUrlId: resolveRelationId(storeBannerUrl, storeBannerUrlId),
+                    storeHeaderBannerUrlId: resolveRelationId(storeHeaderBannerUrl, storeHeaderBannerUrlId),
+                },
+            };
+        },
+        transformUpdateInput: input => {
+            const customFields = { ...(input.customFields ?? {}) } as Record<string, unknown>;
+            delete customFields.storeBannerUrl;
+            delete customFields.storeHeaderBannerUrl;
+
+            for (const key of ['storeBannerUrlId', 'storeHeaderBannerUrlId']) {
+                if (customFields[key] === '' || customFields[key] === undefined) {
+                    delete customFields[key];
+                }
+            }
+
+            return {
+                ...input,
+                password: input.password?.length ? input.password : undefined,
+                customFields,
+            };
+        },`,
                 );
             }
 

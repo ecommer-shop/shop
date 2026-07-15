@@ -12,10 +12,23 @@ import {
     TransactionalConnection,
 } from '@vendure/core';
 
+type AssetFieldValue = string | { preview?: string | null; source?: string | null } | null;
+
 type AdminStoreFields = {
     storeDescription?: string | null;
-    storeBannerUrl?: string | { preview?: string | null; source?: string | null } | null;
+    storeBannerUrl?: AssetFieldValue;
+    storeHeaderBannerUrl?: AssetFieldValue;
 };
+
+type StorePageProfile = {
+    storeName: string;
+    storeDescription: string | null;
+    storeBannerUrl: string | null;
+    storeHeaderBannerUrl: string | null;
+};
+
+const STORE_ASSET_FIELDS = ['storeBannerUrl', 'storeHeaderBannerUrl'] as const;
+type StoreAssetField = (typeof STORE_ASSET_FIELDS)[number];
 
 /** AssetServerPlugin no añade el prefijo a campos String custom; lo hacemos a mano. */
 function absolutizeAssetUrl(value: string | null | undefined): string | null {
@@ -26,39 +39,56 @@ function absolutizeAssetUrl(value: string | null | undefined): string | null {
     return `${prefix.replace(/\/+$/, '')}/${value.replace(/^\/+/, '')}`;
 }
 
-function resolveBannerUrl(field: AdminStoreFields['storeBannerUrl']): string | null {
-    if (!field) return null;
-    const raw = typeof field === 'string' ? field : field.preview || field.source || null;
-    return absolutizeAssetUrl(raw);
+/** Vendure guarda miniaturas en `/preview/` y el original en `/source/`. */
+function preferSourcePath(url: string): string {
+    return url.replace(/\/preview\//i, '/source/');
 }
 
-/** ID del asset de banner cuando la relación no viene hidratada en `customFields`. */
-function resolveBannerAssetId(
+function resolveAssetUrl(field: AssetFieldValue | undefined, preferSource = false): string | null {
+    if (!field) return null;
+    const raw =
+        typeof field === 'string'
+            ? field
+            : preferSource
+              ? field.source || field.preview || null
+              : field.preview || field.source || null;
+    const absolute = absolutizeAssetUrl(raw);
+    return preferSource && absolute ? preferSourcePath(absolute) : absolute;
+}
+
+function resolveAssetId(
     administrator: Administrator,
     customFields: AdminStoreFields | undefined,
+    fieldName: StoreAssetField,
 ): string | null {
-    const bannerField = customFields?.storeBannerUrl;
-    if (typeof bannerField === 'string' || typeof bannerField === 'number') {
-        return String(bannerField);
+    const assetField = customFields?.[fieldName];
+    if (typeof assetField === 'string' || typeof assetField === 'number') {
+        return String(assetField);
     }
-    const cf = customFields as { storeBannerUrlId?: string | number | null } | undefined;
-    if (cf?.storeBannerUrlId != null) {
-        return String(cf.storeBannerUrlId);
+    const idKey = `${fieldName}Id` as keyof AdminStoreFields;
+    const cf = customFields as Record<string, string | number | null | undefined> | undefined;
+    if (cf?.[idKey] != null) {
+        return String(cf[idKey]);
     }
-    const row = administrator as unknown as { customFieldsStorebannerurlid?: number | null };
-    if (row.customFieldsStorebannerurlid != null) {
-        return String(row.customFieldsStorebannerurlid);
+    const columnKey = `customFields${fieldName.charAt(0).toUpperCase()}${fieldName.slice(1)}id` as
+        | 'customFieldsStorebannerurlid'
+        | 'customFieldsStoreheaderbannerurlid';
+    const row = administrator as unknown as Record<string, number | null | undefined>;
+    if (row[columnKey] != null) {
+        return String(row[columnKey]);
     }
     return null;
+}
+
+function isHydratedAsset(field: AssetFieldValue | undefined): boolean {
+    return !!field && typeof field === 'object';
 }
 
 @Resolver()
 export class StorePageShopResolver {
     constructor(private connection: TransactionalConnection) {}
 
-    /** Carga Administrator con custom fields (incluyendo el Asset de `storeBannerUrl`).
-     *  Se hace en dos pasos porque TypeORM `createQueryBuilder` no respeta `eager` ni los joins
-     *  embebidos sobre `customFields.<relation>` de forma fiable. */
+    /** Carga Administrator con custom fields (incluyendo Assets de tienda). */
     private async loadAdminWithStoreFields(
         ctx: RequestContext,
         channelId: string | number,
@@ -87,31 +117,42 @@ export class StorePageShopResolver {
             return null;
         }
 
-        const customFields = administrator.customFields as AdminStoreFields | undefined;
-        const bannerField = customFields?.storeBannerUrl;
+        const customFields = (administrator.customFields ?? {}) as AdminStoreFields;
+        const hydratedFields: AdminStoreFields = { ...customFields };
 
-        if (bannerField && typeof bannerField === 'object') {
-            return administrator;
+        for (const fieldName of STORE_ASSET_FIELDS) {
+            if (isHydratedAsset(customFields[fieldName])) {
+                continue;
+            }
+
+            const assetId = resolveAssetId(administrator, customFields, fieldName);
+            if (!assetId) {
+                continue;
+            }
+
+            const asset = await this.connection.getRepository(ctx, Asset).findOne({
+                where: { id: assetId },
+            });
+
+            if (asset) {
+                hydratedFields[fieldName] = asset;
+            }
         }
 
-        const bannerAssetId = resolveBannerAssetId(administrator, customFields);
-
-        if (!bannerAssetId) {
-            return administrator;
-        }
-
-        const asset = await this.connection.getRepository(ctx, Asset).findOne({
-            where: { id: bannerAssetId },
-        });
-
-        if (asset) {
-            (administrator.customFields as AdminStoreFields) = {
-                ...customFields,
-                storeBannerUrl: asset,
-            };
-        }
-
+        administrator.customFields = hydratedFields as Administrator['customFields'];
         return administrator;
+    }
+
+    private profileFromAdminFields(
+        storeName: string,
+        adminFields: AdminStoreFields | undefined,
+    ): StorePageProfile {
+        return {
+            storeName,
+            storeDescription: adminFields?.storeDescription ?? null,
+            storeBannerUrl: resolveAssetUrl(adminFields?.storeBannerUrl),
+            storeHeaderBannerUrl: resolveAssetUrl(adminFields?.storeHeaderBannerUrl, true),
+        };
     }
 
     /**
@@ -153,7 +194,7 @@ export class StorePageShopResolver {
     async storePageProfile(
         @Ctx() ctx: RequestContext,
         @Args('collectionSlug', { type: () => String, nullable: true }) collectionSlug?: string | null,
-    ): Promise<{ storeName: string; storeDescription: string | null; storeBannerUrl: string | null }> {
+    ): Promise<StorePageProfile> {
         if (!collectionSlug) {
             return this.storePageProfileFromChannelSeller(ctx);
         }
@@ -176,14 +217,16 @@ export class StorePageShopResolver {
 
         let storeDescription: string | null = null;
         let storeBannerUrl: string | null = null;
+        let storeHeaderBannerUrl: string | null = null;
 
         const collTrans =
             collectionEntity?.translations?.find(tr => tr.languageCode === ctx.languageCode) ??
             collectionEntity?.translations?.[0];
         let sellerName = collTrans?.name ?? 'Tienda';
 
-        if (collectionEntity?.featuredAsset?.preview) {
-            storeBannerUrl = absolutizeAssetUrl(collectionEntity.featuredAsset.preview);
+        const collectionHeaderAsset = collectionEntity?.featuredAsset;
+        if (collectionHeaderAsset) {
+            storeHeaderBannerUrl = resolveAssetUrl(collectionHeaderAsset, true);
         }
         storeDescription = collTrans?.description || null;
 
@@ -216,29 +259,32 @@ export class StorePageShopResolver {
             if (adminFields?.storeDescription) {
                 storeDescription = adminFields.storeDescription || storeDescription;
             }
-            storeBannerUrl = resolveBannerUrl(adminFields?.storeBannerUrl) || storeBannerUrl;
+            storeBannerUrl = resolveAssetUrl(adminFields?.storeBannerUrl) || storeBannerUrl;
+            storeHeaderBannerUrl =
+                resolveAssetUrl(adminFields?.storeHeaderBannerUrl, true) || storeHeaderBannerUrl;
         }
 
         return {
             storeName: sellerName,
             storeDescription,
             storeBannerUrl,
+            storeHeaderBannerUrl,
         };
     }
 
-    private async storePageProfileFromChannelSeller(
-        ctx: RequestContext,
-    ): Promise<{ storeName: string; storeDescription: string | null; storeBannerUrl: string | null }> {
+    private async storePageProfileFromChannelSeller(ctx: RequestContext): Promise<StorePageProfile> {
         const channel = await this.connection.getRepository(ctx, Channel).findOne({
             where: { id: ctx.channelId },
             relations: ['seller'],
         });
 
-        let storeDescription: string | null = null;
-        let storeBannerUrl: string | null = null;
-
         if (!channel?.sellerId || !channel.seller) {
-            return { storeName: '', storeDescription: null, storeBannerUrl: null };
+            return {
+                storeName: '',
+                storeDescription: null,
+                storeBannerUrl: null,
+                storeHeaderBannerUrl: null,
+            };
         }
 
         const storeName = channel.seller.name || 'Tienda';
@@ -246,13 +292,6 @@ export class StorePageShopResolver {
         const administrator = await this.loadAdminWithStoreFields(ctx, ctx.channelId);
         const adminFields = administrator?.customFields as AdminStoreFields | undefined;
 
-        storeDescription = adminFields?.storeDescription ?? null;
-        storeBannerUrl = resolveBannerUrl(adminFields?.storeBannerUrl);
-
-        return {
-            storeName,
-            storeDescription,
-            storeBannerUrl,
-        };
+        return this.profileFromAdminFields(storeName, adminFields);
     }
 }

@@ -32,11 +32,14 @@ export function BillingCertificateDocField({
     hint,
     assetId,
     onAssetIdChange,
+    accept = '.pdf,.jpg,.jpeg,.png,image/*,application/pdf',
 }: {
     label: string;
     hint: string;
     assetId: string;
     onAssetIdChange: (id: string) => void;
+    /** MIME / extensiones aceptadas por el input file. */
+    accept?: string;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<AssetPreview | null>(null);
@@ -82,16 +85,24 @@ export function BillingCertificateDocField({
     });
 
     return (
-        <div className="space-y-2 rounded-lg border p-3">
-            <Label>{label}</Label>
-            <p className="text-xs text-muted-foreground leading-snug">{hint}</p>
+        <div className="min-w-0 space-y-2 rounded-lg border p-3">
+            <Label className="break-words">{label}</Label>
+            <p className="text-xs text-muted-foreground leading-snug break-words">{hint}</p>
             {preview ? (
-                <div className="flex items-center gap-2 text-sm">
-                    {preview.preview ? (
-                        <img src={preview.preview} alt={preview.name} className="h-10 w-10 rounded border object-cover" />
-                    ) : null}
-                    <span className="truncate">{preview.name}</span>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => onAssetIdChange('')}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                        {preview.preview ? (
+                            <img src={preview.preview} alt={preview.name} className="h-10 w-10 shrink-0 rounded border object-cover" />
+                        ) : null}
+                        <span className="min-w-0 break-all text-sm">{preview.name}</span>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 self-start sm:self-auto"
+                        onClick={() => onAssetIdChange('')}
+                    >
                         Quitar
                     </Button>
                 </div>
@@ -101,7 +112,7 @@ export function BillingCertificateDocField({
             <input
                 ref={inputRef}
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf"
+                accept={accept}
                 className="hidden"
                 onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -113,6 +124,7 @@ export function BillingCertificateDocField({
                 type="button"
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 disabled={upload.isPending}
                 onClick={() => inputRef.current?.click()}
             >
