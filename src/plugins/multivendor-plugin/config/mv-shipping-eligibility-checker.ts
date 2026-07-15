@@ -23,15 +23,18 @@ export const multivendorShippingEligibilityChecker = new ShippingEligibilityChec
             .innerJoinAndSelect('sm.channels', 'channel')
             .where('sm.id = :id', { id: method.id })
             .getOne();
-        const channels = methodWithChannels?.channels ?? [];
-        const sellerChannel = channels.find(c => c.code !== DEFAULT_CHANNEL_CODE);
-        if (!sellerChannel) {
+        const sellerChannels = (methodWithChannels?.channels ?? []).filter(
+            c => c.code !== DEFAULT_CHANNEL_CODE,
+        );
+        if (sellerChannels.length === 0) {
             return false;
         }
+        const sellerChannelIds = new Set(sellerChannels.map(c => String(c.id)));
+
         // Ensure order lines have sellerChannelId loaded
         const lines = order.lines ?? [];
         for (const line of lines) {
-            if (line.sellerChannelId && idsAreEqual(line.sellerChannelId, sellerChannel.id)) {
+            if (line.sellerChannelId && sellerChannelIds.has(String(line.sellerChannelId))) {
                 return true;
             }
         }

@@ -6,13 +6,13 @@ import {
     TransactionalConnection,
     Logger,
 } from '@vendure/core';
+import { SellerOnboardingService } from '../services/seller-onboarding.service';
 import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
 import { OAuth2Client } from 'google-auth-library';
 
 import { loggerCtx } from '../constants';
-
 export interface GoogleAuthData {
     token: string;
 }
@@ -31,7 +31,7 @@ export class GoogleAdminAuthenticationStrategy
     readonly name = 'google';
     private client: OAuth2Client;
     private connection!: TransactionalConnection;
-
+    private sellerOnboardingService!: SellerOnboardingService;
     constructor(private clientId: string) {
         this.client = new OAuth2Client(clientId);
     }
@@ -46,6 +46,7 @@ export class GoogleAdminAuthenticationStrategy
 
     init(injector: Injector) {
         this.connection = injector.get(TransactionalConnection);
+        this.sellerOnboardingService = injector.get(SellerOnboardingService);
     }
 
     // Extrae el email del token de Google, Primero intenta como ID token
@@ -139,6 +140,18 @@ export class GoogleAdminAuthenticationStrategy
                     loggerCtx,
                 );
                 return false;
+            }
+            // Sincronizar permisos de vendedor antes de crear la sesión
+            const isSeller = user.roles?.some(r => r.code.includes('-admin'));
+            if (isSeller) {
+                try {
+                    await this.sellerOnboardingService.syncAllSellerRolesForUser(ctx, user);
+                } catch (syncError) {
+                    Logger.error(
+                        `Failed to sync seller roles for ${email}: ${syncError instanceof Error ? syncError.message : syncError}`,
+                        loggerCtx,
+                    );
+                }
             }
 
             Logger.info(`Google auth successful for: ${email}`, loggerCtx);

@@ -4,6 +4,8 @@ import { dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
 import { IS_DEV } from './src/config/environment';
+import { patchBaseUiMouseUp } from './src/vite-plugins/patch-base-ui-mouseup';
+import { injectGtm } from './src/vite-plugins/inject-gtm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,12 +18,37 @@ function patchVendureDashboardChannelPermissions() {
             const normalizedId = id.replace(/\\/g, '/');
             let nextCode = code;
 
-            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/shared/boolean-badge.tsx')) {
+            if (normalizedId.includes('/data-display/boolean.tsx')) {
                 nextCode = nextCode
-                    .replace(/id:\s*['"]CM5TXb['"]/g, 'id: "RxzN1M"')
-                    .replace(/id:\s*['"]77Ufuv['"]/g, 'id: "E/QGRL"')
-                    .replace(/id="CM5TXb"/g, 'id="RxzN1M"')
-                    .replace(/id="77Ufuv"/g, 'id="E/QGRL"');
+                    .replace(/labelTrue \?\? 'Enabled'/g, "labelTrue ?? 'Habilitado'")
+                    .replace(/labelFalse \?\? 'Disabled'/g, "labelFalse ?? 'Deshabilitado'")
+                    .replace(/labelTrue \?\? "Enabled"/g, 'labelTrue ?? "Habilitado"')
+                    .replace(/labelFalse \?\? "Disabled"/g, 'labelFalse ?? "Deshabilitado"');
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/hooks/use-dynamic-translations.ts')) {
+                nextCode = nextCode.replace(
+                    `    const getTranslatedFieldName = (fieldId: string) => {
+        const fieldNameTranslationId = \`fieldName.\${fieldId}\`;
+        const translatedDisplay = i18n.t(fieldNameTranslationId);
+        return translatedDisplay !== fieldNameTranslationId
+            ? translatedDisplay
+            : camelCaseToTitleCase(fieldId);
+    };`,
+                    `    const fieldNameOverrides: Record<string, string> = {
+        enabled: 'Habilitado',
+    };
+    const getTranslatedFieldName = (fieldId: string) => {
+        if (fieldNameOverrides[fieldId]) {
+            return fieldNameOverrides[fieldId];
+        }
+        const fieldNameTranslationId = \`fieldName.\${fieldId}\`;
+        const translatedDisplay = i18n.t(fieldNameTranslationId);
+        return translatedDisplay !== fieldNameTranslationId
+            ? translatedDisplay
+            : camelCaseToTitleCase(fieldId);
+    };`,
+                );
             }
 
             if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/channel-switcher.tsx')) {
@@ -81,10 +108,31 @@ function patchVendureDashboardChannelPermissions() {
                         "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { EntityAssets } from '@/vdb/components/shared/entity-assets.js';",
                     );
                 }
+                if (!nextCode.includes("import { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';",
+                    );
+                }
+                if (!nextCode.includes("import { usePermissions } from '@/vdb/hooks/use-permissions.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { toast } from 'sonner';",
+                        "import { toast } from 'sonner';\nimport { usePermissions } from '@/vdb/hooks/use-permissions.js';",
+                    );
+                }
                 if (!nextCode.includes("import { Field } from '@/vdb/components/ui/field.js';")) {
                     nextCode = nextCode.replace(
                         "import { Button } from '@/vdb/components/ui/button.js';",
                         "import { Button } from '@/vdb/components/ui/button.js';\nimport { Field } from '@/vdb/components/ui/field.js';",
+                    );
+                }
+
+                if (!nextCode.includes('const canConfigurePaymentProcessor')) {
+                    nextCode = nextCode.replace(
+                        '    const { t } = useLingui();',
+                        `    const { t } = useLingui();
+    const { hasPermissions } = usePermissions();
+    const canConfigurePaymentProcessor = hasPermissions(['CreateSettings']);`,
                     );
                 }
 
@@ -107,7 +155,12 @@ function patchVendureDashboardChannelPermissions() {
                         .replace(/[^a-z0-9]+/g, '-')
                         .replace(/^-+|-+$/g, ''),
                 checker: input.checker?.code ? input.checker : undefined,
-                handler: input.handler?.code ? input.handler : undefined,
+                handler: input.handler?.code
+                    ? input.handler
+                    : {
+                          code: 'dummy-payment-handler',
+                          arguments: [{ name: 'automaticSettle', value: 'false' }],
+                      },
             };
         },`,
                 );
@@ -194,14 +247,16 @@ function patchVendureDashboardChannelPermissions() {
                             render={({ field }) => <Input {...field} />}
                         />
                     </DetailFormGrid>
-                    <FormFieldWrapper
-                        control={form.control}
-                        name="customFields.bankCertificationVerified"
-                        label="Certificación bancaria verificada"
-                        render={({ field }) => (
-                            <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
-                        )}
-                    />
+                    <PermissionGuard requires={['SuperAdmin']}>
+                        <FormFieldWrapper
+                            control={form.control}
+                            name="customFields.bankCertificationVerified"
+                            label="Certificación bancaria verificada"
+                            render={({ field }) => (
+                                <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
+                            )}
+                        />
+                    </PermissionGuard>
                 </PageBlock>`,
                 );
                 nextCode = nextCode.replace(
@@ -212,6 +267,56 @@ function patchVendureDashboardChannelPermissions() {
                     'title={<Trans>Calculator</Trans>}',
                     "title={'Calculadora'}",
                 );
+
+                if (!nextCode.includes('canConfigurePaymentProcessor && (!checkerArgsValid')) {
+                    nextCode = nextCode.replace(
+                        `                        disabled={
+                            !form.formState.isDirty ||
+                            !form.formState.isValid ||
+                            isPending ||
+                            !checkerArgsValid ||
+                            !handlerArgsValid
+                        }`,
+                        `                        disabled={
+                            !form.formState.isDirty ||
+                            !form.formState.isValid ||
+                            isPending ||
+                            (canConfigurePaymentProcessor &&
+                                (!checkerArgsValid || !handlerArgsValid))
+                        }`,
+                    );
+                }
+
+                if (!nextCode.includes('<PermissionGuard requires={[\'CreateSettings\']}')) {
+                    nextCode = nextCode.replace(
+                        `                <PageBlock
+                    column="main"
+                    blockId="payment-eligibility-checker"
+                    title={'Verificador de elegibilidad de pago'}
+                >`,
+                        `                <PermissionGuard requires={['CreateSettings']}>
+                <PageBlock
+                    column="main"
+                    blockId="payment-eligibility-checker"
+                    title={'Verificador de elegibilidad de pago'}
+                >`,
+                    );
+                    nextCode = nextCode.replace(
+                        `                </PageBlock>
+                <PageBlock column="main" blockId="payment-handler" title={'Calculadora'}>`,
+                        `                </PageBlock>
+                </PermissionGuard>
+                <PermissionGuard requires={['CreateSettings']}>
+                <PageBlock column="main" blockId="payment-handler" title={'Calculadora'}>`,
+                    );
+                    nextCode = nextCode.replace(
+                        `                </PageBlock>
+            </PageLayout>`,
+                        `                </PageBlock>
+                </PermissionGuard>
+            </PageLayout>`,
+                    );
+                }
             }
             if (
                 normalizedId.includes(
@@ -238,6 +343,228 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/payment-methods.tsx')) {
+                nextCode = nextCode.replace(
+                    'title={<Trans>Payment Methods</Trans>}',
+                    "title={'Métodos de pago'}",
+                );
+                nextCode = nextCode.replace(
+                    'breadcrumb: () => <Trans>Payment Methods</Trans>',
+                    "breadcrumb: () => 'Métodos de pago'",
+                );
+                nextCode = nextCode.replace(
+                    '<Trans>New payment method</Trans>',
+                    "'Nuevo método de pago'",
+                );
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/shipping-methods_.$id.tsx')) {
+                if (!nextCode.includes("import { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';")) {
+                    nextCode = nextCode.replace(
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';",
+                    );
+                }
+                if (!nextCode.includes("import { useEffect } from 'react';")) {
+                    nextCode = nextCode.replace(
+                        "import { useState } from 'react';",
+                        "import { useEffect, useState } from 'react';",
+                    );
+                }
+
+                if (!nextCode.includes('transformCreateInput: input =>')) {
+                    nextCode = nextCode.replace(
+                        `        params: { id: params.id },`,
+                        `        transformCreateInput: input => {
+            const name =
+                input.translations?.[0]?.name ??
+                input.name ??
+                '';
+            return {
+                ...input,
+                code:
+                    input.code?.trim() ||
+                    name
+                        .toLowerCase()
+                        .trim()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, ''),
+                fulfillmentHandler: input.fulfillmentHandler || 'manual-fulfillment',
+                checker: input.checker?.code
+                    ? input.checker
+                    : {
+                          code: 'multivendor-shipping-eligibility-checker',
+                          arguments: [],
+                      },
+                calculator: input.calculator?.code
+                    ? input.calculator
+                    : {
+                          code: 'default-shipping-calculator',
+                          arguments: [
+                              { name: 'rate', value: '500' },
+                              { name: 'includesTax', value: 'auto' },
+                              { name: 'taxRate', value: '20' },
+                          ],
+                      },
+            };
+        },
+        params: { id: params.id },`,
+                    );
+                }
+
+                if (!nextCode.includes('multivendor-shipping-eligibility-checker')) {
+                    nextCode = nextCode.replace(
+                        `    const [checkerArgsValid, setCheckerArgsValid] = useState(true);
+    const [calculatorArgsValid, setCalculatorArgsValid] = useState(true);`,
+                        `    const [checkerArgsValid, setCheckerArgsValid] = useState(true);
+    const [calculatorArgsValid, setCalculatorArgsValid] = useState(true);
+
+    useEffect(() => {
+        if (!creatingNewEntity) {
+            return;
+        }
+        if (!form.getValues('fulfillmentHandler')) {
+            form.setValue('fulfillmentHandler', 'manual-fulfillment', {
+                shouldDirty: true,
+                shouldValidate: true,
+            });
+        }
+        if (!form.getValues('checker')?.code) {
+            form.setValue(
+                'checker',
+                { code: 'multivendor-shipping-eligibility-checker', arguments: [] },
+                { shouldDirty: true, shouldValidate: true },
+            );
+        }
+        if (!form.getValues('calculator')?.code) {
+            form.setValue(
+                'calculator',
+                {
+                    code: 'default-shipping-calculator',
+                    arguments: [
+                        { name: 'rate', value: '500' },
+                        { name: 'includesTax', value: 'auto' },
+                        { name: 'taxRate', value: '20' },
+                    ],
+                },
+                { shouldDirty: true, shouldValidate: true },
+            );
+        }
+    }, [creatingNewEntity, form]);`,
+                    );
+                }
+
+                nextCode = nextCode.replace(
+                    '{creatingNewEntity ? <Trans>New shipping method</Trans> : (entity?.name ?? \'\')}',
+                    "{creatingNewEntity ? 'Nuevo método de envío' : (entity?.name ?? '')}",
+                );
+                nextCode = nextCode.replace(
+                    `                            label={<Trans>Name</Trans>}`,
+                    `                            label="Nombre"`,
+                );
+                nextCode = nextCode.replace(
+                    `                            label={<Trans>Code</Trans>}`,
+                    `                            label="Código"`,
+                );
+                nextCode = nextCode.replace(
+                    `                            label={<Trans>Description</Trans>}`,
+                    `                            label="Descripción"`,
+                );
+                nextCode = nextCode.replace(
+                    `                            label={<Trans>Fulfillment handler</Trans>}`,
+                    `                            label="Manejador de cumplimiento"`,
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Conditions</Trans>}',
+                    "title={'Condiciones'}",
+                );
+                nextCode = nextCode.replace(
+                    'title={<Trans>Calculator</Trans>}',
+                    "title={'Calculadora'}",
+                );
+                nextCode = nextCode.replace(
+                    '{creatingNewEntity ? <Trans>Create</Trans> : <Trans>Update</Trans>}',
+                    "{creatingNewEntity ? 'Crear' : 'Actualizar'}",
+                );
+
+                if (!nextCode.includes('<PermissionGuard requires={[\'CreateSettings\']}')) {
+                    nextCode = nextCode.replace(
+                        `                {!creatingNewEntity && entity && (
+                    <ActionBarItem itemId="test-shipping-button">
+                        <TestSingleShippingMethodSheet checker={checker} calculator={calculator} />
+                    </ActionBarItem>
+                )}`,
+                        `                {!creatingNewEntity && entity && (
+                    <PermissionGuard requires={['CreateSettings']}>
+                        <ActionBarItem itemId="test-shipping-button">
+                            <TestSingleShippingMethodSheet checker={checker} calculator={calculator} />
+                        </ActionBarItem>
+                    </PermissionGuard>
+                )}`,
+                    );
+                }
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/shipping-methods.tsx')) {
+                nextCode = nextCode.replace(
+                    'title={<Trans>Shipping Methods</Trans>}',
+                    "title={'Métodos de envío'}",
+                );
+                nextCode = nextCode.replace(
+                    'breadcrumb: () => <Trans>Shipping Methods</Trans>',
+                    "breadcrumb: () => 'Métodos de envío'",
+                );
+                nextCode = nextCode.replace(
+                    '<Trans>New Shipping Method</Trans>',
+                    "'Nuevo método de envío'",
+                );
+                if (!nextCode.includes('<PermissionGuard requires={[\'CreateSettings\']}')) {
+                    nextCode = nextCode.replace(
+                        `            <ActionBarItem itemId="test-shipping-button">
+                <TestShippingMethodsSheet />
+            </ActionBarItem>`,
+                        `            <PermissionGuard requires={['CreateSettings']}>
+                <ActionBarItem itemId="test-shipping-button">
+                    <TestShippingMethodsSheet />
+                </ActionBarItem>
+            </PermissionGuard>`,
+                    );
+                }
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/components/shipping-eligibility-checker-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Shipping Eligibility Checker"',
+                    `buttonText="Seleccionar verificador de elegibilidad de envío"`,
+                );
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/components/shipping-calculator-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'buttonText="Select Shipping Calculator"',
+                    `buttonText="Seleccionar calculadora de envío"`,
+                );
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_shipping-methods/components/fulfillment-handler-selector.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    'placeholder="Select a fulfillment handler"',
+                    `placeholder="Seleccionar manejador de cumplimiento"`,
+                );
+            }
+
             if (
                 normalizedId.includes(
                     '/@vendure/dashboard/src/app/routes/_authenticated/_products/components/add-product-variant-dialog.tsx',
@@ -257,7 +584,7 @@ function patchVendureDashboardChannelPermissions() {
 
                 nextCode = nextCode.replace(
                     `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
-                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className="cursor-not-allowed bg-muted" />\n                            )}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className="cursor-not-allowed bg-muted" value={field.value?.toUpperCase?.() ?? ''} />\n                            )}\n                        />`,
                 );
             }
 
@@ -268,7 +595,7 @@ function patchVendureDashboardChannelPermissions() {
             ) {
                 nextCode = nextCode.replace(
                     `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => <Input {...field} />}\n                        />`,
-                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className=\"cursor-not-allowed bg-muted\" />\n                            )}\n                        />`,
+                    `                        <FormFieldWrapper\n                            control={form.control}\n                            name="sku"\n                            label={<Trans>SKU</Trans>}\n                            render={({ field }) => (\n                                <Input {...field} readOnly className="cursor-not-allowed bg-muted" value={field.value?.toUpperCase?.() ?? ''} />\n                            )}\n                        />`,
                 )
             }
 
@@ -277,6 +604,93 @@ function patchVendureDashboardChannelPermissions() {
                 nextCode = nextCode.replace(
                     `useState<string>('USD')`,
                     `useState<string>('COP')`,
+                );
+            }
+
+            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
+                nextCode = nextCode.replace(
+                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
+                    '',
+                );
+            }
+
+            // Profile query must select Administrator customFields subfields
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    `            customFields`,
+                    `            customFields {
+                storeDescription
+                storeBannerUrl {
+                    id
+                    preview
+                }
+            }`,
+                );
+            }
+
+            return nextCode === code ? null : nextCode;
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/framework/dashboard-widget/base-widget')) {
+                nextCode = nextCode.replace(
+                    `'h-full w-full flex flex-col rounded-md'`,
+                    `'h-full w-full flex flex-col rounded-md overflow-hidden'`
+                );
+            }
+
+            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
+                nextCode = nextCode.replace(
+                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
+                    '',
+                );
+            }
+
+            // Profile query must select Administrator customFields subfields
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    `            customFields`,
+                    `            customFields {
+                storeDescription
+                storeBannerUrl {
+                    id
+                    preview
+                }
+            }`,
+                );
+            }
+
+            return nextCode === code ? null : nextCode;
+            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
+                nextCode = nextCode.replace(
+                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
+                    '',
+                );
+            }
+
+            // Profile query must select Administrator customFields subfields
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    `            customFields`,
+                    `            customFields {
+                storeDescription
+                storeBannerUrl {
+                    id
+                    preview
+                }
+            }`,
                 );
             }
 
@@ -293,6 +707,8 @@ export default defineConfig({
     },
     plugins: [
         patchVendureDashboardChannelPermissions(),
+        patchBaseUiMouseUp(),
+        injectGtm(),
         vendureDashboardPlugin({
             // The vendureDashboardPlugin will scan your configuration in order
             // to find any plugins which have dashboard extensions, as well as
@@ -331,7 +747,7 @@ export default defineConfig({
                     primary: 'hsl(260 91% 69%)',       // Candy Grape Fizz
                     'primary-foreground': 'hsl(0 0% 100%)',
                     secondary: 'hsl(209 100% 71%)',      // Blue Mana
-                    'secondary-foreground': 'hsl(240 56% 16%)',
+                    'secondary-foreground': 'hsl(240 56% 10%)',
                     muted: 'hsl(260 40% 93%)',
                     'muted-foreground': 'hsl(240 20% 45%)',
                     accent: 'hsl(209 100% 71%)',
@@ -403,6 +819,17 @@ export default defineConfig({
                 },
             },
         }),
+        // Plugin: inyecta WOMPI_PUBLIC_KEY en el HTML (corre en dev y build)
+        {
+            name: 'inject-wompi-key',
+            transformIndexHtml(html) {
+                const key = process.env.WOMPI_PUBLIC_KEY || '';
+                return html.replace(
+                    '</head>',
+                    `  <script>window.__WOMPI_PUBLIC_KEY__ = "${key}";</script>\n</head>`
+                );
+            },
+        },
         // Plugin post-dashboard-html: modifica el HTML después de que vendureDashboardPlugin lo genera
         {
             name: 'post-dashboard-html',
@@ -470,7 +897,7 @@ export default defineConfig({
             
             if (!isCollapsibleTrigger && !isDropdownTrigger) {
             setTimeout(function() {
-                const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+                const closeBtn = document.querySelector('[data-sidebar="sidebar"] button.absolute.top-4.right-4');
                 if (closeBtn) closeBtn.click();
             }, 50);
             }
@@ -486,7 +913,7 @@ export default defineConfig({
           if (!dropdownItem) return;
           
           setTimeout(function() {
-            const closeBtn = document.querySelector('button.absolute.top-4.right-4');
+            const closeBtn = document.querySelector('[data-sidebar="sidebar"] button.absolute.top-4.right-4');
             if (closeBtn) closeBtn.click();
           }, 100);
         }, true);
@@ -495,17 +922,45 @@ export default defineConfig({
       /* Fix: ancho de app en móvil */
       html, body, #app {
         max-width: 100vw;
-        overflow-x: hidden;
         width: 100%;
       }
 
-      /* Fix: sidebar-inset no desborde en móvil */
-      @media (max-width: 768px) {
-        [data-slot="sidebar-inset"] {
-          width: 100% !important;
-          min-width: 0 !important;
-        }
-      }
+            /* Fix: sidebar-inset no desborde en móvil */
+            @media (max-width: 768px) {
+                [data-slot="sidebar-inset"] {
+                    width: 100% !important;
+                    min-width: 0 !important;
+                }
+            }
+
+            /* Sticky header - global (todos los tamaños) */
+            header.border-b.border-border {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 100 !important;
+                background: var(--background, #fff) !important;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+            }
+
+            /* Sidebar scroll container - todos los tamaños */
+            [data-slot="sidebar-inset"] {
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto;
+                max-height: 100vh;
+            }
+
+            /* --- Vendure Dashboard: Fix superposición de labels en gráficos métricas home --- */
+            /* Recharts XAxis tick labels: rotar y ajustar en displays pequeños */
+            @media (max-width: 768px) {
+                .recharts-xAxis .recharts-cartesian-axis-tick-value {
+                    transform-box: fill-box;
+                    transform-origin: right center;
+                    transform: rotate(-45deg);
+                    text-anchor: end !important;
+                    font-size: 10px;
+                }
+            }
 
       /* Ocultar formulario nativo de Vendure condicionalmente */
       body.hide-native-login form > div:not([class*="max-w-sm"]),
@@ -529,9 +984,8 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            // This allows all plugins to reference a shared set of
-            // GraphQL types.
             '@/gql': `${__dirname}/src/gql/graphql.ts`,
+            '@/plugins': `${__dirname}/src/plugins`,
         },
     },
 });

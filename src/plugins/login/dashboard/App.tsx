@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { GoogleLoginButton } from './components/GoogleLoginButton';
 import { SellerRegistrationForm } from './components/SellerRegistrationForm';
-import { POST_LOGIN_RELOAD_KEY } from './components/PostLoginReloadBlock';
 
 const FALLBACK_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '';
+const FALLBACK_GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 // Detectar la URL del Admin API basándose en la URL actual del dashboard
 function getAdminApiUrl(): string {
@@ -19,7 +19,8 @@ export function App() {
     const [error, setError] = useState<string | null>(null);
     const [registerNotice, setRegisterNotice] = useState<string | null>(null);
     const [googleClientId, setGoogleClientId] = useState<string>(FALLBACK_GOOGLE_CLIENT_ID);
-    const [configLoaded, setConfigLoaded] = useState<boolean>(!!FALLBACK_GOOGLE_CLIENT_ID);
+    const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>(FALLBACK_GOOGLE_MAPS_API_KEY);
+    const [configLoaded, setConfigLoaded] = useState<boolean>(false);
 
     const redirectToRegisterFlow = useCallback(() => {
         setView('register');
@@ -34,9 +35,6 @@ export function App() {
 
     useEffect(() => {
         // Resolve public login config at runtime to avoid depending on Vite build-time env vars.
-        if (googleClientId) {
-            return;
-        }
 
         const loadLoginConfig = async () => {
             try {
@@ -49,6 +47,7 @@ export function App() {
                             query LoginConfig {
                                 loginConfig {
                                     googleOAuthClientId
+                                    googleMapsApiKey
                                 }
                             }
                         `,
@@ -57,9 +56,13 @@ export function App() {
 
                 const result = await response.json();
                 const runtimeClientId = result?.data?.loginConfig?.googleOAuthClientId;
+                const runtimeMapsApiKey = result?.data?.loginConfig?.googleMapsApiKey;
 
                 if (typeof runtimeClientId === 'string' && runtimeClientId.trim()) {
                     setGoogleClientId(runtimeClientId);
+                }
+                if (typeof runtimeMapsApiKey === 'string' && runtimeMapsApiKey.trim()) {
+                    setGoogleMapsApiKey(runtimeMapsApiKey);
                 }
             } catch {
                 // Keep existing fallback behavior when runtime config cannot be fetched.
@@ -69,7 +72,7 @@ export function App() {
         };
 
         void loadLoginConfig();
-    }, [adminApiUrl, googleClientId]);
+    }, [adminApiUrl]);
 
     const handleGoogleLogin = useCallback(
         async (idToken: string, fromRegistration = false) => {
@@ -96,6 +99,7 @@ export function App() {
                                         channels {
                                             id
                                             code
+                                            token
                                             permissions
                                         }
                                     }
@@ -156,7 +160,21 @@ export function App() {
 
                 if (authResult?.id) {
                     setStatus('¡Sesión iniciada! Redirigiendo...');
-                    sessionStorage.setItem(POST_LOGIN_RELOAD_KEY, '1');
+
+                    const firstChannel = authResult.channels?.[0];
+                    if (firstChannel?.token) {
+                        localStorage.setItem(
+                            'vendure-selected-channel-token',
+                            firstChannel.token,
+                        );
+                    }
+
+                    const isSuperAdmin = authResult.channels?.some(
+                        (ch: any) => ch.permissions?.includes?.('SuperAdmin'),
+                    );
+                    localStorage.setItem('ecommer.isSuperAdmin', isSuperAdmin ? 'true' : 'false');
+
+                    document.body.classList.remove('hide-native-login');
                     window.location.href = '/dashboard';
                 } else {
                     if (!fromRegistration) {
@@ -305,6 +323,7 @@ export function App() {
 
                     <SellerRegistrationForm
                         clientId={googleClientId}
+                        googleMapsApiKey={googleMapsApiKey}
                         onRegistered={(email, token) => handleGoogleLogin(token, true)}
                         adminApiUrl={adminApiUrl}
                     />

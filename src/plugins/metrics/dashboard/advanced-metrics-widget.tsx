@@ -6,7 +6,7 @@ import {
     Button,
 } from '@vendure/dashboard';
 import { RefreshCw } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
     LineChart,
     Line,
@@ -42,7 +42,18 @@ export function AdvancedMetricsWidget() {
     const { formatCurrency } = useLocalFormat();
     const { activeChannel } = useChannel();
 
+    useEffect(() => {
+        if (activeChannel?.code) {
+            (window as any).dataLayer = (window as any).dataLayer || [];
+            (window as any).dataLayer.push({
+                event: 'seller_view_dashboard',
+                seller_id: activeChannel.code
+            });
+        }
+    }, [activeChannel?.code]);
+
     const [selectedMetricCode, setSelectedMetricCode] = useState<string | null>(null);
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
 
     const { data, refetch, isRefetching, isLoading, error } = useAdvancedMetrics({
         channelId: activeChannel?.id,
@@ -62,7 +73,7 @@ export function AdvancedMetricsWidget() {
     const formatValue = (value: number) => {
         if (!activeMetric) return String(value);
         if (activeMetric.type === 'currency') {
-            return formatCurrency(value * 100, activeChannel?.defaultCurrencyCode);
+            return formatCurrency(value, activeChannel?.defaultCurrencyCode!);
         }
         return value.toLocaleString();
     };
@@ -75,17 +86,19 @@ export function AdvancedMetricsWidget() {
             title="Métricas avanzadas"
             description="Ganancia, AOV & unidades vendidas"
             actions={
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => refetch()}
-                    disabled={isRefetching}
-                    title="Actualizar métricas"
-                >
-                    <RefreshCw
-                        className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
-                    />
-                </Button>
+                <div className="shrink-0">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => refetch()}
+                        disabled={isRefetching}
+                        title="Actualizar métricas"
+                    >
+                        <RefreshCw
+                            className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
+                        />
+                    </Button>
+                </div>
             }
         >
             <div className="flex flex-col gap-3 p-1">
@@ -133,15 +146,15 @@ export function AdvancedMetricsWidget() {
                             />
                             <XAxis
                                 dataKey="name"
-                                tick={{ fontSize: 12 }}
+                                tick={{ fontSize: isMobile ? 9 : 12, angle: -45, dy: 12 }}
+                                interval={isMobile ? 'preserveStartEnd' : 0}
                                 className="fill-muted-foreground"
                             />
                             <YAxis
                                 tickFormatter={formatValue}
                                 tick={{ fontSize: 12 }}
                                 className="fill-muted-foreground"
-                                width={80}
-
+                                width={isMobile ? 55 : 80}
                             />
                             <Tooltip
                                 formatter={(value: number | string, name: string) => [

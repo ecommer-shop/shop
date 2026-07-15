@@ -26,6 +26,21 @@ export function formatDateForFile(date: Date): string {
     return date.toISOString().slice(0, 10);
 }
 
+export function abbreviateChartValue(value: number): string {
+    if (value === 0) return '$0';
+    const abs = Math.abs(value);
+    const prefix = value < 0 ? '-' : '';
+    if (abs >= 1_000_000_000) return `${prefix}$${(abs / 1_000_000_000).toFixed(2)}B`;
+    if (abs >= 1_000_000) return `${prefix}$${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000) return `${prefix}$${(abs / 1_000).toFixed(1)}K`;
+    return `${prefix}$${abs}`;
+}
+
+export function formatFullPesos(value: number): string {
+    const pesos = value / 100;
+    return `$${pesos.toLocaleString('es-CO', { minimumFractionDigits: 0 })}`;
+}
+
 export function buildSingleMetricChartData(
     metric: AdvancedMetricSummary | null
 ): Array<Record<string, string | number>> {

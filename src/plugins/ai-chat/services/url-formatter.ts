@@ -21,7 +21,7 @@ export class UrlFormatter {
         });
 
         // Luego, manejar URLs sueltas que no están en el patrón anterior
-        const urlRegex = /(https?:\/\/[^\s<]+)/g;
+        const urlRegex = /(https?:\/\/[^\s<,]+)/g;
         
         text = text.replace(urlRegex, (url) => {
             // Extraer el slug del producto de la URL

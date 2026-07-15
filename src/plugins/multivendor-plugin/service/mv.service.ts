@@ -6,24 +6,21 @@ import {
     Channel,
     ChannelService,
     ConfigService,
-    defaultShippingCalculator,
     InternalServerError,
     isGraphQlErrorResult,
-    manualFulfillmentHandler,
+    Logger,
     RequestContext,
     RequestContextService,
     RoleService,
     SellerService,
     ShippingMethod,
-    ShippingMethodService,
     StockLocation,
     StockLocationService,
-    TaxSetting,
     TransactionalConnection,
     User,
 } from '@vendure/core';
 
-import { multivendorShippingEligibilityChecker } from '../config/mv-shipping-eligibility-checker';
+import { MESSENGER_DOMIS_SHIPPING_METHOD_CODE } from '../constants';
 import { CreateSellerInput } from '../types';
 
 @Injectable()
@@ -33,68 +30,19 @@ export class MultivendorService {
         private sellerService: SellerService,
         private roleService: RoleService,
         private channelService: ChannelService,
-        private shippingMethodService: ShippingMethodService,
         private configService: ConfigService,
         private stockLocationService: StockLocationService,
         private requestContextService: RequestContextService,
         private connection: TransactionalConnection,
-    ) {}
+    ) { }
 
     async registerNewSeller(ctx: RequestContext, input: { shopName: string; seller: CreateSellerInput }) {
         const superAdminCtx = await this.getSuperAdminContext(ctx);
         const channel = await this.createSellerChannelRoleAdmin(superAdminCtx, input);
-        await this.createSellerShippingMethod(superAdminCtx, input.shopName, channel);
         await this.createSellerStockLocation(superAdminCtx, input.shopName, channel);
+        await this.removeNonMessengerShippingMethodsFromChannel(superAdminCtx, channel);
+        await this.assignMessengerShippingMethodToChannel(superAdminCtx, channel);
         return channel;
-    }
-
-    private async createSellerShippingMethod(ctx: RequestContext, shopName: string, sellerChannel: Channel) {
-        const defaultChannel = await this.channelService.getDefaultChannel(ctx);
-        const { shippingEligibilityCheckers, shippingCalculators, fulfillmentHandlers } =
-            this.configService.shippingOptions;
-        const shopCode = normalizeString(shopName, '-');
-        const checker = shippingEligibilityCheckers.find(
-            c => c.code === multivendorShippingEligibilityChecker.code,
-        );
-        const calculator = shippingCalculators.find(c => c.code === defaultShippingCalculator.code);
-        const fulfillmentHandler = fulfillmentHandlers.find(h => h.code === manualFulfillmentHandler.code);
-        if (!checker) {
-            throw new InternalServerError(
-                'Could not find a suitable ShippingEligibilityChecker for the seller',
-            );
-        }
-        if (!calculator) {
-            throw new InternalServerError('Could not find a suitable ShippingCalculator for the seller');
-        }
-        if (!fulfillmentHandler) {
-            throw new InternalServerError('Could not find a suitable FulfillmentHandler for the seller');
-        }
-        const shippingMethod = await this.shippingMethodService.create(ctx, {
-            code: `${shopCode}-shipping`,
-            checker: {
-                code: checker.code,
-                arguments: [],
-            },
-            calculator: {
-                code: calculator.code,
-                arguments: [
-                    { name: 'rate', value: '500' },
-                    { name: 'includesTax', value: TaxSetting.auto },
-                    { name: 'taxRate', value: '20' },
-                ],
-            },
-            fulfillmentHandler: fulfillmentHandler.code,
-            translations: [
-                {
-                    languageCode: defaultChannel.defaultLanguageCode,
-                    name: `Standard Shipping for ${shopName}`,
-                },
-            ],
-        });
-
-        await this.channelService.assignToChannels(ctx, ShippingMethod, shippingMethod.id, [
-            sellerChannel.id,
-        ]);
     }
 
     private async createSellerStockLocation(ctx: RequestContext, shopName: string, sellerChannel: Channel) {
@@ -102,6 +50,48 @@ export class MultivendorService {
             name: `${shopName} Warehouse`,
         });
         await this.channelService.assignToChannels(ctx, StockLocation, stockLocation.id, [sellerChannel.id]);
+    }
+
+    private async removeNonMessengerShippingMethodsFromChannel(ctx: RequestContext, sellerChannel: Channel) {
+        const shippingMethods = await this.connection
+            .getRepository(ctx, ShippingMethod)
+            .createQueryBuilder('shippingMethod')
+            .innerJoinAndSelect('shippingMethod.channels', 'channel', 'channel.id = :channelId', {
+                channelId: sellerChannel.id,
+            })
+            .where('shippingMethod.code != :messengerCode', {
+                messengerCode: MESSENGER_DOMIS_SHIPPING_METHOD_CODE,
+            })
+            .getMany();
+
+        for (const shippingMethod of shippingMethods) {
+            await this.channelService.removeFromChannels(ctx, ShippingMethod, shippingMethod.id, [sellerChannel.id]);
+        }
+    }
+
+    private async assignMessengerShippingMethodToChannel(ctx: RequestContext, sellerChannel: Channel) {
+        const shippingMethod = await this.connection.rawConnection.getRepository(ShippingMethod).findOne({
+            where: {
+                code: MESSENGER_DOMIS_SHIPPING_METHOD_CODE,
+            },
+            relations: ['channels'],
+        });
+
+        if (!shippingMethod) {
+            Logger.warn(
+                `Shipping method ${MESSENGER_DOMIS_SHIPPING_METHOD_CODE} was not found for seller channel ${sellerChannel.code}`,
+                'MultivendorService',
+            );
+            return;
+        }
+
+        const alreadyAssigned = (shippingMethod.channels ?? []).some(
+            channel => String(channel.id) === String(sellerChannel.id),
+        );
+
+        if (!alreadyAssigned) {
+            await this.channelService.assignToChannels(ctx, ShippingMethod, shippingMethod.id, [sellerChannel.id]);
+        }
     }
 
     private async createSellerChannelRoleAdmin(
@@ -140,16 +130,15 @@ export class MultivendorService {
             channelIds: [channel.id],
             description: `Administrator of ${input.shopName}`,
             permissions: [
-                Permission.CreateCatalog,
-                Permission.UpdateCatalog,
-                Permission.ReadCatalog,
-                Permission.DeleteCatalog,
                 Permission.CreateOrder,
                 Permission.ReadOrder,
                 Permission.UpdateOrder,
                 Permission.DeleteOrder,
                 Permission.ReadCustomer,
                 Permission.ReadPaymentMethod,
+                Permission.CreatePaymentMethod,
+                Permission.UpdatePaymentMethod,
+                Permission.DeletePaymentMethod,
                 Permission.ReadShippingMethod,
                 Permission.ReadPromotion,
                 Permission.ReadCountry,
@@ -161,6 +150,14 @@ export class MultivendorService {
                 Permission.ReadTag,
                 Permission.UpdateTag,
                 Permission.DeleteTag,
+                Permission.CreateProduct,
+                Permission.ReadProduct,
+                Permission.UpdateProduct,
+                Permission.DeleteProduct,
+                Permission.CreateAsset,
+                Permission.ReadAsset,
+                Permission.UpdateAsset,
+                Permission.DeleteAsset,
             ],
         });
         const administrator = await this.administratorService.create(ctx, {

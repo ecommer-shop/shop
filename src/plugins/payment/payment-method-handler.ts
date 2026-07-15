@@ -17,14 +17,17 @@ export const PaymentPaymentHandler = new PaymentMethodHandler({
       { languageCode: LanguageCode.es, value: 'Pasarela de Pago Wompi Bancolombia' },
    ],
 
-   args: {privateKey: { type: 'string' },
-    apiUrl: { type: 'string' },},
+   args: {
+      privateKey: { type: 'string' },
+      apiUrl: { type: 'string' },
+   },
 
    createPayment: async (ctx, order, amount, args, metadata): Promise<CreatePaymentResult> => {
+      const wompiTransactionId = (metadata as any)?.wompiTransactionId;
       return {
          amount,
          state: 'Settled',
-         transactionId: order.code, // Store reference to link with webhook
+         transactionId: wompiTransactionId || order.code,
          metadata: metadata || {},
       };
    },
@@ -43,7 +46,7 @@ export const PaymentPaymentHandler = new PaymentMethodHandler({
          return {
             state: 'Failed',
             metadata: {
-            errorMessage: 'Missing Wompi transaction ID',
+               errorMessage: 'Missing Wompi transaction ID',
             },
          };
       }
@@ -72,7 +75,7 @@ export const PaymentPaymentHandler = new PaymentMethodHandler({
             state: 'Settled',
             transactionId: result.id,
             metadata: {
-            wompiStatus: result.status,
+               wompiStatus: result.status,
             },
          };
       } catch (error: any) {
@@ -81,7 +84,7 @@ export const PaymentPaymentHandler = new PaymentMethodHandler({
          return {
             state: 'Failed',
             metadata: {
-            errorMessage: error.message,
+               errorMessage: error.message,
             },
          };
       }
@@ -93,5 +96,5 @@ export const PaymentPaymentHandler = new PaymentMethodHandler({
 
    cancelPayment: async (ctx, order, payment, args): Promise<SettlePaymentResult> => {
       return { success: true };
-   }
+   },
 });

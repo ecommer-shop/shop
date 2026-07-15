@@ -23,7 +23,7 @@ import { ROUTE, ROUTE_STORE } from '../constants';
 import { PaymentPlugin } from '../plugins/payment/payment.plugin';
 import { CoinbasePlugin } from "@pinelab/vendure-plugin-coinbase";
 import { ReviewsPlugin } from '../plugins/reviews/reviews-plugin';
-import { CURRENCY, METRICS_DISPLAY_PAST_MONTHS } from '../plugins/payment/constants';
+import { CURRENCY } from '../plugins/payment/constants';
 import { ClerkPlugin } from '../plugins/clerk/clerk.plugin';
 import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin';
 
@@ -40,14 +40,29 @@ import { vendureDashboardPlugin } from '@vendure/dashboard/vite';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { MultivendorPlugin } from '../plugins/multivendor-plugin/multivendor.plugin';
 import { ExcelLoaderPlugin } from '../plugins/google-sheets-loader/excel-loader.plugin';
-import { MetricsPlugin } from '@pinelab/vendure-plugin-metrics';
-import { IngresosPorProducto, ValorPromedioDeOrden, UnidadesVendidas } from './metrics-es';
 import { MetricsDashboardPlugin } from '../plugins/metrics/metrics.plugin';
 import { LoginPlugin } from '../plugins/login/login.plugin';
 import { AiChatPlugin } from '../plugins/ai-chat/ai-chat.plugin';
 import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
 import { StorePagePlugin } from '../plugins/store-page/store-page.plugin';
 import { AutoSkuPlugin } from '../plugins/auto-sku/auto-sku.plugin';
+import { ProductVariantEnforcementPlugin } from '../plugins/product-variant-enforcement/product-variant-enforcement.plugin';
+import {
+  DeliveryCostPlugin,
+  MessengerDomisDeliveryCostStrategy,
+} from '../plugins/delivery-cost';
+import {
+  DeliveryOrderPlugin,
+  MessengerDomisDeliveryOrderStrategy,
+} from '../plugins/delivery-order';
+import { SuperadminvisibilityPlugin } from '../plugins/superadminvisibility/superadminvisibility.plugin';
+import { WompiSubscriptionPlugin } from '../plugins/wompi-subscription/wompi-subscription.plugin';
+import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
+import { MetricsApiPlugin } from '../plugins/metrics-api/metrics-api.plugin';
+import { SafeShippingPlugin } from '../plugins/safe-shipping/safe-shipping.plugin';
+import { StoresManagementPlugin } from '../plugins/stores-management/stores-management.plugin';
+import { SellerSettingsVisibilityPlugin } from '../plugins/seller-settings-visibility/seller-settings-visibility.plugin';
+import { CommandPalettePlugin } from '../plugins/command-palette/command-palette.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -122,8 +137,27 @@ export const plugins: VendureConfig['plugins'] = [
   StorePagePlugin,
   AiChatPlugin,
 
+  DeliveryCostPlugin.init({
+    strategy: new MessengerDomisDeliveryCostStrategy({
+      apiKey: process.env.DELIVERY_COST_API_KEY,
+      url: process.env.DELIVERY_COST_API_URL,
+    }),
+  }),
+
+  DeliveryOrderPlugin.init({
+    webhookSecret: process.env.DELIVERY_ORDER_WEBHOOK_SECRET,
+    strategy: new MessengerDomisDeliveryOrderStrategy({
+      apiKey: process.env.DELIVERY_ORDER_API_KEY,
+      url: process.env.DELIVERY_ORDER_API_URL,
+    }),
+  }),
+
+  DynamicShippingPricePlugin,
+
+  SafeShippingPlugin,
+
   PaymentPlugin.init({
-    secretKey: process.env.PAYMENT_SECRET_KEY,
+    secretKey: process.env.WOMPI_INTEGRITY_SECRET || process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
   }),
 
@@ -144,19 +178,34 @@ export const plugins: VendureConfig['plugins'] = [
     resolutionNumber: process.env.MATIAS_RESOLUTION_NUMBER,
   }),
 
-  MetricsPlugin.init({
-    displayPastMonths: METRICS_DISPLAY_PAST_MONTHS,
-    metrics: [
-      new IngresosPorProducto(),
-      new ValorPromedioDeOrden(),
-      new UnidadesVendidas(),
-    ],
-  }),
-
   MetricsDashboardPlugin.init(),
 
   LoginPlugin.init({
     googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
+    googleMapsApiKey:
+      process.env.GOOGLE_MAPS_API_KEY ||
+      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+      '',
   }),
+
+  ProductVariantEnforcementPlugin,
+  SuperadminvisibilityPlugin,
+
+  StoresManagementPlugin.init({}),
+
+  SellerSettingsVisibilityPlugin,
+
+  CommandPalettePlugin,
+
+  WompiSubscriptionPlugin.init({
+    wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
+    wompiApiKey: process.env.WOMPI_API_KEY || '',
+    wompiEventsSecret: process.env.WOMPI_EVENTS_SECRET || '',
+    wompiIntegritySecret: process.env.WOMPI_INTEGRITY_SECRET || '',
+    currency: process.env.WOMPI_CURRENCY || 'COP',
+    wompiPublicKey: process.env.WOMPI_PUBLIC_KEY || '',
+  }),
+
+  MetricsApiPlugin,
 ];
 

@@ -6,21 +6,28 @@ import { GoogleAdminAuthenticationStrategy } from './config/google-auth.strategy
 import { GoogleAuthService } from './services/google-auth.service';
 import { GoogleTokenVerificationService } from './services/google-token-verification.service';
 import { SellerOnboardingService } from './services/seller-onboarding.service';
+import { DeleteSellerAccountService } from './services/delete-seller-account.service';
+import { SellerChannelSetupJobService } from './services/seller-channel-setup-job.service';
 import { LoginResolver } from './api/login.resolver';
 import { adminApiExtensions } from './api/api-extensions';
+import { DeleteAccountResolver } from './api/delete-account.resolver';
 
 @VendurePlugin({
+
     imports: [PluginCommonModule],
     providers: [
         { provide: LOGIN_PLUGIN_OPTIONS, useFactory: () => LoginPlugin.options },
         GoogleAuthService,
         GoogleTokenVerificationService,
         SellerOnboardingService,
+        DeleteSellerAccountService,
+        SellerChannelSetupJobService,
     ],
     adminApiExtensions: {
         schema: adminApiExtensions,
-        resolvers: [LoginResolver],
+        resolvers: [LoginResolver, DeleteAccountResolver],
     },
+
     configuration: config => {
         const clientId =
             LoginPlugin.options?.googleOAuthClientId ||
