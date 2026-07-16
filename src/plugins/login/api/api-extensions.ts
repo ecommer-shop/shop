@@ -68,14 +68,6 @@ export const adminApiExtensions = gql`
         email: String!
     }
 
-    """
-    Resultado de sincronizar el canal del seller.
-    """
-    type SyncSellerChannelResult {
-        success: Boolean!
-        channelToken: String
-    }
-
     extend type Query {
         """
         Retorna configuración pública del login para el dashboard.
@@ -100,13 +92,6 @@ export const adminApiExtensions = gql`
         registerSellerWithGoogle(
             input: RegisterSellerWithGoogleInput!
         ): GoogleSellerRegistrationResult!
-
-        """
-        Sincroniza el canal activo del seller después del login.
-        Usado para asegurar que el administrador quede operando
-        sobre su canal correspondiente.
-        """
-        syncSellerChannelAfterLogin: SyncSellerChannelResult!
 
         """
         Elimina permanentemente la cuenta del seller autenticado.

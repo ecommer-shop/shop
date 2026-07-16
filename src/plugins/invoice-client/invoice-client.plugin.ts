@@ -48,6 +48,7 @@ import { InvoiceShopResolver } from './api/invoice-shop.resolver';
     ClickwrapAcceptanceService,
     InvoiceSubscriber,
   ],
+  exports: [BillingPlansService],
   adminApiExtensions: {
     schema: adminApiExtensions,
     resolvers: [InvoiceAdminResolver],

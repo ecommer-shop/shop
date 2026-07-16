@@ -1,10 +1,13 @@
 import { defineDashboardExtension, DropdownMenuItem, useChannel } from '@vendure/dashboard';
 import { Share2 } from 'lucide-react';
+import ProductTracker from '@/plugins/login/dashboard/components/ProductTracker';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import SellerFirstSaleTracker from '@/plugins/login/dashboard/components/SellerFirstSaleTracker';
 import { StoreBannerAssetPickerInput } from './store-banner-asset-picker-input';
 import { StoreFeaturedStarInput } from './store-featured-star-input';
 import { StorePickupMapPreviewInput } from './store-pickup-map-preview-input';
+import { StorePickupAddressInput } from './store-pickup-address-input';
 import { ShareProductButton } from './share-product-button';
 import { SlugShareDisplay } from './slug-share-display';
 import { ShareLinksWidget } from './share-links-widget';
@@ -17,6 +20,7 @@ defineDashboardExtension({
             { id: 'ecommer-store-header-banner-asset-picker', component: StoreBannerAssetPickerInput },
             { id: 'ecommer-store-banner-asset-picker', component: StoreBannerAssetPickerInput },
             { id: 'ecommer-store-pickup-map-preview', component: StorePickupMapPreviewInput },
+            { id: 'ecommer-store-pickup-address-input', component: StorePickupAddressInput },
         ],
     },
     actionBarItems: [
@@ -31,6 +35,18 @@ defineDashboardExtension({
             pageId: 'product-detail',
             component: ShareProductDropdownItem,
             type: 'dropdown',
+        },
+        {
+            id: 'ecommer-product-tracker',
+            pageId: 'product-detail',
+            component: ProductTracker,
+            type: 'button',
+        },
+        {
+            id: 'ecommer-seller-first-sale-tracker',
+            pageId: 'seller-order-detail',
+            component: SellerFirstSaleTracker,
+            type: 'button',
         },
     ],
     dataTables: [

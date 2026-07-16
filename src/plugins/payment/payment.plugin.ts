@@ -1,23 +1,37 @@
 import { PluginCommonModule, Type, VendurePlugin } from '@vendure/core';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { InvoiceClientPlugin } from '../invoice-client/invoice-client.plugin';
 import { PAYMENT_PLUGIN_OPTIONS } from './constants';
 import { PluginInitOptions } from './types';
 import { PaymentService } from './services/payment.service';
+import { WompiCheckoutService } from './services/wompi-checkout.service';
+import { SavedPaymentService } from './services/saved-payment.service';
+import { RateLimitService } from './services/rate-limit.service';
 import { paymentShopResolver } from './api/payment-shop.resolver';
+import { CheckoutPaymentResolver } from './api/checkout-payment.resolver';
 import { shopApiExtensions } from './api/api-extensions';
 import { PaymentController } from './api/payment.controller';
 import { PaymentPaymentHandler } from './payment-method-handler';
+import { SavedPaymentMethod } from './entities/saved-payment-method.entity';
+import { ProcessedWebhookEvent } from './entities/processed-webhook-event.entity';
 
 @VendurePlugin({
-    imports: [PluginCommonModule, InvoiceClientPlugin],
+imports: [
+        PluginCommonModule,
+        TypeOrmModule.forFeature([SavedPaymentMethod, ProcessedWebhookEvent]),
+        InvoiceClientPlugin,
+    ],
     controllers: [PaymentController],
-    providers: [{ provide: PAYMENT_PLUGIN_OPTIONS, useFactory: () => PaymentPlugin.options }, PaymentService],
+    entities: [SavedPaymentMethod, ProcessedWebhookEvent],
+    providers: [
+        { provide: PAYMENT_PLUGIN_OPTIONS, useFactory: () => PaymentPlugin.options },
+        PaymentService,
+        WompiCheckoutService,
+        SavedPaymentService,
+        RateLimitService,
+    ],
     configuration: config => {
-        // Plugin-specific configuration
-        // such as custom fields, custom permissions,
-        // strategies etc. can be configured here by
-        // modifying the `config` object.
         config.paymentOptions.paymentMethodHandlers.push(
             PaymentPaymentHandler,
         );
@@ -26,9 +40,8 @@ import { PaymentPaymentHandler } from './payment-method-handler';
     compatibility: '^3.0.0',
     shopApiExtensions: {
         schema: shopApiExtensions,
-        resolvers: [paymentShopResolver]
+        resolvers: [paymentShopResolver, CheckoutPaymentResolver],
     },
-
 })
 export class PaymentPlugin {
     static options: PluginInitOptions;

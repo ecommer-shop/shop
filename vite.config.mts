@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { defineConfig } from 'vite';
 import { IS_DEV } from './src/config/environment';
 import { patchBaseUiMouseUp } from './src/vite-plugins/patch-base-ui-mouseup';
+import { injectGtm } from './src/vite-plugins/inject-gtm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -898,6 +899,7 @@ export default defineConfig({
     plugins: [
         patchVendureDashboardChannelPermissions(),
         patchBaseUiMouseUp(),
+        injectGtm(),
         vendureDashboardPlugin({
             // The vendureDashboardPlugin will scan your configuration in order
             // to find any plugins which have dashboard extensions, as well as
@@ -1111,7 +1113,6 @@ export default defineConfig({
       /* Fix: ancho de app en móvil */
       html, body, #app {
         max-width: 100vw;
-        overflow-x: hidden;
         width: 100%;
       }
 
@@ -1123,24 +1124,21 @@ export default defineConfig({
                 }
             }
 
-            /* Sticky header - solo en displays pequeños */
-            @media (max-width: 768px) {
-                [data-slot="sidebar-inset"] {
-                    display: flex;
-                    flex-direction: column;
-                    overflow-y: auto;
-                    max-height: 100vh;
-                }
+            /* Sticky header - global (todos los tamaños) */
+            header.border-b.border-border {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 100 !important;
+                background: var(--background, #fff) !important;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+            }
 
-                [data-slot="sidebar-inset"] header,
-                main header {
-                    position: sticky;
-                    top: 0;
-                    z-index: 100;
-                    background: var(--background, #fff);
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-                    flex-shrink: 0;
-                }
+            /* Sidebar scroll container - todos los tamaños */
+            [data-slot="sidebar-inset"] {
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto;
+                max-height: 100vh;
             }
 
             /* --- Vendure Dashboard: Fix superposición de labels en gráficos métricas home --- */
@@ -1177,9 +1175,8 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            // This allows all plugins to reference a shared set of
-            // GraphQL types.
             '@/gql': `${__dirname}/src/gql/graphql.ts`,
+            '@/plugins': `${__dirname}/src/plugins`,
         },
     },
 });

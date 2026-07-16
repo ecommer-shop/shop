@@ -215,6 +215,7 @@ export const customFields: VendureConfig['customFields'] = {
       type: 'string',
       nullable: true,
       public: true,
+      ui: { component: 'ecommer-store-pickup-address-input', fullWidth: true },
       label: [
         { languageCode: LanguageCode.en, value: 'Pickup address' },
         { languageCode: LanguageCode.es, value: 'Dirección de recogida' },

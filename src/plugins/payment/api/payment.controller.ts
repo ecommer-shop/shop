@@ -1,79 +1,85 @@
-import { Controller, Post, Body, HttpException, HttpStatus, HttpCode } from '@nestjs/common';
-import {
-   RequestContextService,
-   LanguageCode,
-   OrderService,
-   Logger,
-} from '@vendure/core';
-import { loggerCtx, PAYMENT_METHOD } from '../constants';
+import { Controller, Post, Body, HttpException, HttpStatus, Inject, HttpCode } from '@nestjs/common';
+import { RequestContextService, LanguageCode, Logger } from '@vendure/core';
+import { PluginInitOptions } from '../types';
+import { loggerCtx, PAYMENT_PLUGIN_OPTIONS } from '../constants';
+import { WompiCheckoutService } from '../services/wompi-checkout.service';
 import { BillingPlansService } from '../../invoice-client/services/billing-plans.service';
 import {
-   parseCertPaymentReference,
-   parsePlanPaymentReference,
+    parseCertPaymentReference,
+    parsePlanPaymentReference,
 } from '../../invoice-client/payment-reference.util';
 import { WompiService } from '../../wompi-subscription/services/wompi.service';
 
 @Controller('api/payment')
 export class PaymentController {
-   constructor(
-      private requestContextService: RequestContextService,
-      private orderService: OrderService,
-      private billingPlans: BillingPlansService,
-      private wompiService: WompiService,
-   ) { }
+    private wompiService: WompiService;
 
-   @Post('confirm')
-   @HttpCode(200)
-   async paymentConfirm(@Body() payload: any) {
-      Logger.debug('Received payment confirmation webhook', loggerCtx);
-      const { data } = payload;
-      if (!this.wompiService.validateWebhookSignature(payload)) {
-         throw new HttpException('Invalid webhook signature', HttpStatus.UNAUTHORIZED);
-      }
-      const transaction = data.transaction;
-      if (!transaction || !transaction.reference) {
-         throw new HttpException('Missing transaction reference', HttpStatus.BAD_REQUEST);
-      }
-      const reference = String(transaction.reference);
-      // Create a context for Vendure operations
-      const ctx = await this.requestContextService.create({
-         languageCode: LanguageCode.es,
-         apiType: 'shop',
-      });
+    constructor(
+        @Inject(PAYMENT_PLUGIN_OPTIONS) private options: PluginInitOptions,
+        private requestContextService: RequestContextService,
+        private checkoutService: WompiCheckoutService,
+        private billingPlans: BillingPlansService,
+    ) {
+        this.wompiService = new WompiService();
+    }
 
-      if (transaction.status === 'APPROVED' && (reference.startsWith('CERT::') || reference.startsWith('CERT-'))) {
-         const channelCode = parseCertPaymentReference(reference);
-         if (!channelCode) {
-            throw new HttpException('Invalid certificate payment reference', HttpStatus.BAD_REQUEST);
-         }
-         await this.billingPlans.applyCertificatePaymentByChannelCode(ctx, channelCode);
-         return HttpStatus.OK;
-      }
-      if (transaction.status === 'APPROVED' && (reference.startsWith('PLAN::') || reference.startsWith('PLAN-'))) {
-         const parsed = parsePlanPaymentReference(reference);
-         if (!parsed) {
-            throw new HttpException('Invalid invoice plan reference', HttpStatus.BAD_REQUEST);
-         }
-         const { channelCode, planCode } = parsed;
-         await this.billingPlans.applyPlanPurchaseFromWebhook(ctx, channelCode, planCode, reference);
-         return HttpStatus.OK;
-      }
+    @Post('confirm')
+    @HttpCode(200)
+    async paymentConfirm(@Body() payload: any) {
+        Logger.debug('Received payment confirmation webhook', loggerCtx);
 
-      const order = await this.orderService.findOneByCode(ctx, reference);
-      if (!order) {
-         throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
-      }
-      Logger.debug(`Processing transaction for order ${order.code}`, loggerCtx);
-      if (order.state === 'PaymentSettled') {
-         return HttpStatus.OK;
-      }
-      if (transaction.status === 'APPROVED') {
-         await this.orderService.addPaymentToOrder(ctx, order.id, {
-            method: PAYMENT_METHOD.code,
-            metadata: transaction.data,
-         });
-         Logger.debug('Payment settled successfully', loggerCtx);
-      }
-      return HttpStatus.OK;
-   }
+        if (!this.wompiService.validateWebhookSignature(payload)) {
+            Logger.warn('Invalid webhook signature', loggerCtx);
+            throw new HttpException('Invalid webhook signature', HttpStatus.UNAUTHORIZED);
+        }
+
+        const transaction = payload.data?.transaction;
+        if (!transaction) {
+            throw new HttpException('Missing transaction data', HttpStatus.BAD_REQUEST);
+        }
+
+        const reference = String(transaction.reference || '');
+        if (!reference) {
+            throw new HttpException('Missing transaction reference', HttpStatus.BAD_REQUEST);
+        }
+
+        if (reference.startsWith('SUB-')) {
+            return { status: 'ok' };
+        }
+
+        if (transaction.status === 'APPROVED' && (reference.startsWith('CERT::') || reference.startsWith('CERT-'))) {
+            const ctx = await this.requestContextService.create({
+                languageCode: LanguageCode.es,
+                apiType: 'shop',
+            });
+            const channelCode = parseCertPaymentReference(reference);
+            if (!channelCode) {
+                throw new HttpException('Invalid certificate payment reference', HttpStatus.BAD_REQUEST);
+            }
+            await this.billingPlans.applyCertificatePaymentByChannelCode(ctx, channelCode);
+            return { status: 'ok' };
+        }
+
+        if (transaction.status === 'APPROVED' && (reference.startsWith('PLAN::') || reference.startsWith('PLAN-'))) {
+            const ctx = await this.requestContextService.create({
+                languageCode: LanguageCode.es,
+                apiType: 'shop',
+            });
+            const parsed = parsePlanPaymentReference(reference);
+            if (!parsed) {
+                throw new HttpException('Invalid invoice plan reference', HttpStatus.BAD_REQUEST);
+            }
+            const { channelCode, planCode } = parsed;
+            await this.billingPlans.applyPlanPurchaseFromWebhook(ctx, channelCode, planCode, reference);
+            return { status: 'ok' };
+        }
+
+        try {
+            await this.checkoutService.processWebhookTransaction(transaction);
+            return { status: 'ok' };
+        } catch (error: any) {
+            Logger.error(`Webhook processing failed: ${error.message}`, loggerCtx);
+            return { status: 'ok' };
+        }
+    }
 }
