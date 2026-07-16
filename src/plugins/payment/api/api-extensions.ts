@@ -73,6 +73,7 @@ const paymentShopApiExtensions = gql`
     userLegalId: String
     paymentDescription: String
     paymentMethodDetails: JSON
+    installments: Int
   }
 
   input InitWompiSavedCardTransactionInput {
@@ -82,6 +83,8 @@ const paymentShopApiExtensions = gql`
     amountInCents: Int!
     reference: String!
     currency: String!
+    type: String
+    installments: Int
   }
 
   input ConfirmWompiPaymentInput {
@@ -106,7 +109,6 @@ const paymentShopApiExtensions = gql`
     token: String!
     type: String!
     customerEmail: String!
-    acceptanceToken: String!
   }
 
   extend type Mutation {

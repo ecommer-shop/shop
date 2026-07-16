@@ -78,6 +78,9 @@ export class WompiService {
             return response.data.data;
         } catch (error: any) {
             Logger.error('Failed to create payment source: ' + error.message, 'WompiService');
+            if (error.response?.data) {
+                Logger.error(`Wompi error details: ${JSON.stringify(error.response.data)}`, 'WompiService');
+            }
             throw new Error(`Failed to create payment source: ${error.response?.data?.message || error.message}`);
         }
     }
