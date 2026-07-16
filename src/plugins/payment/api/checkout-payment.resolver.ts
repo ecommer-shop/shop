@@ -32,6 +32,7 @@ export class CheckoutPaymentResolver {
             userLegalId?: string;
             paymentDescription?: string;
             paymentMethodDetails?: Record<string, any>;
+            installments?: number;
         },
     ) {
         try {
@@ -63,6 +64,8 @@ export class CheckoutPaymentResolver {
             amountInCents: number;
             reference: string;
             currency: string;
+            type?: string;
+            installments?: number;
         },
     ) {
         try {
@@ -102,17 +105,16 @@ export class CheckoutPaymentResolver {
 
     @Mutation()
     @Allow(Permission.Owner)
-    async createWompiPaymentSource(
-        @Ctx() ctx: RequestContext,
-        @Args('input') input: {
-            token: string;
-            type: string;
-            customerEmail: string;
-            acceptanceToken: string;
-        },
-    ) {
-        try {
-            const result = await this.checkoutService.createPaymentSource(input);
+async createWompiPaymentSource(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: {
+        token: string;
+        type: string;
+        customerEmail: string;
+    },
+) {
+    try {
+        const result = await this.checkoutService.createPaymentSource(input);
             return {
                 id: result.id,
                 type: result.type,
