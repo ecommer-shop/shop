@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleLoginButton } from './GoogleLoginButton';
+import { GoogleMapPicker, MapPickerSelection } from './GoogleMapPicker';
 
 interface SellerRegistrationFormProps {
     clientId: string;
@@ -51,6 +52,7 @@ export function SellerRegistrationForm({
     const [pickupAddress, setPickupAddress] = useState('');
     const [pickupSelection, setPickupSelection] = useState<PickupAddressSelection | null>(null);
     const [mapsReady, setMapsReady] = useState(false);
+    const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -196,6 +198,13 @@ export function SellerRegistrationForm({
         setError(null);
     };
 
+    const handleMapPickerSelect = (selection: MapPickerSelection) => {
+        setPickupAddress(selection.address);
+        setPickupSelection(selection);
+        setError(null);
+        setIsMapPickerOpen(false);
+    };
+
     const handleGoogleSuccess = async (idToken: string) => {
         if (!shopName.trim()) {
             setError('Ingresa el nombre de tu tienda antes de continuar');
@@ -329,6 +338,16 @@ export function SellerRegistrationForm({
                             disabled={loading || !googleMapsApiKey}
                             className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                         />
+                        {mapsReady && (
+                            <button
+                                type="button"
+                                onClick={() => setIsMapPickerOpen(true)}
+                                disabled={loading}
+                                className="self-start text-xs font-medium text-primary underline underline-offset-2 hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                📍 Seleccionar ubicación en el mapa
+                            </button>
+                        )}
                         {!googleMapsApiKey && (
                             <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
                                 Configura GOOGLE_MAPS_API_KEY o NEXT_PUBLIC_GOOGLE_MAPS_API_KEY en el backend para seleccionar direcciones.
@@ -414,6 +433,15 @@ export function SellerRegistrationForm({
                         <p className="text-sm text-muted-foreground text-center mt-1">
                             Registrando vendedor...
                         </p>
+                    )}
+
+                    {isMapPickerOpen && (
+                        <GoogleMapPicker
+                            initialLatitude={pickupSelection?.latitude}
+                            initialLongitude={pickupSelection?.longitude}
+                            onLocationSelect={handleMapPickerSelect}
+                            onClose={() => setIsMapPickerOpen(false)}
+                        />
                     )}
                 </>
             )}
