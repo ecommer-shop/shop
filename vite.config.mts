@@ -705,6 +705,14 @@ export default defineConfig({
         outDir: `${__dirname}/dist/dashboard`,
         emptyOutDir: true,
     },
+    optimizeDeps: {
+        // @vendure-io/ui and @vendure/dashboard each ship their own nested
+        // recharts@2.x (the project's own recharts is a separate v3 copy).
+        // Without this, Vite's dev-server dependency scanner doesn't crawl
+        // into those nested copies, so their `import get from 'lodash/get'`
+        // hits an un-prebundled raw CJS file with no default export.
+        include: ['@vendure-io/ui > recharts', '@vendure/dashboard > recharts'],
+    },
     plugins: [
         patchVendureDashboardChannelPermissions(),
         patchBaseUiMouseUp(),
@@ -985,6 +993,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@/gql': `${__dirname}/src/gql/graphql.ts`,
+            // Mirrors the "@/plugins/*" path mapping in tsconfig.dashboard.json.
             '@/plugins': `${__dirname}/src/plugins`,
         },
     },
