@@ -23,6 +23,16 @@ import {
     SelectTrigger,
     SelectValue,
     Spinner,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
     Textarea,
 } from '@vendure/dashboard';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -195,36 +205,178 @@ function FeedbackPage() {
                         </Card>
                     )}
 
-                    {prioritized.length > 0 && (
-                        <section className="mb-8">
-                            <h2 className="flex items-center gap-2 text-sm font-medium mb-3">
-                                <Pin className="h-4 w-4" />
-                                Priorizadas por Ecommer
-                            </h2>
-                            <div className="space-y-3">
-                                {prioritized.map(post => (
-                                    <PostCard key={post.id} post={post} isSuperAdmin={isSuperAdmin} />
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                    {!isLoading && (posts ?? []).length > 0 && (
+                        <Tabs defaultValue="board">
+                            <TabsList className="mb-4">
+                                <TabsTrigger value="board">Tablero</TabsTrigger>
+                                <TabsTrigger value="table">Tabla</TabsTrigger>
+                            </TabsList>
 
-                    {byStatus.map(group => (
-                        <section key={group.status} className="mb-8">
-                            <h2 className="text-sm font-medium mb-3">
-                                {STATUS_META[group.status].label}
-                                <span className="ml-2 text-muted-foreground">{group.items.length}</span>
-                            </h2>
-                            <div className="space-y-3">
-                                {group.items.map(post => (
-                                    <PostCard key={post.id} post={post} isSuperAdmin={isSuperAdmin} />
+                            <TabsContent value="board">
+                                {prioritized.length > 0 && (
+                                    <section className="mb-8">
+                                        <h2 className="flex items-center gap-2 text-sm font-medium mb-3">
+                                            <Pin className="h-4 w-4" />
+                                            Priorizadas por Ecommer
+                                        </h2>
+                                        <div className="space-y-3">
+                                            {prioritized.map(post => (
+                                                <PostCard key={post.id} post={post} isSuperAdmin={isSuperAdmin} />
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {byStatus.map(group => (
+                                    <section key={group.status} className="mb-8">
+                                        <h2 className="text-sm font-medium mb-3">
+                                            {STATUS_META[group.status].label}
+                                            <span className="ml-2 text-muted-foreground">{group.items.length}</span>
+                                        </h2>
+                                        <div className="space-y-3">
+                                            {group.items.map(post => (
+                                                <PostCard key={post.id} post={post} isSuperAdmin={isSuperAdmin} />
+                                            ))}
+                                        </div>
+                                    </section>
                                 ))}
-                            </div>
-                        </section>
-                    ))}
+                            </TabsContent>
+
+                            <TabsContent value="table">
+                                <RoadmapTable posts={posts ?? []} />
+                            </TabsContent>
+                        </Tabs>
+                    )}
                 </PageBlock>
             </PageLayout>
         </Page>
+    );
+}
+
+function RoadmapTable({ posts }: { posts: FeedbackPost[] }) {
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+
+    const term = search.trim().toLowerCase();
+    const filtered = posts
+        .filter(post => statusFilter === 'all' || post.status === statusFilter)
+        .filter(post => categoryFilter === 'all' || post.category === categoryFilter)
+        .filter(
+            post =>
+                !term ||
+                post.title.toLowerCase().includes(term) ||
+                post.description.toLowerCase().includes(term) ||
+                post.authorName.toLowerCase().includes(term),
+        )
+        .sort((a, b) => {
+            if (a.prioritized !== b.prioritized) return a.prioritized ? -1 : 1;
+            return (b.okVotes - b.notOkVotes) - (a.okVotes - a.notOkVotes);
+        });
+
+    return (
+        <div>
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+                <Input
+                    placeholder="Buscar por título, descripción o autor"
+                    className="max-w-xs"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-40">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos los estados</SelectItem>
+                        {Object.entries(STATUS_META).map(([value, meta]) => (
+                            <SelectItem key={value} value={value}>
+                                {meta.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-44">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todas las categorías</SelectItem>
+                        {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                                {label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <span className="text-xs text-muted-foreground ml-auto">
+                    {filtered.length === 1 ? '1 idea' : `${filtered.length} ideas`}
+                </span>
+            </div>
+
+            <Card>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Idea</TableHead>
+                                <TableHead>Categoría</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-center">
+                                    <ThumbsUp className="h-3.5 w-3.5 inline" aria-label="Votos a favor" />
+                                </TableHead>
+                                <TableHead className="text-center">
+                                    <ThumbsDown className="h-3.5 w-3.5 inline" aria-label="Votos en contra" />
+                                </TableHead>
+                                <TableHead className="text-center">
+                                    <MessageSquare className="h-3.5 w-3.5 inline" aria-label="Comentarios" />
+                                </TableHead>
+                                <TableHead>Autor</TableHead>
+                                <TableHead>Fecha</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filtered.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                                        Ninguna idea coincide con los filtros.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {filtered.map(post => (
+                                <TableRow key={post.id}>
+                                    <TableCell className="max-w-64">
+                                        <span className="flex items-center gap-1.5 font-medium">
+                                            {post.prioritized && (
+                                                <Pin className="h-3.5 w-3.5 text-primary shrink-0" aria-label="Priorizada" />
+                                            )}
+                                            <span className="truncate">{post.title}</span>
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline">
+                                            {CATEGORY_LABELS[post.category] ?? post.category}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge className={`border-transparent ${STATUS_META[post.status].className}`}>
+                                            {STATUS_META[post.status].label}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center font-medium">{post.okVotes}</TableCell>
+                                    <TableCell className="text-center text-muted-foreground">{post.notOkVotes}</TableCell>
+                                    <TableCell className="text-center text-muted-foreground">{post.commentCount}</TableCell>
+                                    <TableCell className="text-muted-foreground">{post.authorName}</TableCell>
+                                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                                        {new Date(post.createdAt).toLocaleDateString('es-CO')}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </div>
     );
 }
 
