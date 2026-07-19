@@ -212,9 +212,9 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'feedback',
-        label: 'Retroalimentación',
-        keywords: ['feedback', 'opinion', 'sugerencia', 'encuesta', 'formulario'],
-        path: '/feedback',
+        label: 'Cocreativo',
+        keywords: ['cocreativo', 'cocreacion', 'roadmap', 'ideas', 'feedback', 'opinion', 'sugerencia', 'votar'],
+        path: '/cocreativo',
         section: 'Configuración',
     },
     {
