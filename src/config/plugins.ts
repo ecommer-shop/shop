@@ -65,6 +65,8 @@ import { SellerSettingsVisibilityPlugin } from '../plugins/seller-settings-visib
 import { CommandPalettePlugin } from '../plugins/command-palette/command-palette.plugin';
 import { MetricsApiPlugin } from '../plugins/metrics-api/metrics-api.plugin';
 import { EnviaShippingPlugin } from '../plugins/envia-shipping';
+import { ChannelStockLocationPlugin } from '../plugins/channel-stock-location/channel-stock-location.plugin';
+import { SellerUxPlugin } from '../plugins/seller-ux/seller-ux.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -202,6 +204,10 @@ export const plugins: VendureConfig['plugins'] = [
   CommandPalettePlugin,
 
   BlogPlugin.init({}),
+
+  ChannelStockLocationPlugin,
+
+  SellerUxPlugin,
 
   WompiSubscriptionPlugin.init({
     wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
