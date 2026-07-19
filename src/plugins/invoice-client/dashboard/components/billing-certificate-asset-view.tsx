@@ -132,7 +132,7 @@ export function BillingCertificateAssetView({
                     <DialogHeader>
                         <DialogTitle>{asset.name}</DialogTitle>
                         <DialogDescription>
-                            Vista previa del documento..
+                            Vista previa del documento.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex-1 min-h-0 overflow-auto rounded-md border bg-muted/30 p-2">

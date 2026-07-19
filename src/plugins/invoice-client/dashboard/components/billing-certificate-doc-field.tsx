@@ -1,8 +1,10 @@
 import { api, Button, Label } from '@vendure/dashboard';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-
-type AssetPreview = { id: string; name: string; preview?: string | null };
+import {
+    BillingCertificateAssetView,
+    type BillingCertAsset,
+} from './billing-certificate-asset-view';
 
 const CREATE_ASSET = `
 mutation CreateBillingCertificateAsset($input: [CreateAssetInput!]!) {
@@ -11,6 +13,9 @@ mutation CreateBillingCertificateAsset($input: [CreateAssetInput!]!) {
       id
       name
       preview
+      source
+      mimeType
+      type
     }
     ... on ErrorResult {
       message
@@ -22,7 +27,7 @@ mutation CreateBillingCertificateAsset($input: [CreateAssetInput!]!) {
 const GET_ASSET = `
 query GetBillingCertAsset($options: AssetListOptions) {
   assets(options: $options) {
-    items { id name preview }
+    items { id name preview source mimeType type }
   }
 }
 `;
@@ -42,7 +47,7 @@ export function BillingCertificateDocField({
     accept?: string;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
-    const [preview, setPreview] = useState<AssetPreview | null>(null);
+    const [preview, setPreview] = useState<BillingCertAsset | null>(null);
 
     useEffect(() => {
         if (!assetId.trim()) {
@@ -51,7 +56,7 @@ export function BillingCertificateDocField({
         }
         let mounted = true;
         void api
-            .query<{ assets: { items: AssetPreview[] } }>(GET_ASSET, {
+            .query<{ assets: { items: BillingCertAsset[] } }>(GET_ASSET, {
                 options: { take: 1, filter: { id: { in: [assetId] } } },
             })
             .then((res) => {
@@ -67,7 +72,7 @@ export function BillingCertificateDocField({
 
     const upload = useMutation({
         mutationFn: async (file: File) => {
-            const res = await api.mutate<{ createAssets: Array<AssetPreview | { message: string }> }>(
+            const res = await api.mutate<{ createAssets: Array<BillingCertAsset | { message: string }> }>(
                 CREATE_ASSET,
                 { input: [{ file }] },
             );
@@ -89,23 +94,24 @@ export function BillingCertificateDocField({
             <Label className="break-words">{label}</Label>
             <p className="text-xs text-muted-foreground leading-snug break-words">{hint}</p>
             {preview ? (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                        {preview.preview ? (
-                            <img src={preview.preview} alt={preview.name} className="h-10 w-10 shrink-0 rounded border object-cover" />
-                        ) : null}
-                        <span className="min-w-0 break-all text-sm">{preview.name}</span>
-                    </div>
+                <div className="space-y-2 min-w-0">
+                    <BillingCertificateAssetView
+                        assetId={preview.id}
+                        assetsById={{ [preview.id]: preview }}
+                        compact
+                    />
                     <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="shrink-0 self-start sm:self-auto"
+                        className="shrink-0"
                         onClick={() => onAssetIdChange('')}
                     >
                         Quitar
                     </Button>
                 </div>
+            ) : assetId.trim() ? (
+                <p className="text-xs text-muted-foreground">Cargando documento…</p>
             ) : (
                 <p className="text-xs text-muted-foreground">Sin archivo</p>
             )}
@@ -128,7 +134,7 @@ export function BillingCertificateDocField({
                 disabled={upload.isPending}
                 onClick={() => inputRef.current?.click()}
             >
-                {upload.isPending ? 'Subiendo…' : 'Subir archivo'}
+                {upload.isPending ? 'Subiendo…' : preview ? 'Reemplazar archivo' : 'Subir archivo'}
             </Button>
             {upload.isError ? (
                 <p className="text-xs text-destructive">{String(upload.error)}</p>

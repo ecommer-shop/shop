@@ -102,10 +102,17 @@ function patchVendureDashboardChannelPermissions() {
             }
 
             if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/payment-methods_.$id.tsx')) {
-                if (!nextCode.includes("import { EntityAssets } from '@/vdb/components/shared/entity-assets.js';")) {
+                // Prefer the billing-style asset field (hydrate + Ver/Descargar) over EntityAssets.
+                if (nextCode.includes("import { EntityAssets } from '@/vdb/components/shared/entity-assets.js';")) {
+                    nextCode = nextCode.replace(
+                        "\nimport { EntityAssets } from '@/vdb/components/shared/entity-assets.js';",
+                        '',
+                    );
+                }
+                if (!nextCode.includes("import { BillingCertificateDocField } from '@/plugins/invoice-client/dashboard/components/billing-certificate-doc-field';")) {
                     nextCode = nextCode.replace(
                         "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
-                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { EntityAssets } from '@/vdb/components/shared/entity-assets.js';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { BillingCertificateDocField } from '@/plugins/invoice-client/dashboard/components/billing-certificate-doc-field';",
                     );
                 }
                 if (!nextCode.includes("import { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';")) {
@@ -212,15 +219,17 @@ function patchVendureDashboardChannelPermissions() {
                     blockId="bank-certification-pdf"
                     title="Carga tu certificado bancario"
                 >
-                    <EntityAssets
-                        compact={true}
-                        multiSelect={false}
-                        onChange={value => {
-                            form.setValue('customFields.bankCertificationPdf', value.featuredAssetId ?? undefined, {
+                    <BillingCertificateDocField
+                        label="Certificación bancaria"
+                        hint="PDF o imagen de la certificación bancaria. Al guardar el método de pago, el archivo queda asociado y se muestra al volver a abrir."
+                        assetId={String(form.watch('customFields.bankCertificationPdf') ?? '')}
+                        onAssetIdChange={id => {
+                            form.setValue('customFields.bankCertificationPdf', id || undefined, {
                                 shouldDirty: true,
                                 shouldValidate: true,
                             });
                         }}
+                        accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf"
                     />
                 </PageBlock>
                 <PageBlock column="main" blockId="payment-method-bank-fields" title="Datos bancarios">
