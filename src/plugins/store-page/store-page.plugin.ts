@@ -1,4 +1,4 @@
-import { LanguageCode, PluginCommonModule, VendurePlugin } from '@vendure/core';
+import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 
 import { storePageAdminApiExtensions, storePageShopApiExtensions } from './api/api-extensions';
 import { StorePageAdminResolver } from './api/store-page-admin.resolver';
@@ -10,22 +10,6 @@ import { MetaOAuthService } from './services/meta-oauth.service';
 
 @VendurePlugin({
     imports: [PluginCommonModule],
-    configuration: config => {
-        config.customFields.Seller.push({
-            name: 'socialLinks',
-            type: 'text',
-            nullable: true,
-            public: true,
-            label: [{ languageCode: LanguageCode.es, value: 'Redes sociales' }],
-            description: [
-                {
-                    languageCode: LanguageCode.es,
-                    value: 'Redes sociales vinculadas del vendedor (WhatsApp, Facebook, Instagram)',
-                },
-            ],
-        });
-        return config;
-    },
     providers: [
         StoreFeaturedService,
         SocialLinksService,

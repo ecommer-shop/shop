@@ -92,8 +92,6 @@ export class WompiCheckoutService {
             payment_method: { type: methodCode } as Record<string, any>,
         };
 
-        const isSandbox = (this.wompiService as any).options?.wompiApiUrl?.includes('sandbox');
-
         // PSE fields
         if (input.financialInstitutionCode) {
             payload.payment_method.financial_institution_code = input.financialInstitutionCode;
@@ -111,11 +109,9 @@ export class WompiCheckoutService {
             payload.payment_method.payment_description = input.paymentDescription;
         }
 
-        // Bancolombia QR / Recaudo - sandbox requires sandbox_status
+        // Bancolombia QR / Recaudo - sandbox_status required in sandbox (safe to always send)
         if (methodCode === 'BANCOLOMBIA_QR' || methodCode === 'BANCOLOMBIA_COLLECT') {
-            if (isSandbox) {
-                payload.payment_method.sandbox_status = 'APPROVED';
-            }
+            payload.payment_method.sandbox_status = 'APPROVED';
         }
 
         // Bancolombia BNPL (Cuotas) - requires personal data
