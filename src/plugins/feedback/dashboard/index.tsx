@@ -36,7 +36,21 @@ import {
     Textarea,
 } from '@vendure/dashboard';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, MessageSquare, Pencil, Pin, Plus, Send, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react';
+import {
+    Check,
+    Lightbulb,
+    MessageSquare,
+    Pencil,
+    Pin,
+    Plus,
+    Search,
+    Send,
+    Sparkles,
+    ThumbsDown,
+    ThumbsUp,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useIsSuperAdmin } from '../../superadminvisibility/dashboard/hooks';
 
@@ -131,12 +145,32 @@ function applyVoteLocally(post: FeedbackPost, value: VoteValue): FeedbackPost {
     return { ...post, okVotes, notOkVotes, myVote };
 }
 
-const STATUS_META: Record<PostStatus, { label: string; className: string }> = {
-    under_review: { label: 'En revisión', className: 'bg-muted text-muted-foreground' },
-    planned: { label: 'Planificada', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
-    in_progress: { label: 'En progreso', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' },
-    done: { label: 'Completada', className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' },
-    declined: { label: 'Descartada', className: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' },
+const STATUS_META: Record<PostStatus, { label: string; className: string; dot: string }> = {
+    under_review: {
+        label: 'En revisión',
+        className: 'bg-muted text-muted-foreground',
+        dot: 'bg-slate-400',
+    },
+    planned: {
+        label: 'Planificada',
+        className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+        dot: 'bg-blue-500',
+    },
+    in_progress: {
+        label: 'En progreso',
+        className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+        dot: 'bg-amber-500',
+    },
+    done: {
+        label: 'Completada',
+        className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+        dot: 'bg-emerald-500',
+    },
+    declined: {
+        label: 'Descartada',
+        className: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+        dot: 'bg-red-400',
+    },
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -147,6 +181,29 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const STATUS_ORDER: PostStatus[] = ['in_progress', 'planned', 'under_review', 'done', 'declined'];
+
+function AuthorAvatar({ name, size = 'sm' }: { name: string; size?: 'sm' | 'xs' }) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = (hash * 31 + name.charCodeAt(i)) % 360;
+    }
+    const initials = name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(part => part[0]?.toUpperCase())
+        .join('');
+    const dimensions = size === 'sm' ? 'h-6 w-6 text-[10px]' : 'h-5 w-5 text-[9px]';
+    return (
+        <span
+            aria-hidden="true"
+            className={`${dimensions} rounded-full inline-flex items-center justify-center font-semibold text-white shrink-0`}
+            style={{ backgroundColor: `hsl(${hash} 55% 45%)` }}
+        >
+            {initials || '?'}
+        </span>
+    );
+}
 
 export default defineDashboardExtension({
     routes: [
@@ -183,12 +240,43 @@ function FeedbackPage() {
             <PageTitle>Cocreativo</PageTitle>
             <PageLayout>
                 <PageBlock column="main" blockId="feedback-board">
-                    <div className="flex items-center justify-between mb-6">
-                        <p className="text-sm text-muted-foreground">
-                            Cocrea la plataforma con nosotros: propón ideas y vota las de otros
-                            vendedores. Las más votadas y las priorizadas por Ecommer definen el roadmap.
-                        </p>
-                        <NewPostDialog />
+                    <div className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 mb-6">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                                <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                                    <Sparkles className="h-5 w-5 text-primary" />
+                                </div>
+                                <div>
+                                    <h2 className="font-semibold text-lg leading-tight">
+                                        Construyamos el roadmap juntos
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+                                        Propón ideas y vota las de otros vendedores. Las más votadas y las
+                                        priorizadas por Ecommer definen lo que construimos.
+                                    </p>
+                                </div>
+                            </div>
+                            <NewPostDialog />
+                        </div>
+                        {(posts ?? []).length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                <Badge variant="outline" className="bg-background/60">
+                                    <Lightbulb className="h-3 w-3 mr-1" />
+                                    {(posts ?? []).length === 1 ? '1 idea' : `${(posts ?? []).length} ideas`}
+                                </Badge>
+                                {STATUS_ORDER.map(status => {
+                                    const count = (posts ?? []).filter(p => p.status === status).length;
+                                    if (!count) return null;
+                                    const meta = STATUS_META[status];
+                                    return (
+                                        <Badge key={status} variant="outline" className="bg-background/60">
+                                            <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${meta.dot}`} />
+                                            {count} {meta.label.toLowerCase()}
+                                        </Badge>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     {isLoading && (
@@ -198,9 +286,15 @@ function FeedbackPage() {
                     )}
 
                     {!isLoading && (posts ?? []).length === 0 && (
-                        <Card>
-                            <CardContent className="py-12 text-center text-muted-foreground">
-                                Aún no hay ideas publicadas. Sé el primero en proponer una.
+                        <Card className="border-dashed">
+                            <CardContent className="py-16 flex flex-col items-center gap-3 text-center">
+                                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                                    <Lightbulb className="h-6 w-6 text-muted-foreground" />
+                                </div>
+                                <p className="font-medium">Aún no hay ideas publicadas</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Sé el primero en proponer una mejora para la plataforma.
+                                </p>
                             </CardContent>
                         </Card>
                     )}
@@ -215,9 +309,12 @@ function FeedbackPage() {
                             <TabsContent value="board">
                                 {prioritized.length > 0 && (
                                     <section className="mb-8">
-                                        <h2 className="flex items-center gap-2 text-sm font-medium mb-3">
+                                        <h2 className="flex items-center gap-2 text-sm font-semibold mb-3 text-primary">
                                             <Pin className="h-4 w-4" />
                                             Priorizadas por Ecommer
+                                            <span className="text-xs font-normal text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                                                {prioritized.length}
+                                            </span>
                                         </h2>
                                         <div className="space-y-3">
                                             {prioritized.map(post => (
@@ -229,9 +326,12 @@ function FeedbackPage() {
 
                                 {byStatus.map(group => (
                                     <section key={group.status} className="mb-8">
-                                        <h2 className="text-sm font-medium mb-3">
+                                        <h2 className="flex items-center gap-2 text-sm font-semibold mb-3">
+                                            <span className={`h-2 w-2 rounded-full ${STATUS_META[group.status].dot}`} />
                                             {STATUS_META[group.status].label}
-                                            <span className="ml-2 text-muted-foreground">{group.items.length}</span>
+                                            <span className="text-xs font-normal text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                                                {group.items.length}
+                                            </span>
                                         </h2>
                                         <div className="space-y-3">
                                             {group.items.map(post => (
@@ -277,12 +377,15 @@ function RoadmapTable({ posts }: { posts: FeedbackPost[] }) {
     return (
         <div>
             <div className="flex flex-wrap items-center gap-2 mb-4">
-                <Input
-                    placeholder="Buscar por título, descripción o autor"
-                    className="max-w-xs"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                />
+                <div className="relative max-w-xs w-full">
+                    <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Input
+                        placeholder="Buscar por título, descripción o autor"
+                        className="pl-9"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                    />
+                </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-40">
                         <SelectValue />
@@ -314,14 +417,14 @@ function RoadmapTable({ posts }: { posts: FeedbackPost[] }) {
                 </span>
             </div>
 
-            <Card>
+            <Card className="rounded-xl overflow-hidden">
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                <TableHead>Idea</TableHead>
-                                <TableHead>Categoría</TableHead>
-                                <TableHead>Estado</TableHead>
+                            <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                <TableHead className="text-xs uppercase tracking-wide">Idea</TableHead>
+                                <TableHead className="text-xs uppercase tracking-wide">Categoría</TableHead>
+                                <TableHead className="text-xs uppercase tracking-wide">Estado</TableHead>
                                 <TableHead className="text-center">
                                     <ThumbsUp className="h-3.5 w-3.5 inline" aria-label="Votos a favor" />
                                 </TableHead>
@@ -331,20 +434,31 @@ function RoadmapTable({ posts }: { posts: FeedbackPost[] }) {
                                 <TableHead className="text-center">
                                     <MessageSquare className="h-3.5 w-3.5 inline" aria-label="Comentarios" />
                                 </TableHead>
-                                <TableHead>Autor</TableHead>
-                                <TableHead>Fecha</TableHead>
+                                <TableHead className="text-xs uppercase tracking-wide">Autor</TableHead>
+                                <TableHead className="text-xs uppercase tracking-wide">Fecha</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filtered.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                                        Ninguna idea coincide con los filtros.
+                                    <TableCell colSpan={8} className="py-10">
+                                        <div className="flex flex-col items-center gap-2 text-center">
+                                            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                                                <Search className="h-5 w-5 text-muted-foreground" />
+                                            </div>
+                                            <p className="font-medium">Ninguna idea coincide</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                Prueba con otra búsqueda o limpia los filtros.
+                                            </p>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             )}
                             {filtered.map(post => (
-                                <TableRow key={post.id}>
+                                <TableRow
+                                    key={post.id}
+                                    className={`hover:bg-muted/30 ${post.prioritized ? 'bg-primary/[0.04]' : ''}`}
+                                >
                                     <TableCell className="max-w-64">
                                         <span className="flex items-center gap-1.5 font-medium">
                                             {post.prioritized && (
@@ -366,7 +480,12 @@ function RoadmapTable({ posts }: { posts: FeedbackPost[] }) {
                                     <TableCell className="text-center font-medium">{post.okVotes}</TableCell>
                                     <TableCell className="text-center text-muted-foreground">{post.notOkVotes}</TableCell>
                                     <TableCell className="text-center text-muted-foreground">{post.commentCount}</TableCell>
-                                    <TableCell className="text-muted-foreground">{post.authorName}</TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        <span className="flex items-center gap-1.5">
+                                            <AuthorAvatar name={post.authorName} size="xs" />
+                                            {post.authorName}
+                                        </span>
+                                    </TableCell>
                                     <TableCell className="text-muted-foreground whitespace-nowrap">
                                         {new Date(post.createdAt).toLocaleDateString('es-CO')}
                                     </TableCell>
@@ -571,45 +690,47 @@ function PostCard({ post, isSuperAdmin }: { post: FeedbackPost; isSuperAdmin: bo
     const canManage = post.mine || isSuperAdmin;
 
     return (
-        <Card>
+        <Card
+            className={`rounded-xl transition-all duration-200 hover:shadow-md ${
+                post.prioritized
+                    ? 'border-primary/40 bg-primary/[0.03]'
+                    : 'hover:border-primary/25'
+            }`}
+        >
             <CardContent className="flex gap-4 py-4">
-                <div className="flex flex-col items-center gap-2 shrink-0">
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            aria-label="Me sirve"
-                            className={`h-9 w-9 rounded-full ${
-                                okActive
-                                    ? 'bg-primary/10 text-primary border-primary/50 hover:bg-primary/20 hover:text-primary'
-                                    : 'text-muted-foreground'
-                            }`}
-                            onClick={() => voteMutation.mutate('ok')}
-                        >
-                            <ThumbsUp className="h-4 w-4" />
-                        </Button>
-                        <span className={`text-sm font-medium min-w-5 ${okActive ? 'text-primary' : ''}`}>
-                            {post.okVotes}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            aria-label="No me sirve"
-                            className={`h-9 w-9 rounded-full ${
-                                notOkActive
-                                    ? 'bg-destructive/10 text-destructive border-destructive/50 hover:bg-destructive/20 hover:text-destructive'
-                                    : 'text-muted-foreground'
-                            }`}
-                            onClick={() => voteMutation.mutate('not_ok')}
-                        >
-                            <ThumbsDown className="h-4 w-4" />
-                        </Button>
-                        <span className={`text-sm min-w-5 ${notOkActive ? 'text-destructive' : 'text-muted-foreground'}`}>
-                            {post.notOkVotes}
-                        </span>
-                    </div>
+                <div className="flex flex-col items-center gap-1.5 shrink-0 bg-muted/40 rounded-full px-1.5 py-2 self-start">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Me sirve"
+                        className={`h-9 w-9 rounded-full transition-transform active:scale-90 ${
+                            okActive
+                                ? 'bg-primary/10 text-primary border-primary/50 hover:bg-primary/20 hover:text-primary'
+                                : 'text-muted-foreground bg-background'
+                        }`}
+                        onClick={() => voteMutation.mutate('ok')}
+                    >
+                        <ThumbsUp className="h-4 w-4" />
+                    </Button>
+                    <span className={`text-xs font-semibold ${okActive ? 'text-primary' : ''}`}>
+                        {post.okVotes}
+                    </span>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="No me sirve"
+                        className={`h-9 w-9 rounded-full transition-transform active:scale-90 ${
+                            notOkActive
+                                ? 'bg-destructive/10 text-destructive border-destructive/50 hover:bg-destructive/20 hover:text-destructive'
+                                : 'text-muted-foreground bg-background'
+                        }`}
+                        onClick={() => voteMutation.mutate('not_ok')}
+                    >
+                        <ThumbsDown className="h-4 w-4" />
+                    </Button>
+                    <span className={`text-xs ${notOkActive ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                        {post.notOkVotes}
+                    </span>
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -632,7 +753,8 @@ function PostCard({ post, isSuperAdmin }: { post: FeedbackPost; isSuperAdmin: bo
                         </p>
                     )}
                     <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                        <span>
+                        <span className="flex items-center gap-1.5">
+                            <AuthorAvatar name={post.authorName} />
                             {post.authorName} · {new Date(post.createdAt).toLocaleDateString('es-CO')}
                         </span>
                         <button
@@ -768,8 +890,16 @@ function CommentSection({ postId, isSuperAdmin }: { postId: string; isSuperAdmin
     return (
         <div className="mt-3 border-t pt-3 space-y-3">
             {isLoading && <Spinner />}
+            {!isLoading && (comments ?? []).length === 0 && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5 py-1">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Aún no hay comentarios. ¡Sé quien inicie la conversación!
+                </p>
+            )}
             {(comments ?? []).map(comment => (
-                <div key={comment.id} className="text-sm group">
+                <div key={comment.id} className="text-sm group flex gap-2">
+                    <AuthorAvatar name={comment.authorName} size="xs" />
+                    <div className="flex-1 min-w-0 bg-muted/40 rounded-lg px-3 py-2">
                     <div className="flex items-center gap-2">
                         <span className="font-medium">{comment.authorName}</span>
                         <span className="text-xs text-muted-foreground">
@@ -841,6 +971,7 @@ function CommentSection({ postId, isSuperAdmin }: { postId: string; isSuperAdmin
                     ) : (
                         <p className="text-muted-foreground whitespace-pre-line">{comment.text}</p>
                     )}
+                    </div>
                 </div>
             ))}
             <div className="flex gap-2">

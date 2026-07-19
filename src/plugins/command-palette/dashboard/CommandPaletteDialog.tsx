@@ -229,7 +229,6 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
                             position: 'fixed',
                             top: isMobile ? '4px' : '15%',
                             left: isMobile ? '4px' : '50%',
-                            transform: isMobile ? 'none' : 'translateX(-50%)',
                             width: isMobile ? 'calc(100vw - 8px)' : 'min(90vw, 560px)',
                             maxHeight: isMobile ? '80vh' : '60vh',
                             background: 'var(--popover, var(--card))',
@@ -241,9 +240,9 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
                             zIndex: 9999,
                             overflow: 'hidden',
                         }}
-                        initial={{ opacity: 0, scale: 0.96, y: -20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.96, y: -20 }}
+                        initial={{ opacity: 0, scale: 0.96, y: -20, x: isMobile ? 0 : '-50%' }}
+                        animate={{ opacity: 1, scale: 1, y: 0, x: isMobile ? 0 : '-50%' }}
+                        exit={{ opacity: 0, scale: 0.96, y: -20, x: isMobile ? 0 : '-50%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                         onKeyDown={handleKeyDown}
                     >
@@ -500,9 +499,17 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
                                                                 position: 'relative',
                                                                 zIndex: 1,
                                                             }}>
-                                                                {cmd.id === 'ask-ai' && (
-                                                                    <Sparkles style={{ width: 15, height: 15, color: 'var(--primary)', flexShrink: 0 }} />
-                                                                )}
+                                                                <cmd.icon
+                                                                    style={{
+                                                                        width: 15,
+                                                                        height: 15,
+                                                                        color: cmd.id === 'ask-ai' || isSelected
+                                                                            ? 'var(--primary)'
+                                                                            : 'var(--muted-foreground)',
+                                                                        flexShrink: 0,
+                                                                        transition: 'color 0.15s',
+                                                                    }}
+                                                                />
                                                                 <span style={{ fontSize: 14, color: 'var(--foreground)' }}>
                                                                     {cmd.label}
                                                                 </span>
