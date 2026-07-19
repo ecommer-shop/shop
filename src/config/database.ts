@@ -3,11 +3,26 @@ import path from 'node:path';
 import { IS_DEV } from './environment';
 
 /**
+ * `synchronize` solo en BD local de desarrollo.
+ * Con BD compartida (stage/prod) usar `DB_SYNCHRONIZE=false` en .env — evita ALTER automáticos
+ * (p. ej. columna `asset.name` NOT NULL con filas legacy en NULL).
+ */
+function resolveSynchronize(): boolean {
+  if (process.env.DB_SYNCHRONIZE === 'false') {
+    return false;
+  }
+  if (process.env.DB_SYNCHRONIZE === 'true') {
+    return true;
+  }
+  return IS_DEV && process.env.NODE_ENV !== 'production';
+}
+
+/**
  * Config de TypeORM usada por Vendure.
  */
 export const dbConnectionOptions: VendureConfig['dbConnectionOptions'] = {
   type: 'postgres',
-  synchronize: IS_DEV && process.env.NODE_ENV !== 'production',
+  synchronize: resolveSynchronize(),
   logging: false,
   migrations: [path.join(__dirname, '../migrations/*.+(js|ts)')],
 

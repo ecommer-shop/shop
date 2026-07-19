@@ -14,7 +14,11 @@
         "start:worker": "node ./dist/index-worker.js",
         "start": "concurrently \"bun run start:server\" \"bun run start:worker\"",
         "seed:prod": "node ./dist/populate/seed.js",
-        "seed:dev": "ts-node ./src/populate/seed.ts"
+        "seed:dev": "ts-node ./src/populate/seed.ts",
+        "migrate": "ts-node ./src/migrate.ts",
+        "repair:invoice-schema": "ts-node --transpile-only ./scripts/repair-invoice-schema.ts",
+        "repair:store-schema": "node ./scripts/repair-store-schema.mjs",
+        "predev": "node ./scripts/repair-store-schema.mjs"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "3.908.0",
@@ -46,8 +50,10 @@
         "jwks-rsa": "^3.2.0",
         "lucide-react": "^0.563.0",
         "modern-screenshot": "^4.7.0",
+        "p-limit": "^3.1.0",
         "pg": "8.16.3",
         "react-hook-form": "^7.71.1",
+        "react-is": "^19.2.7",
         "recharts": "^3.8.1",
         "resend": "^6.0.2",
         "sonner": "^2.0.7",
