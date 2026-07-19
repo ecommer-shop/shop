@@ -21,7 +21,7 @@ defineDashboardExtension({
         beforeForm: {
             component: () => (
                 <div className="flex flex-col items-center text-center gap-2">
-                    <h1 className="text-2xl font-semibold tracking-tight">Bienvenido a Ecommer</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">Bienvenido a Ecommer $$$</h1>
                     <p className="text-sm text-muted-foreground">Inicia sesión para acceder al panel de administración</p>
                 </div>
             ),
