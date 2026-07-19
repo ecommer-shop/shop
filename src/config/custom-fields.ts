@@ -544,16 +544,6 @@ export const customFields: VendureConfig['customFields'] = {
         { languageCode: LanguageCode.es, value: 'Destacado en mi tienda' },
         { languageCode: LanguageCode.en, value: 'Featured in my store' },
       ],
-      description: [
-        {
-            languageCode: LanguageCode.es,
-            value: 'Máximo 3 productos destacados por tienda. Actívalo con la estrella en el panel de producto.',
-        },
-        {
-            languageCode: LanguageCode.en,
-            value: 'Up to 3 featured products per store. Toggle with the star on the product screen.',
-        },
-      ],
       ui: { component: 'ecommer-store-featured-star' },
     },
     {

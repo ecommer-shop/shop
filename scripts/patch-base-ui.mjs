@@ -15,11 +15,16 @@ const patches = [
 
 let totalPatched = 0;
 for (const file of files) {
-    if (!existsSync(file)) {
-        console.log(`[patch-base-ui] skipping missing file ${file}`);
-        continue;
+    let content;
+    try {
+        content = readFileSync(file, 'utf-8');
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            console.log(`[patch-base-ui] skipping ${file} (not found in this @base-ui/react layout)`);
+            continue;
+        }
+        throw err;
     }
-    let content = readFileSync(file, 'utf-8');
     let filePatchedCount = 0;
     for (const patch of patches) {
         if (content.includes(patch.TARGET)) {

@@ -1,0 +1,16 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"Content-Type: text/plain; charset=utf-8\n"
+
+#. "Perspectivas" (traducción core de "Insights") no le dice nada a un vendedor.
+#. js-lingui-explicit-id
+msgid "Insights"
+msgstr "Inicio"
+
+#. En Colombia nadie llama "SKU" a la referencia del producto.
+msgid "SKU"
+msgstr "Referencia"
+
+msgid "SKU:"
+msgstr "Referencia:"
