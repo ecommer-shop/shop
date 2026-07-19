@@ -23,6 +23,7 @@ const paymentShopApiExtensions = gql`
     paymentMethodExtra: PaymentMethodExtra
     asyncPaymentUrl: String
     qrImage: String
+    url: String
   }
 
   type WompiTransactionStatus {
@@ -30,6 +31,9 @@ const paymentShopApiExtensions = gql`
     status: String!
     statusMessage: String
     paymentMethodExtra: PaymentMethodExtra
+    url: String
+    asyncPaymentUrl: String
+    qrImage: String
   }
 
   type ConfirmPaymentResult {
@@ -111,6 +115,16 @@ const paymentShopApiExtensions = gql`
     customerEmail: String!
   }
 
+  input SaveWompiPaymentMethodInput {
+    wompiPaymentSourceId: String!
+    type: String!
+    lastFour: String!
+    brand: String!
+    expiryMonth: String
+    expiryYear: String
+    cardHolderName: String
+  }
+
   extend type Mutation {
     initWompiTransaction(input: InitWompiTransactionInput!): WompiTransactionResult!
     initWompiSavedCardTransaction(input: InitWompiSavedCardTransactionInput!): WompiTransactionResult!
@@ -118,6 +132,7 @@ const paymentShopApiExtensions = gql`
     confirmWompiPayment(input: ConfirmWompiPaymentInput!): ConfirmPaymentResult!
     deleteSavedPaymentMethod(id: ID!): DeletePaymentMethodResult!
     setDefaultPaymentMethod(id: ID!): SavedPaymentMethod
+    saveWompiPaymentMethod(input: SaveWompiPaymentMethodInput!): SavedPaymentMethod!
   }
 `;
 
