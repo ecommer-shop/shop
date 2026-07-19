@@ -1,4 +1,6 @@
 import { Button, Card, CardContent } from '@vendure/dashboard';
+import { Wallet } from 'lucide-react';
+import { EmptyState } from '../../shared/dashboard/empty-state';
 import { PlanCard } from './components/plan-card';
 import { Plan } from './graphql-queries';
 
@@ -26,8 +28,12 @@ export function PlansStep({
 
             {displayPlans.length === 0 && (
                 <Card>
-                    <CardContent className="text-center py-10 text-muted-foreground">
-                        No hay planes disponibles.
+                    <CardContent>
+                        <EmptyState
+                            icon={Wallet}
+                            title="No hay planes disponibles"
+                            hint="Estamos preparando los planes. Vuelve a intentarlo en unos minutos."
+                        />
                     </CardContent>
                 </Card>
             )}

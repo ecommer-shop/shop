@@ -8,7 +8,9 @@ import {
     PageTitle,
 } from '@vendure/dashboard';
 import { useQuery } from '@tanstack/react-query';
+import { TrendingUp } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import { EmptyState } from '../../shared/dashboard/empty-state';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { domToCanvas } from 'modern-screenshot';
@@ -576,9 +578,11 @@ return (
                 {visibleMetrics.length === 0 && (
                     <Card>
                         <CardContent className="flex items-center justify-center h-96">
-                            <div className="text-muted-foreground">
-                                No hay datos disponibles. Selecciona métricas o verifica tus filtros.
-                            </div>
+                            <EmptyState
+                                icon={TrendingUp}
+                                title="Aún no hay datos de métricas"
+                                hint="Selecciona métricas arriba o verifica tus filtros. Cuando haya ventas, verás aquí las gráficas."
+                            />
                         </CardContent>
                     </Card>
                 )}

@@ -7,7 +7,7 @@
         "dev:worker": "ts-node ./src/index-worker.ts",
         "dev": "concurrently \"bun run dev:server\" \"bun run dev:worker\"",
         "build:server": "tsc",
-        "build:dashboard": "node scripts/patch-base-ui.mjs && node scripts/patch-empty-states.mjs && vite build",
+        "build:dashboard": "node scripts/patch-base-ui.mjs && node scripts/patch-empty-states.mjs && node scripts/patch-seller-labels.mjs && vite build",
         "build": "bun run build:server && bun run build:dashboard",
         "build:seed": "tsc && cp -R ./static ./dist/static",
         "start:server": "node ./dist/index.js",
