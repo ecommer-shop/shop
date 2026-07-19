@@ -1,26 +1,16 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-// Ajustes de UX para vendedores colombianos, aplicados sobre el core del
-// dashboard antes de cada build (mismo patrón que patch-empty-states.mjs):
+// Ajustes de UX para vendedores colombianos SIN vía oficial en Vendure,
+// aplicados sobre el core del dashboard antes de cada build (mismo patrón que
+// patch-empty-states.mjs):
 //
-// 1. "SKU" → "Referencia" en la traducción es (nadie llama SKU a la referencia).
-// 2. El SKU deja de ser obligatorio en los formularios de variantes: si se deja
-//    vacío, AutoSkuPlugin (src/plugins/auto-sku) lo genera automáticamente.
+// - El SKU deja de ser obligatorio en los formularios de variantes: si se deja
+//   vacío, AutoSkuPlugin (src/plugins/auto-sku) lo genera automáticamente.
+//
+// Nota: el rename "SKU" → "Referencia" NO va aquí — se hace por la vía oficial
+// con overrides de traducción en src/plugins/seller-ux/dashboard/es.po.
 
 const PATCHES = [
-    {
-        file: 'node_modules/@vendure/dashboard/src/i18n/locales/es.po',
-        replacements: [
-            {
-                target: 'msgid "SKU"\nmsgstr "SKU"',
-                replacement: 'msgid "SKU"\nmsgstr "Referencia"',
-            },
-            {
-                target: 'msgid "SKU:"\nmsgstr "SKU:"',
-                replacement: 'msgid "SKU:"\nmsgstr "Referencia:"',
-            },
-        ],
-    },
     {
         file: 'node_modules/@vendure/dashboard/src/app/routes/_authenticated/_products/components/add-product-variant-dialog.tsx',
         replacements: [

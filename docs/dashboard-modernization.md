@@ -8,6 +8,10 @@ Estado: `[x]` hecho · `[~]` en progreso · `[ ]` pendiente
 - [x] Página Cocreativo (roadmap colaborativo): tablero + tabla, votos optimistas, hero con gradiente, avatares, estados vacíos ilustrados.
 - [x] Estados vacíos bonitos en TODAS las tablas del core (Pedidos, Productos, etc.) vía `scripts/patch-empty-states.mjs`.
 - [x] Command palette centrado y con iconos por comando.
+- [x] UX de variantes para vendedores colombianos: "SKU" → "Referencia" por la vía oficial de Vendure (overrides de traducción en `src/plugins/seller-ux/dashboard/es.po`, descubiertos y fusionados automáticamente por el build), SKU opcional (`scripts/patch-seller-labels.mjs`) con generación automática (fix de `AutoSkuPlugin`, que nunca había funcionado y además crasheaba el server), y texto duplicado de "Destacado" eliminado.
+- [x] Auditoría contra la documentación oficial (19/7/2026): patrón de EventBus de los plugins `auto-sku` y `channel-stock-location` coincide con el recomendado; `StockLocationStrategy` NO cubre dónde cae el stock inicial (el subscriber es la mejor opción disponible); los parches de money-input, estados vacíos y SKU-opcional no tienen API oficial equivalente (detailForms solo cubre inputs de páginas de detalle, no los paneles de creación). Mejora futura opcional: migrar los subscribers a `registerBlockingEventHandler` para eliminar la pequeña ventana en que la UI puede refrescar antes de que el SKU/stock se ajuste.
+- [x] Fix de stock en marketplace (`src/plugins/channel-stock-location/`): el core escribía el stock inicial de variantes nuevas en la bodega global por defecto, invisible para el canal del vendedor (se veía "0 / 0"). Ahora un subscriber lo reubica en la bodega del canal. Cubre dashboard, importador de Excel y cualquier cliente del API.
+- [x] Input de precio adaptado a COP (`scripts/patch-money-input.mjs` + `scripts/templates/money-input.patched.tsx`): solo dígitos, separador de miles en vivo, sin decimales, select-all al enfocar, vacío cuando el precio es 0.
 
 ## Quick wins
 

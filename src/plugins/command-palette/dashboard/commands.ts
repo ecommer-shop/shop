@@ -30,8 +30,8 @@ export const ALL_COMMANDS: Command[] = [
     {
         id: 'dashboard',
         icon: Home,
-        label: 'Dashboard',
-        keywords: ['inicio', 'home', 'panel', 'principal'],
+        label: 'Inicio',
+        keywords: ['inicio', 'home', 'panel', 'principal', 'dashboard', 'perspectivas'],
         path: '/',
         section: 'Inicio',
     },
