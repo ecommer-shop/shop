@@ -5,7 +5,8 @@ import {
     useChannel,
     Button,
 } from '@vendure/dashboard';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, TrendingUp } from 'lucide-react';
+import { EmptyState } from '../../shared/dashboard/empty-state';
 import { useMemo, useState, useEffect } from 'react';
 import {
     LineChart,
@@ -186,9 +187,12 @@ export function AdvancedMetricsWidget() {
 
                 {/* Empty state */}
                 {!isLoading && !error && metrics.length === 0 && (
-                    <div className="flex items-center justify-center h-48 text-muted-foreground">
-                        No hay datos de metricas disponibles. Asegúrese de que se hayan realizado pedidos.
-                    </div>
+                    <EmptyState
+                        className="h-48 py-0"
+                        icon={TrendingUp}
+                        title="Aún no hay métricas"
+                        hint="Cuando recibas tus primeros pedidos verás aquí la evolución de tus ventas."
+                    />
                 )}
             </div>
         </DashboardBaseWidget>

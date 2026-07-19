@@ -240,7 +240,7 @@ function FeedbackPage() {
             <PageTitle>Cocreativo</PageTitle>
             <PageLayout>
                 <PageBlock column="main" blockId="feedback-board">
-                    <div className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 mb-6">
+                    <div className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 sm:p-6 mb-6">
                         <div className="flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-start gap-3">
                                 <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
@@ -248,7 +248,7 @@ function FeedbackPage() {
                                 </div>
                                 <div>
                                     <h2 className="font-semibold text-lg leading-tight">
-                                        Construyamos el roadmap juntos
+                                        Construyamos el camino juntos
                                     </h2>
                                     <p className="text-sm text-muted-foreground mt-1 max-w-xl">
                                         Propón ideas y vota las de otros vendedores. Las más votadas y las
@@ -697,8 +697,8 @@ function PostCard({ post, isSuperAdmin }: { post: FeedbackPost; isSuperAdmin: bo
                     : 'hover:border-primary/25'
             }`}
         >
-            <CardContent className="flex gap-4 py-4">
-                <div className="flex flex-col items-center gap-1.5 shrink-0 bg-muted/40 rounded-full px-1.5 py-2 self-start">
+            <CardContent className="flex flex-col sm:flex-row gap-3 sm:gap-4 py-4">
+                <div className="flex items-center gap-1.5 shrink-0 bg-muted/40 rounded-full px-2 py-1.5 self-start order-last sm:order-none">
                     <Button
                         variant="outline"
                         size="icon"
@@ -811,7 +811,7 @@ function PostCard({ post, isSuperAdmin }: { post: FeedbackPost; isSuperAdmin: bo
                 </div>
 
                 {isSuperAdmin && (
-                    <div className="flex flex-col items-end gap-2 shrink-0">
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 shrink-0">
                         <Select
                             value={post.status}
                             onValueChange={value => statusMutation.mutate(value as PostStatus)}
