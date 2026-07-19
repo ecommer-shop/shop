@@ -1,4 +1,4 @@
-import { Button, Spinner } from '@vendure/dashboard';
+import { Button } from '@vendure/dashboard';
 import { CheckCircle2, Loader2, Smartphone } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PAYMENT_METHODS } from './graphql-queries';
@@ -110,7 +110,7 @@ export function WompiTokenizationForm({
     if (envLoading) {
         return (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Spinner />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Inicializando entorno seguro...
             </div>
         );
@@ -297,7 +297,7 @@ function CardTokenForm({
             )}
             <div className="flex gap-3">
                 <Button variant="default" onClick={handleTokenize} disabled={loading}>
-                    {loading ? <><Spinner /> Tokenizando...</> : 'Tokenizar tarjeta'}
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Tokenizando...</> : 'Tokenizar tarjeta'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>Volver</Button>
             </div>
@@ -379,7 +379,7 @@ function NequiTokenForm({
                 <p className="text-sm text-muted-foreground">
                     Revisa la app de Nequi en tu celular y acepta la suscripción.
                 </p>
-                <Spinner />
+                <Loader2 className="h-4 w-4 animate-spin" />
             </div>
         );
     }
@@ -412,7 +412,7 @@ function NequiTokenForm({
             )}
             <div className="flex gap-3">
                 <Button variant="default" onClick={handleStart} disabled={loading}>
-                    {loading ? <><Spinner /> Tokenizando...</> : 'Tokenizar con Nequi'}
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Tokenizando...</> : 'Tokenizar con Nequi'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>Volver</Button>
             </div>
@@ -569,7 +569,7 @@ function DaviplataTokenForm({
                 )}
                 <div className="flex gap-3">
                     <Button variant="default" onClick={handleVerifyOtp} disabled={loading}>
-                        {loading ? <><Spinner /> Verificando...</> : 'Verificar OTP'}
+                        {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Verificando...</> : 'Verificar OTP'}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setStep('form')} disabled={loading}>Volver</Button>
                 </div>
@@ -614,7 +614,7 @@ function DaviplataTokenForm({
             )}
             <div className="flex gap-3">
                 <Button variant="default" onClick={handleTokenize} disabled={loading}>
-                    {loading ? <><Spinner /> Tokenizando...</> : 'Tokenizar con Daviplata'}
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Tokenizando...</> : 'Tokenizar con Daviplata'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>Volver</Button>
             </div>

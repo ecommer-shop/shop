@@ -45,8 +45,15 @@ export const storePageShopApiExtensions = gql`
     type StorePageProfileResult {
         storeName: String!
         storeDescription: String
+        """
+        Logo cuadrado de la tienda.
+        """
         storeBannerUrl: String
         socialLinks: [SocialLink!]!
+        """
+        Imagen ancha de cabecera de la tienda.
+        """
+        storeHeaderBannerUrl: String
     }
 `;
 

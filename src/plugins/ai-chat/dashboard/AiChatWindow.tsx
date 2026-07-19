@@ -11,6 +11,7 @@ export function AiChatWindow() {
     const chat = useChat();
 
     return (
+        <div className="h-full w-full min-h-0 overflow-hidden">
         <div className="ac-chat-window">
             {/* HEADER */}
             <div className="ac-chat-header">
@@ -93,6 +94,7 @@ export function AiChatWindow() {
             </div>
 
             <div className="ac-powered-by">Powered by SimetrIA</div>
+        </div>
         </div>
     );
 }

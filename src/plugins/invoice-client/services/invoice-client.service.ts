@@ -1,14 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Order, RequestContext } from '@vendure/core';
-import { INVOICE_CLIENT_PLUGIN_OPTIONS } from '../constants';
+import { INVOICE_CLIENT_PLUGIN_OPTIONS, MATIAS_COMPANY_ID_HEADER } from '../constants';
 import type { PluginInitOptions } from '../types';
 import { InvoiceMicroHttpClient } from './invoice-micro-http.client';
+import { resolveInvoiceBillingCustomer } from './invoice-order-billing';
+import { formatInvoiceEmissionError } from './format-invoice-emission-error';
 
 interface CreateInvoiceRequest {
   orderCode: string;
-  resolutionNumber: string;
+  matiasCompanyId: string;
   prefix: string;
-  documentNumber: string;
+  resolutionNumber: string;
   notes?: string;
   graphicRepresentation?: number;
   sendEmail?: number;
@@ -61,6 +63,16 @@ export interface InvoiceCreateResponseData {
   message?: string;
 }
 
+export interface InvoiceMatiasStatusPayload {
+  status: string;
+  matiasInvoiceId?: string;
+  matiasInvoiceNumber?: string;
+  cufe?: string;
+  error?: string;
+  pdfUrl?: string;
+  xmlUrl?: string;
+}
+
 interface InvoiceResponse {
   success: boolean;
   data?: InvoiceCreateResponseData;
@@ -76,22 +88,6 @@ export class InvoiceClientService {
     private readonly microHttp: InvoiceMicroHttpClient,
     @Inject(INVOICE_CLIENT_PLUGIN_OPTIONS) private readonly options: PluginInitOptions,
   ) {}
-
-  /**
-   * Siguiente número de documento (persistido en la BD del microservicio).
-   */
-  async fetchNextDocumentNumber(prefix: string): Promise<string> {
-    const res = await this.microHttp.axios.get<{
-      success: boolean;
-      data?: { documentNumber: string };
-      error?: string;
-    }>('/sequence/next', { params: { prefix } });
-
-    if (!res.data.success || !res.data.data?.documentNumber) {
-      throw new Error(res.data.error || 'Failed to get next document number from invoice service');
-    }
-    return res.data.data.documentNumber;
-  }
 
   /**
    * Comprueba si ya existe factura para la orden (solo lectura en el micro).
@@ -113,10 +109,6 @@ export class InvoiceClientService {
     }
   }
 
-  private mapCityToMatiasId(_cityName?: string): string {
-    return '836';
-  }
-
   /**
    * Crea una factura vía microservicio Matias. No persiste nada en la BD de Vendure.
    */
@@ -124,9 +116,9 @@ export class InvoiceClientService {
     _ctx: RequestContext,
     order: Order,
     config: {
-      resolutionNumber: string;
+      matiasCompanyId: string;
       prefix: string;
-      documentNumber: string;
+      resolutionNumber: string;
       operationTypeId?: number;
       typeDocumentId?: number;
       sendEmail?: number;
@@ -135,25 +127,16 @@ export class InvoiceClientService {
     try {
       this.logger.log(`Creating invoice for order ${order.code}`);
 
-      const customer = order.customer;
-      if (!customer) {
-        throw new Error('Order does not have a customer');
-      }
-
-      const billingAddress = order.billingAddress || order.shippingAddress;
-      const customerName =
-        (customer.firstName && customer.lastName
-          ? `${customer.firstName} ${customer.lastName}`
-          : customer.firstName || customer.lastName) || 'Cliente';
-      const customerDni =
-        (customer.customFields as Record<string, string> | undefined)?.dni ||
-        customer.phoneNumber ||
-        '0000000000';
+      const billingCustomer = resolveInvoiceBillingCustomer(order);
 
       const items = order.lines.map((line) => {
         const productVariant = line.productVariant;
-        const taxRate = line.taxRate || 19;
-        const unitPrice = line.unitPriceWithTax / (1 + taxRate / 100);
+        const taxRate = line.taxRate ?? 19;
+        const discountedLinePrice =
+          typeof line.discountedLinePrice === 'number'
+            ? line.discountedLinePrice
+            : line.unitPrice * line.quantity;
+        const unitPrice = line.quantity > 0 ? discountedLinePrice / line.quantity : 0;
         const description =
           productVariant?.name ||
           line.productVariant?.product?.name ||
@@ -171,6 +154,32 @@ export class InvoiceClientService {
           referencePriceId: '1',
         };
       });
+
+      const shippingLines = (order.shippingLines ?? [])
+        .map((line, index) => {
+          const price =
+            typeof line.discountedPrice === 'number'
+              ? line.discountedPrice
+              : typeof line.price === 'number'
+                ? line.price
+                : 0;
+          if (price <= 0) {
+            return null;
+          }
+          return {
+            description: line.shippingMethod?.name || 'Domicilio',
+            code: line.shippingMethod?.code || `SHIPPING-${index + 1}`,
+            quantity: 1,
+            unitPrice: Number(price.toFixed(2)),
+            taxPercent: 0,
+            quantityUnitsId: '1093',
+            typeItemIdentificationsId: '4',
+            referencePriceId: '1',
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item != null);
+
+      items.push(...shippingLines);
 
       // Totales coherentes con las líneas enviadas al micro/Matias
       const subtotal = items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
@@ -191,9 +200,9 @@ export class InvoiceClientService {
 
       const request: CreateInvoiceRequest = {
         orderCode: order.code,
-        resolutionNumber: config.resolutionNumber,
+        matiasCompanyId: config.matiasCompanyId,
         prefix: config.prefix,
-        documentNumber: config.documentNumber,
+        resolutionNumber: config.resolutionNumber,
         notes: `Orden ${order.code}`,
         graphicRepresentation: 0,
         sendEmail: config.sendEmail ?? 1,
@@ -204,15 +213,15 @@ export class InvoiceClientService {
         reportTotal: total.toFixed(2),
         currencyCode: order.currencyCode || 'COP',
         customer: {
-          companyName: customerName,
-          dni: customerDni,
-          email: customer.emailAddress,
-          mobile: customer.phoneNumber,
-          address: billingAddress?.streetLine1 || '',
-          postalCode: billingAddress?.postalCode || '',
+          companyName: billingCustomer.companyName,
+          dni: billingCustomer.dni,
+          email: billingCustomer.email,
+          mobile: billingCustomer.mobile,
+          address: billingCustomer.address,
+          postalCode: billingCustomer.postalCode,
           countryId: '45',
-          cityId: this.mapCityToMatiasId(billingAddress?.city),
-          identityDocumentId: '1',
+          cityId: billingCustomer.cityId,
+          identityDocumentId: billingCustomer.identityDocumentId,
           typeOrganizationId: 2,
           taxRegimeId: 2,
           taxLevelId: 5,
@@ -225,7 +234,11 @@ export class InvoiceClientService {
         `Sending POST ${this.options.invoiceServiceUrl.replace(/\/+$/, '')}/invoices for order ${order.code}`,
       );
 
-      const response = await this.microHttp.axios.post<InvoiceResponse>('/invoices', request);
+      const trimmedCompanyId = config.matiasCompanyId?.trim();
+      const headers = trimmedCompanyId
+        ? { [MATIAS_COMPANY_ID_HEADER]: trimmedCompanyId }
+        : undefined;
+      const response = await this.microHttp.axios.post<InvoiceResponse>('/invoices', request, { headers });
       if (!response.data.success) {
         throw new Error(response.data.error || response.data.message || 'Failed to create invoice');
       }
@@ -239,8 +252,53 @@ export class InvoiceClientService {
 
       return response.data;
     } catch (error: any) {
-      this.logger.error(`Error creating invoice for order ${order.code}:`, error.message);
-      throw error;
+      const readable = formatInvoiceEmissionError(error);
+      this.logger.error(`Error creating invoice for order ${order.code}: ${readable}`, error?.stack);
+      throw new Error(readable);
     }
+  }
+
+  async fetchInvoiceMatiasStatus(
+    invoiceId: string,
+    matiasCompanyId?: string | null,
+  ): Promise<InvoiceMatiasStatusPayload> {
+    const trimmed = matiasCompanyId?.trim();
+    const headers = trimmed ? { [MATIAS_COMPANY_ID_HEADER]: trimmed } : undefined;
+    const res = await this.microHttp.axios.get<{
+      success: boolean;
+      data?: InvoiceMatiasStatusPayload;
+      error?: string;
+      message?: string;
+    }>(`/invoices/${encodeURIComponent(invoiceId)}/status`, { headers });
+    if (!res.data.success || !res.data.data) {
+      throw new Error(
+        res.data.error ||
+          res.data.message ||
+          'No se pudo obtener el estado de la factura en el microservicio.',
+      );
+    }
+    return res.data.data;
+  }
+
+  async resendInvoiceMatiasEmail(
+    invoiceId: string,
+    email: string | undefined,
+    matiasCompanyId?: string | null,
+  ): Promise<InvoiceCreateResponseData> {
+    const trimmed = matiasCompanyId?.trim();
+    const headers = trimmed ? { [MATIAS_COMPANY_ID_HEADER]: trimmed } : undefined;
+    const res = await this.microHttp.axios.post<InvoiceResponse>(
+      `/invoices/${encodeURIComponent(invoiceId)}/resend`,
+      email?.trim() ? { email: email.trim() } : {},
+      { headers },
+    );
+    if (!res.data.success || !res.data.data) {
+      throw new Error(
+        res.data.error ||
+          res.data.message ||
+          'No se pudo reenviar el correo de la factura en el microservicio.',
+      );
+    }
+    return res.data.data;
   }
 }
