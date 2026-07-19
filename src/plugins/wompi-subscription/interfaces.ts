@@ -24,6 +24,7 @@ export interface WompiCreateTransactionResponse {
     currency: string;
     payment_method_type?: string;
     receipt_url?: string;
+    redirect_url?: string;
     payment_method?: {
         type: string;
         extra?: {

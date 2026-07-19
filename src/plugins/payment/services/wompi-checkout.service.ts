@@ -81,14 +81,20 @@ export class WompiCheckoutService {
             return this.wompiService.createTransaction(txnPayload);
         }
 
+        const { acceptanceToken } = await this.wompiService.getAcceptanceTokens();
+
         const payload: Record<string, any> = {
             amount_in_cents: input.amountInCents,
             currency: input.currency,
             reference: input.reference,
             customer_email: input.customerEmail,
+            acceptance_token: input.acceptanceToken || acceptanceToken || '',
             payment_method: { type: methodCode } as Record<string, any>,
         };
 
+        const isSandbox = (this.wompiService as any).options?.wompiApiUrl?.includes('sandbox');
+
+        // PSE fields
         if (input.financialInstitutionCode) {
             payload.payment_method.financial_institution_code = input.financialInstitutionCode;
         }
@@ -104,6 +110,31 @@ export class WompiCheckoutService {
         if (input.paymentDescription) {
             payload.payment_method.payment_description = input.paymentDescription;
         }
+
+        // Bancolombia QR / Recaudo - sandbox requires sandbox_status
+        if (methodCode === 'BANCOLOMBIA_QR' || methodCode === 'BANCOLOMBIA_COLLECT') {
+            if (isSandbox) {
+                payload.payment_method.sandbox_status = 'APPROVED';
+            }
+        }
+
+        // Bancolombia BNPL (Cuotas) - requires personal data
+        if (methodCode === 'BANCOLOMBIA_BNPL') {
+            payload.payment_method.user_legal_id_type = input.userLegalIdType || 'CC';
+            payload.payment_method.user_legal_id = input.userLegalId || '1234567890';
+            payload.payment_method.name = input.paymentMethodDetails?.name || 'Test';
+            payload.payment_method.last_name = input.paymentMethodDetails?.lastName || 'User';
+            payload.payment_method.phone_code = input.paymentMethodDetails?.phoneCode || '57';
+            payload.payment_method.phone_number = input.paymentMethodDetails?.phoneNumber || '3000000000';
+            payload.payment_method.payment_description = input.paymentDescription || 'Pago Ecommer';
+        }
+
+        // Su Plus - requires document info
+        if (methodCode === 'SU_PLUS') {
+            payload.payment_method.user_legal_id_type = input.userLegalIdType || 'CC';
+            payload.payment_method.user_legal_id = input.userLegalId || '1234567890';
+        }
+
         if (input.paymentMethodDetails) {
             Object.assign(payload.payment_method, input.paymentMethodDetails);
         }
