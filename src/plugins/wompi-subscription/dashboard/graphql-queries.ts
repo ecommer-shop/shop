@@ -194,13 +194,13 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
     return json.data as T;
 }
 
-export function statusColor(status: string): 'success' | 'warning' | 'danger' | 'default' {
+export function statusColor(status: string): 'success' | 'warning' | 'destructive' | 'default' {
     switch (status) {
         case 'ACTIVE': return 'success';
         case 'PENDING_PAYMENT':
         case 'GRACE_PERIOD': return 'warning';
         case 'SUSPENDED':
-        case 'CANCELLED': return 'danger';
+        case 'CANCELLED': return 'destructive';
         default: return 'default';
     }
 }

@@ -1,5 +1,11 @@
+import type { LucideIcon } from 'lucide-react';
+import {
+    BarChart3, Bot, Boxes, Building2, Calculator, CircleUser, Clock, Cog, CreditCard, FileSpreadsheet, FolderTree, Globe, Home, Image, Key, Lightbulb, ListChecks, Map, Network, Package, Percent, Receipt, Settings, Shield, ShoppingCart, SlidersHorizontal, Sparkles, Star, Store, Tags, TrendingUp, Truck, UserCog, Users, UsersRound, Wallet, Warehouse,
+} from 'lucide-react';
+
 export interface Command {
     id: string;
+    icon: LucideIcon;
     label: string;
     keywords: string[];
     path: string;
@@ -23,13 +29,15 @@ export type CommandSection = (typeof SECTIONS)[number];
 export const ALL_COMMANDS: Command[] = [
     {
         id: 'dashboard',
-        label: 'Dashboard',
-        keywords: ['inicio', 'home', 'panel', 'principal'],
+        icon: Home,
+        label: 'Inicio',
+        keywords: ['inicio', 'home', 'panel', 'principal', 'dashboard', 'perspectivas'],
         path: '/',
         section: 'Inicio',
     },
     {
         id: 'products',
+        icon: Package,
         label: 'Productos',
         keywords: ['producto', 'listado', 'catalogo', 'inventario'],
         path: '/products',
@@ -37,6 +45,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'product-variants',
+        icon: Boxes,
         label: 'Variantes de Producto',
         keywords: ['variante', 'sku', 'precio', 'stock'],
         path: '/product-variants',
@@ -44,6 +53,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'option-groups',
+        icon: SlidersHorizontal,
         label: 'Grupos de Opciones',
         keywords: ['opcion', 'atributo', 'talla', 'color', 'tamano'],
         path: '/option-groups',
@@ -51,6 +61,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'facets',
+        icon: Tags,
         label: 'Facetas',
         keywords: ['filtro', 'categoria', 'etiqueta', 'tag'],
         path: '/facets',
@@ -58,6 +69,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'collections',
+        icon: FolderTree,
         label: 'Colecciones',
         keywords: ['coleccion', 'agrupacion', 'categoria'],
         path: '/collections',
@@ -65,6 +77,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'assets',
+        icon: Image,
         label: 'Archivos',
         keywords: ['asset', 'imagen', 'imagenes', 'foto', 'multimedia'],
         path: '/assets',
@@ -72,6 +85,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'reviews',
+        icon: Star,
         label: 'Reviews',
         keywords: ['resena', 'opinion', 'comentario', 'valoracion', 'calificacion'],
         path: '/reviews',
@@ -79,6 +93,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'ai-chat',
+        icon: Bot,
         label: 'Asistente IA',
         keywords: ['ia', 'inteligencia', 'artificial', 'chat', 'simetria', 'ayuda'],
         path: '/ai-chat',
@@ -86,6 +101,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'excel-product-import',
+        icon: FileSpreadsheet,
         label: 'Importar Productos (Excel)',
         keywords: ['excel', 'importar', 'cargar', 'masivo', 'xlsx', 'hoja', 'calculo'],
         path: '/excel-product-import',
@@ -93,6 +109,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'orders',
+        icon: ShoppingCart,
         label: 'Pedidos',
         keywords: ['orden', 'venta', 'compra', 'factura'],
         path: '/orders',
@@ -100,6 +117,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'metrics',
+        icon: BarChart3,
         label: 'Métricas Avanzadas',
         keywords: ['analisis', 'estadistica', 'reporte', 'grafico', 'dashboard'],
         path: '/metrics',
@@ -107,6 +125,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'customers',
+        icon: Users,
         label: 'Clientes',
         keywords: ['cliente', 'comprador', 'usuario', 'persona'],
         path: '/customers',
@@ -114,6 +133,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'customer-groups',
+        icon: UsersRound,
         label: 'Grupos de Clientes',
         keywords: ['grupo', 'segmento', 'clasificacion'],
         path: '/customer-groups',
@@ -121,6 +141,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'promotions',
+        icon: Percent,
         label: 'Promociones',
         keywords: ['promocion', 'descuento', 'oferta', 'cupon'],
         path: '/promotions',
@@ -128,6 +149,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'sellers',
+        icon: Store,
         label: 'Vendedores',
         keywords: ['vendedor', 'tienda', 'seller', 'comerciante'],
         path: '/sellers',
@@ -135,6 +157,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'channels',
+        icon: Network,
         label: 'Canales',
         keywords: ['canal', 'multitienda', 'multi'],
         path: '/channels',
@@ -142,6 +165,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'stock-locations',
+        icon: Warehouse,
         label: 'Ubicaciones de Stock',
         keywords: ['stock', 'bodega', 'almacen', 'inventario', 'ubicacion'],
         path: '/stock-locations',
@@ -149,6 +173,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'administrators',
+        icon: UserCog,
         label: 'Administradores',
         keywords: ['admin', 'administrador', 'usuario', 'acceso'],
         path: '/administrators',
@@ -156,6 +181,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'roles',
+        icon: Shield,
         label: 'Roles',
         keywords: ['rol', 'permiso', 'acceso', 'autorizacion'],
         path: '/roles',
@@ -163,6 +189,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'shipping-methods',
+        icon: Truck,
         label: 'Métodos de Envío',
         keywords: ['envio', 'domicilio', 'entrega', 'mensajeria', 'shipping'],
         path: '/shipping-methods',
@@ -170,6 +197,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'payment-methods',
+        icon: CreditCard,
         label: 'Métodos de Pago',
         keywords: ['pago', 'pagos', 'wompi', 'tarjeta', 'bancolombia', 'nequi'],
         path: '/payment-methods',
@@ -177,6 +205,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'tax-categories',
+        icon: Receipt,
         label: 'Categorías de Impuestos',
         keywords: ['impuesto', 'iva', 'categoria', 'tax'],
         path: '/tax-categories',
@@ -184,6 +213,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'tax-rates',
+        icon: Calculator,
         label: 'Tasas de Impuestos',
         keywords: ['tasa', 'iva', 'porcentaje', 'impuesto'],
         path: '/tax-rates',
@@ -191,6 +221,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'countries',
+        icon: Globe,
         label: 'Países',
         keywords: ['pais', 'paises', 'colombia', 'nacionalidad'],
         path: '/countries',
@@ -198,6 +229,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'zones',
+        icon: Map,
         label: 'Zonas',
         keywords: ['zona', 'region', 'departamento', 'ciudad'],
         path: '/zones',
@@ -205,6 +237,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'global-settings',
+        icon: Settings,
         label: 'Configuración Global',
         keywords: ['global', 'general', 'sistema', 'config'],
         path: '/global-settings',
@@ -212,13 +245,15 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'feedback',
-        label: 'Retroalimentación',
-        keywords: ['feedback', 'opinion', 'sugerencia', 'encuesta', 'formulario'],
-        path: '/feedback',
+        icon: Lightbulb,
+        label: 'Cocreativo',
+        keywords: ['cocreativo', 'cocreacion', 'roadmap', 'ideas', 'feedback', 'opinion', 'sugerencia', 'votar'],
+        path: '/cocreativo',
         section: 'Configuración',
     },
     {
         id: 'billing',
+        icon: Wallet,
         label: 'Facturación y Plan',
         keywords: ['factura', 'plan', 'suscripcion', 'pago', 'billing', 'cobro'],
         path: '/billing',
@@ -226,6 +261,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'store-management',
+        icon: Building2,
         label: 'Tiendas',
         keywords: ['tienda', 'store', 'vendedor', 'listado'],
         path: '/stores',
@@ -233,6 +269,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'store-analytics',
+        icon: TrendingUp,
         label: 'Analíticas de Tiendas',
         keywords: ['analitica', 'tienda', 'reporte', 'estadistica', 'vendedor'],
         path: '/store-analytics',
@@ -240,6 +277,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'job-queue',
+        icon: ListChecks,
         label: 'Cola de Trabajos',
         keywords: ['trabajo', 'job', 'cola', 'proceso', 'tarea'],
         path: '/job-queue',
@@ -247,6 +285,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'scheduled-tasks',
+        icon: Clock,
         label: 'Tareas Programadas',
         keywords: ['tarea', 'programada', 'cron', 'automatico', 'scheduler'],
         path: '/scheduled-tasks',
@@ -254,6 +293,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'settings-store',
+        icon: Cog,
         label: 'Configuración de Tienda',
         keywords: ['config', 'tienda', 'ajustes', 'store', 'settings'],
         path: '/settings-store',
@@ -261,6 +301,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'api-keys',
+        icon: Key,
         label: 'API Keys',
         keywords: ['api', 'key', 'llave', 'token', 'acceso', 'integracion'],
         path: '/api-keys',
@@ -268,6 +309,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'profile',
+        icon: CircleUser,
         label: 'Mi Perfil',
         keywords: ['perfil', 'usuario', 'cuenta', 'ajustes', 'personal'],
         path: '/profile',
@@ -275,6 +317,7 @@ export const ALL_COMMANDS: Command[] = [
     },
     {
         id: 'ask-ai',
+        icon: Sparkles,
         label: 'Preguntar a SimetrIA',
         keywords: ['ia', 'simetria', 'preguntar', 'ayuda', 'duda', 'consulta', 'chat', 'gpt', 'inteligencia', 'artificial'],
         path: '',
