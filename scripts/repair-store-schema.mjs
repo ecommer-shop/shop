@@ -4,58 +4,65 @@ import pg from 'pg';
 const { Client } = pg;
 
 const ADMINISTRATOR_SQL = [
-    `ALTER TABLE "administrator" ADD COLUMN IF NOT EXISTS "customFieldsStoreheaderbannerurlid" integer`,
-    `ALTER TABLE "administrator" DROP CONSTRAINT IF EXISTS "FK_administrator_customFieldsStoreheaderbannerurlid"`,
-    `ALTER TABLE "administrator" ADD CONSTRAINT "FK_administrator_customFieldsStoreheaderbannerurlid" FOREIGN KEY ("customFieldsStoreheaderbannerurlid") REFERENCES "asset"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
-    `ALTER TABLE "administrator" ADD COLUMN IF NOT EXISTS "customFieldsStorebannerurlid" integer`,
-    `ALTER TABLE "administrator" DROP CONSTRAINT IF EXISTS "FK_administrator_customFieldsStorebannerurlid"`,
-    `ALTER TABLE "administrator" ADD CONSTRAINT "FK_administrator_customFieldsStorebannerurlid" FOREIGN KEY ("customFieldsStorebannerurlid") REFERENCES "asset"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    `ALTER TABLE public."administrator" ADD COLUMN IF NOT EXISTS "customFieldsStoreheaderbannerurlid" integer`,
+    `ALTER TABLE public."administrator" DROP CONSTRAINT IF EXISTS "FK_administrator_customFieldsStoreheaderbannerurlid"`,
+    `ALTER TABLE public."administrator" ADD CONSTRAINT "FK_administrator_customFieldsStoreheaderbannerurlid" FOREIGN KEY ("customFieldsStoreheaderbannerurlid") REFERENCES public."asset"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    `ALTER TABLE public."administrator" ADD COLUMN IF NOT EXISTS "customFieldsStorebannerurlid" integer`,
+    `ALTER TABLE public."administrator" DROP CONSTRAINT IF EXISTS "FK_administrator_customFieldsStorebannerurlid"`,
+    `ALTER TABLE public."administrator" ADD CONSTRAINT "FK_administrator_customFieldsStorebannerurlid" FOREIGN KEY ("customFieldsStorebannerurlid") REFERENCES public."asset"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
 ];
 
 const CHANNEL_SQL = [
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsInvoicebillingactive" boolean NOT NULL DEFAULT false`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsInvoicelimitremaining" integer`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiascompanyid" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasaccesstoken" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasinvoiceprefix" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasresolutionnumber" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasglobalpooltotal" integer`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasglobalpoolsellable" integer`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatestatus" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatepaymentstatus" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatetype" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificateexpiresat" TIMESTAMP`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatepaidat" TIMESTAMP`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocchamber" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocrut" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocnit" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocdianresolution" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatereviewnote" character varying`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingplanlastpurchasedat" TIMESTAMP`,
-    `ALTER TABLE "channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingplanpurchasehistory" text`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsInvoicebillingactive" boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsInvoicelimitremaining" integer`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiascompanyid" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasaccesstoken" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasinvoiceprefix" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasresolutionnumber" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasglobalpooltotal" integer`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsMatiasglobalpoolsellable" integer`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatestatus" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatepaymentstatus" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatetype" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificateexpiresat" TIMESTAMP`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatepaidat" TIMESTAMP`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocchamber" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocrut" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocnit" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocdianresolution" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatedocstorelogo" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingcertificatereviewnote" character varying`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingplanlastpurchasedat" TIMESTAMP`,
+    `ALTER TABLE public."channel" ADD COLUMN IF NOT EXISTS "customFieldsBillingplanpurchasehistory" text`,
 ];
 
 const CUSTOMER_SQL = [
-    `ALTER TABLE "customer" ADD COLUMN IF NOT EXISTS "customFieldsDni" character varying`,
-    `ALTER TABLE "customer" ADD COLUMN IF NOT EXISTS "customFieldsIdentitydocumentid" character varying`,
+    `ALTER TABLE public."customer" ADD COLUMN IF NOT EXISTS "customFieldsDni" character varying`,
+    `ALTER TABLE public."customer" ADD COLUMN IF NOT EXISTS "customFieldsIdentitydocumentid" character varying`,
 ];
 
 const ADDRESS_SQL = [
-    `ALTER TABLE "address" ADD COLUMN IF NOT EXISTS "customFieldsMatiascityid" character varying`,
-    `ALTER TABLE "address" ADD COLUMN IF NOT EXISTS "customFieldsDni" character varying`,
-    `ALTER TABLE "address" ADD COLUMN IF NOT EXISTS "customFieldsIdentitydocumentid" character varying`,
+    `ALTER TABLE public."address" ADD COLUMN IF NOT EXISTS "customFieldsMatiascityid" character varying`,
+    `ALTER TABLE public."address" ADD COLUMN IF NOT EXISTS "customFieldsDni" character varying`,
+    `ALTER TABLE public."address" ADD COLUMN IF NOT EXISTS "customFieldsIdentitydocumentid" character varying`,
 ];
 
 const ORDER_SQL = [
-    `ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "customFieldsInvoicelasterror" text`,
+    `ALTER TABLE public."order" ADD COLUMN IF NOT EXISTS "customFieldsInvoicelasterror" text`,
 ];
 
 async function columnExists(client, table, column) {
     const result = await client.query(
-        `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
+        `SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1
+           AND lower(column_name) = lower($2)`,
         [table, column],
     );
     return result.rows.length > 0;
+}
+
+if (!process.env.DATABASE_URL?.trim()) {
+    throw new Error('[repair-store-schema] Falta DATABASE_URL en .env');
 }
 
 const client = new Client({
@@ -89,7 +96,18 @@ const checks = [
 ];
 
 for (const [table, column] of checks) {
-    const ok = await columnExists(client, table, column);
+    let ok = await columnExists(client, table, column);
+    if (!ok) {
+        // Reintento explícito por si el lote anterior no aplicó ese ALTER.
+        await client.query(
+            `ALTER TABLE public."${table}" ADD COLUMN IF NOT EXISTS "${column}" ${
+                column === 'customFieldsInvoicebillingactive'
+                    ? 'boolean NOT NULL DEFAULT false'
+                    : 'character varying'
+            }`,
+        );
+        ok = await columnExists(client, table, column);
+    }
     console.info(`[repair-store-schema] ${table}.${column}: ${ok ? 'OK' : 'FALTA'}`);
     if (!ok) {
         throw new Error(`Columna faltante: ${table}.${column}`);

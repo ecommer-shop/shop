@@ -46,15 +46,12 @@ async function main() {
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   });
   await client.connect();
-  console.info('[repair] Aplicando columnas en channel…');
   for (const sql of CHANNEL_COLUMNS) {
     await client.query(sql);
   }
-  console.info('[repair] Aplicando columnas fiscales en customer…');
   for (const sql of CUSTOMER_COLUMNS) {
     await client.query(sql);
   }
-  console.info('[repair] Aplicando columnas Matias en address…');
   for (const sql of ADDRESS_COLUMNS) {
     await client.query(sql);
   }
@@ -73,7 +70,6 @@ async function main() {
   if (customerCheck.rows.length === 0) {
     throw new Error('No se creó customFieldsDni');
   }
-  console.info('[repair] OK — columnas de facturación presentes en channel, customer, address y order.');
   await client.end();
 }
 
