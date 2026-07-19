@@ -29,7 +29,7 @@ Estado: `[x]` hecho · `[~]` en progreso · `[ ]` pendiente
 
 7. [ ] **Centro de notificaciones** — conectar la campana del header a eventos reales (nuevo pedido, idea del roadmap completada, pago recibido) con un feed desplegable.
 8. [ ] **Pase mobile** — auditar overflow de tablas y gráficos en páginas propias si la analítica muestra uso desde el teléfono.
-9. [ ] **Refinamiento de tema** — púrpura de marca como primary consistente (focus rings, gráficos), grises más cálidos, radius unificado vía variables CSS.
+9. [x] **Refinamiento de tema** — la paleta de marca ya existía en `vite.config.mts`; se añadió `src/styles/dashboard-modern.css` (vía oficial `theme.additionalStylesheets`) con el acabado moderno: sombras suaves en capas para cards y superficies flotantes, header con efecto vidrio, items del sidebar tipo pill con tinte primary, hover en filas de tabla, cabeceras de tabla en mayúsculas discretas, badges pill, micro-interacción en botones, scrollbars finos y overlay de diálogos con blur. Todo con tokens, sirve en claro y oscuro.
 
 ## Relacionadas (backlog Cocreativo)
 
