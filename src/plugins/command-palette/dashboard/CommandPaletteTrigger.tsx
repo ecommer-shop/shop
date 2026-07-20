@@ -40,30 +40,16 @@ export function CommandPaletteTrigger() {
                 onClick={handleOpen}
                 title={`Buscar comandos (${isMac ? '⌘K' : 'Ctrl+K'})`}
                 aria-label="Buscar comandos"
+                className="ai-glow-trigger"
                 style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 8,
                     height: 34,
                     padding: isMobile ? '0 8px' : '0 10px',
-                    border: '1px solid var(--border)',
-                    background: 'color-mix(in srgb, var(--muted) 55%, transparent)',
                     borderRadius: 9999,
                     cursor: 'pointer',
                     color: 'var(--muted-foreground)',
-                    transition: 'border-color 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s',
-                }}
-                onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--primary) 45%, var(--border))';
-                    e.currentTarget.style.background = 'var(--background)';
-                    e.currentTarget.style.color = 'var(--foreground)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent)';
-                }}
-                onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.background = 'color-mix(in srgb, var(--muted) 55%, transparent)';
-                    e.currentTarget.style.color = 'var(--muted-foreground)';
-                    e.currentTarget.style.boxShadow = 'none';
                 }}
             >
                 <Search style={{ width: 16, height: 16, flexShrink: 0 }} />

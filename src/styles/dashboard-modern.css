@@ -176,6 +176,52 @@ header.border-b.border-border {
     background: var(--muted);
 }
 
+/* ── trigger del command palette: borde degradado "vivo" (look IA) ──── */
+@property --ai-glow-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+@keyframes ai-glow-spin {
+    to {
+        --ai-glow-angle: 360deg;
+    }
+}
+.ai-glow-trigger {
+    border: 1.5px solid transparent;
+    background:
+        linear-gradient(
+                color-mix(in srgb, var(--muted) 45%, var(--background)),
+                color-mix(in srgb, var(--muted) 45%, var(--background))
+            )
+            padding-box,
+        conic-gradient(
+                from var(--ai-glow-angle),
+                var(--primary),
+                var(--secondary),
+                color-mix(in srgb, var(--primary) 35%, var(--border)),
+                var(--primary)
+            )
+            border-box;
+    animation: ai-glow-spin 5s linear infinite;
+    transition: color 0.2s ease, box-shadow 0.3s ease;
+}
+.ai-glow-trigger:hover {
+    color: var(--foreground);
+    box-shadow:
+        0 0 14px color-mix(in srgb, var(--primary) 30%, transparent),
+        0 0 3px color-mix(in srgb, var(--secondary) 25%, transparent);
+    animation-duration: 2s;
+}
+.ai-glow-trigger kbd {
+    border-color: color-mix(in srgb, var(--primary) 25%, var(--border)) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    .ai-glow-trigger {
+        animation: none;
+    }
+}
+
 /* ── selección de texto con tinte de marca ──────────────────────────── */
 ::selection {
     background: color-mix(in srgb, var(--primary) 28%, transparent);
