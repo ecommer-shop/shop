@@ -90,6 +90,11 @@ export const wompiSubscriptionShopApiExtensions = gql`
     limit: Int!
   }
 
+  type WompiDashboardConfig {
+    publicKey: String!
+    sandbox: Boolean!
+  }
+
   extend type Query {
     mySubscription(customerEmail: String): CustomerSubscription
     allPlans: [Plan!]!
@@ -97,6 +102,7 @@ export const wompiSubscriptionShopApiExtensions = gql`
     checkVariationLimit(channelToken: String, customerEmail: String): SubscriptionCheckResult
     checkFeatureAccess(featureCode: String!, customerEmail: String): Boolean
     GetWompiIntegritySignature(amountInCents: Int!, paymentReference: String!): String!
+    wompiDashboardConfig: WompiDashboardConfig!
   }
 
   extend type Mutation {

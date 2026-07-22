@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Allow, Permission } from '@vendure/core';
 import { Resolver, Query, Args } from '@nestjs/graphql';
 import { WompiService } from '../services/wompi.service';
 
@@ -8,6 +9,16 @@ export class WompiResolver {
     constructor(
         private wompiService: WompiService,
     ) { }
+
+    @Query()
+    @Allow(Permission.Authenticated)
+    wompiDashboardConfig() {
+        const publicKey = this.wompiService.getPublicKey();
+        return {
+            publicKey,
+            sandbox: publicKey.startsWith('pub_test_'),
+        };
+    }
 
     @Query('GetWompiIntegritySignature')
     async getWompiIntegritySignature(

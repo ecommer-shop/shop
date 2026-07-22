@@ -1031,7 +1031,10 @@ export default defineConfig({
         {
             name: 'inject-wompi-key',
             transformIndexHtml(html) {
-                const key = process.env.WOMPI_PUBLIC_KEY || '';
+                const key =
+                    process.env.WOMPI_PUBLIC_KEY?.trim() ||
+                    process.env.PAYMENT_PUBLIC_KEY?.trim() ||
+                    '';
                 return html.replace(
                     '</head>',
                     `  <script>window.__WOMPI_PUBLIC_KEY__ = "${key}";</script>\n</head>`
