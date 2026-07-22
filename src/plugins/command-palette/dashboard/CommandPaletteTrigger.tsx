@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Search } from 'lucide-react';
+import { useIsMobile } from '@vendure/dashboard';
 import { CommandPaletteDialog } from './CommandPaletteDialog';
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 export function CommandPaletteTrigger() {
     const [open, setOpen] = useState(false);
+    const isMobile = useIsMobile();
 
     const handleOpen = useCallback(() => {
         setOpen(true);
@@ -31,42 +35,46 @@ export function CommandPaletteTrigger() {
 
     return (
         <>
-            {/* Toolbar button */}
+            {/* Header trigger: pill de búsqueda en desktop, icono en móvil */}
             <button
                 onClick={handleOpen}
-                title="Buscar comandos (⌘K)"
+                title={`Buscar comandos (${isMac ? '⌘K' : 'Ctrl+K'})`}
+                aria-label="Buscar comandos"
+                className="ai-glow-trigger"
                 style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 36,
-                    height: 36,
-                    border: 'none',
-                    background: 'transparent',
-                    borderRadius: 8,
+                    gap: 8,
+                    height: 34,
+                    padding: isMobile ? '0 8px' : '0 10px',
+                    borderRadius: 9999,
                     cursor: 'pointer',
                     color: 'var(--muted-foreground)',
-                    transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                    e.currentTarget.style.background = 'var(--accent, hsl(var(--accent)))';
-                    e.currentTarget.style.color = 'var(--accent-foreground, var(--foreground))';
-                    e.currentTarget.style.opacity = '0.8';
-                }}
-                onMouseLeave={e => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'var(--muted-foreground)';
-                    e.currentTarget.style.opacity = '1';
                 }}
             >
-                <Search style={{ width: 18, height: 18 }} />
+                <Search style={{ width: 16, height: 16, flexShrink: 0 }} />
+                {!isMobile && (
+                    <>
+                        <span style={{ fontSize: 13 }}>Buscar</span>
+                        <kbd
+                            style={{
+                                fontSize: 11,
+                                fontFamily: 'inherit',
+                                lineHeight: 1,
+                                padding: '3px 5px',
+                                borderRadius: 6,
+                                border: '1px solid var(--border)',
+                                background: 'var(--background)',
+                                color: 'var(--muted-foreground)',
+                            }}
+                        >
+                            {isMac ? '⌘K' : 'Ctrl K'}
+                        </kbd>
+                    </>
+                )}
             </button>
 
-            {/* Dialog via portal */}
-            {createPortal(
-                <CommandPaletteDialog open={open} onClose={handleClose} />,
-                document.body,
-            )}
+            {createPortal(<CommandPaletteDialog open={open} onClose={handleClose} />, document.body)}
         </>
     );
 }

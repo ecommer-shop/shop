@@ -1,0 +1,60 @@
+/*
+ * Tipografía de marca: Gilroy para títulos, Poppins para el resto.
+ * Cargada vía theme.additionalStylesheets (vite.config.mts); los woff2 viven
+ * en src/styles/fonts/ y vite los emite como assets con hash.
+ */
+
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('./fonts/Poppins-Regular.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('./fonts/Poppins-Medium.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('./fonts/Poppins-SemiBold.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('./fonts/Poppins-Bold.woff2') format('woff2');
+}
+
+/* Gilroy (pesos gratuitos: Light y ExtraBold). Los rangos de font-weight
+   hacen que cualquier título medium/semibold/bold resuelva a ExtraBold —
+   el look de marca — y los pesos ligeros a Light. */
+@font-face {
+    font-family: 'Gilroy';
+    font-style: normal;
+    font-weight: 100 449;
+    font-display: swap;
+    src: url('./fonts/Gilroy-Light.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Gilroy';
+    font-style: normal;
+    font-weight: 450 900;
+    font-display: swap;
+    src: url('./fonts/Gilroy-ExtraBold.woff2') format('woff2');
+}
+
+/* Overrides de los tokens tipográficos del dashboard
+   (--font-body/--font-sans: Inter → Poppins; --font-heading: Public Sans → Gilroy) */
+:root {
+    --font-body: 'Poppins', system-ui, sans-serif;
+    --font-sans: 'Poppins', system-ui, sans-serif;
+    --font-heading: 'Gilroy', 'Poppins', system-ui, sans-serif;
+}

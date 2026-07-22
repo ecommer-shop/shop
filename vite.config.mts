@@ -905,6 +905,14 @@ export default defineConfig({
         outDir: `${__dirname}/dist/dashboard`,
         emptyOutDir: true,
     },
+    server: {
+        fs: {
+            // En dev el plugin del dashboard usa como root el paquete dentro de
+            // node_modules, y las fuentes de marca (src/styles/fonts) quedan
+            // fuera de la lista permitida de @fs → 403. Permitimos el proyecto.
+            allow: [__dirname],
+        },
+    },
     optimizeDeps: {
         // @vendure-io/ui and @vendure/dashboard each ship their own nested
         // recharts@2.x (the project's own recharts is a separate v3 copy).
@@ -945,6 +953,12 @@ export default defineConfig({
             // #6BB8FF Blue Mana         → hsl(209 100% 71%)
             // #F1F1F1 Beluga            → hsl(0 0% 95%)
             theme: {
+                // Pulido moderno (sombras, radius, micro-interacciones) en capa
+                // sobre los tokens de marca. Solo usa var(--…), sirve en ambos modos.
+                additionalStylesheets: [
+                    `${__dirname}/src/styles/brand-fonts.css`,
+                    `${__dirname}/src/styles/dashboard-modern.css`,
+                ],
                 light: {
                     background: 'hsl(0 0% 95%)',          // Beluga
                     foreground: 'hsl(240 56% 16%)',       // Deadly Depths
@@ -1051,6 +1065,16 @@ export default defineConfig({
                 }
 
                 let html = indexHtml.source as string;
+
+                // Favicons de marca (archivos copiados por scripts/copy-favicons.mjs)
+                html = html.replace(
+                    '<link rel="icon" type="image/png" href="favicon.png" />',
+                    `<link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="manifest" href="site.webmanifest" />`,
+                );
 
                 // Inyectar título personalizado y scripts
                 html = html.replace(
