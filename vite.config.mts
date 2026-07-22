@@ -102,10 +102,17 @@ function patchVendureDashboardChannelPermissions() {
             }
 
             if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_payment-methods/payment-methods_.$id.tsx')) {
-                if (!nextCode.includes("import { EntityAssets } from '@/vdb/components/shared/entity-assets.js';")) {
+                // Prefer the billing-style asset field (hydrate + Ver/Descargar) over EntityAssets.
+                if (nextCode.includes("import { EntityAssets } from '@/vdb/components/shared/entity-assets.js';")) {
+                    nextCode = nextCode.replace(
+                        "\nimport { EntityAssets } from '@/vdb/components/shared/entity-assets.js';",
+                        '',
+                    );
+                }
+                if (!nextCode.includes("import { BillingCertificateDocField } from '@/plugins/invoice-client/dashboard/components/billing-certificate-doc-field';")) {
                     nextCode = nextCode.replace(
                         "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
-                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { EntityAssets } from '@/vdb/components/shared/entity-assets.js';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { BillingCertificateDocField } from '@/plugins/invoice-client/dashboard/components/billing-certificate-doc-field';",
                     );
                 }
                 if (!nextCode.includes("import { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';")) {
@@ -120,13 +127,6 @@ function patchVendureDashboardChannelPermissions() {
                         "import { toast } from 'sonner';\nimport { usePermissions } from '@/vdb/hooks/use-permissions.js';",
                     );
                 }
-                if (!nextCode.includes("import { Field } from '@/vdb/components/ui/field.js';")) {
-                    nextCode = nextCode.replace(
-                        "import { Button } from '@/vdb/components/ui/button.js';",
-                        "import { Button } from '@/vdb/components/ui/button.js';\nimport { Field } from '@/vdb/components/ui/field.js';",
-                    );
-                }
-
                 if (!nextCode.includes('const canConfigurePaymentProcessor')) {
                     nextCode = nextCode.replace(
                         '    const { t } = useLingui();',
@@ -219,18 +219,18 @@ function patchVendureDashboardChannelPermissions() {
                     blockId="bank-certification-pdf"
                     title="Carga tu certificado bancario"
                 >
-                    <Field>
-                        <EntityAssets
-                            compact={true}
-                            multiSelect={false}
-                            onChange={value => {
-                                form.setValue('customFields.bankCertificationPdf', value.featuredAssetId ?? undefined, {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                });
-                            }}
-                        />
-                    </Field>
+                    <BillingCertificateDocField
+                        label="Certificación bancaria"
+                        hint="PDF o imagen de la certificación bancaria. Al guardar el método de pago, el archivo queda asociado y se muestra al volver a abrir."
+                        assetId={String(form.watch('customFields.bankCertificationPdf') ?? '')}
+                        onAssetIdChange={id => {
+                            form.setValue('customFields.bankCertificationPdf', id || undefined, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                            });
+                        }}
+                        accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf"
+                    />
                 </PageBlock>
                 <PageBlock column="main" blockId="payment-method-bank-fields" title="Datos bancarios">
                     <DetailFormGrid>
@@ -625,6 +625,10 @@ function patchVendureDashboardChannelPermissions() {
                     `            customFields`,
                     `            customFields {
                 storeDescription
+                storeHeaderBannerUrl {
+                    id
+                    preview
+                }
                 storeBannerUrl {
                     id
                     preview
@@ -633,7 +637,137 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
-            return nextCode === code ? null : nextCode;
+            // Strip Asset relation objects from customFields before GraphQL mutations (only *Id is valid).
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/framework/form-engine/use-generated-form.tsx')) {
+                nextCode = nextCode.replace(
+                    `            const onSubmitWrapper = (values: any) => {
+                let processed = convertEmptyStringsToNull(
+                    removeEmptyIdFields(values, updateFields),
+                    updateFields,
+                );
+                if (!entity) {
+                    processed = stripNullNullableFields(processed, updateFields);
+                }
+                onSubmit(processed);
+            };`,
+                    `            const onSubmitWrapper = (values: any) => {
+                let processed = convertEmptyStringsToNull(
+                    removeEmptyIdFields(values, updateFields),
+                    updateFields,
+                );
+                if (!entity) {
+                    processed = stripNullNullableFields(processed, updateFields);
+                }
+                if (processed?.customFields && typeof processed.customFields === 'object') {
+                    const cf = { ...processed.customFields } as Record<string, unknown>;
+                    for (const key of Object.keys(cf)) {
+                        if (key.endsWith('Url') && cf[\`\${key}Id\`] != null) {
+                            delete cf[key];
+                        }
+                    }
+                    delete cf.storeBannerUrl;
+                    delete cf.storeHeaderBannerUrl;
+                    processed = { ...processed, customFields: cf };
+                }
+                onSubmit(processed);
+            };`,
+                );
+            }
+
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/framework/form-engine/utils.ts')) {
+                nextCode = nextCode.replace(
+                    `            const relationValue = entity.customFields[propertyAccessorKey];
+            processedEntity.customFields[relationField] = relationValue === null ? null : relationValue?.id;
+            delete processedEntity.customFields[propertyAccessorKey];`,
+                    `            const relationValue = entity.customFields[propertyAccessorKey];
+            const existingId = entity.customFields[relationField];
+            if (relationValue === null || relationValue === undefined) {
+                if (existingId != null && existingId !== '') {
+                    processedEntity.customFields[relationField] = existingId;
+                } else {
+                    processedEntity.customFields[relationField] = null;
+                }
+            } else {
+                processedEntity.customFields[relationField] =
+                    typeof relationValue === 'object' ? relationValue?.id : relationValue;
+            }
+            delete processedEntity.customFields[propertyAccessorKey];`,
+                );
+            }
+
+            // Profile save: map Asset relations to *Id fields and strip object keys from mutation input
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.tsx')) {
+                nextCode = nextCode.replace(
+                    `        setValuesForUpdate: entity => {
+            return {
+                id: entity.id,
+                firstName: entity.firstName,
+                lastName: entity.lastName,
+                emailAddress: entity.emailAddress,
+                password: '',
+                customFields: entity.customFields,
+            };
+        },
+        transformUpdateInput: input => {
+            return {
+                ...input,
+                password: input.password?.length ? input.password : undefined,
+            };
+        },`,
+                    `        setValuesForUpdate: entity => {
+            const cf = (entity.customFields ?? {}) as Record<string, any>;
+            const {
+                storeBannerUrl,
+                storeHeaderBannerUrl,
+                storeBannerUrlId,
+                storeHeaderBannerUrlId,
+                ...restCustomFields
+            } = cf;
+
+            const resolveRelationId = (relation: unknown, idValue: unknown) => {
+                if (typeof idValue === 'string' && idValue) return idValue;
+                if (relation && typeof relation === 'object' && relation !== null && 'id' in relation) {
+                    const id = (relation as { id?: string | number | null }).id;
+                    if (id != null) return String(id);
+                }
+                if (typeof idValue === 'string') return idValue || null;
+                return null;
+            };
+
+            return {
+                id: entity.id,
+                firstName: entity.firstName,
+                lastName: entity.lastName,
+                emailAddress: entity.emailAddress,
+                password: '',
+                customFields: {
+                    ...restCustomFields,
+                    storeBannerUrlId: resolveRelationId(storeBannerUrl, storeBannerUrlId),
+                    storeHeaderBannerUrlId: resolveRelationId(storeHeaderBannerUrl, storeHeaderBannerUrlId),
+                },
+            };
+        },
+        transformUpdateInput: input => {
+            const customFields = { ...(input.customFields ?? {}) } as Record<string, unknown>;
+            delete customFields.storeBannerUrl;
+            delete customFields.storeHeaderBannerUrl;
+
+            for (const key of ['storeBannerUrlId', 'storeHeaderBannerUrlId']) {
+                if (customFields[key] === '' || customFields[key] === undefined) {
+                    delete customFields[key];
+                }
+            }
+
+            return {
+                ...input,
+                password: input.password?.length ? input.password : undefined,
+                customFields,
+            };
+        },`,
+                );
+            }
+
+
             if (normalizedId.includes('/@vendure/dashboard/src/lib/framework/dashboard-widget/base-widget')) {
                 nextCode = nextCode.replace(
                     `'h-full w-full flex flex-col rounded-md'`,
@@ -641,56 +775,122 @@ function patchVendureDashboardChannelPermissions() {
                 );
             }
 
-            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
-            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
+            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/ui/grid-layout.tsx')) {
                 nextCode = nextCode.replace(
-                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
-                    '',
+                    `<div className="h-full w-full">`,
+                    `<div className="h-full w-full overflow-hidden">`,
                 );
             }
 
-            // Profile query must select Administrator customFields subfields
-            if (
-                normalizedId.includes(
-                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
-                )
-            ) {
-                nextCode = nextCode.replace(
-                    `            customFields`,
-                    `            customFields {
-                storeDescription
-                storeBannerUrl {
-                    id
-                    preview
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/index.tsx')) {
+                if (!nextCode.includes('ECOMMER_RECOMMENDED_WIDGET_LAYOUT')) {
+                    nextCode = nextCode.replace(
+                        `const findNextPosition = (`,
+                        `const ECOMMER_LAYOUT_VERSION = 2;
+const ECOMMER_LAYOUT_VERSION_KEY = 'ecommer.widgetLayoutVersion';
+const ECOMMER_RECOMMENDED_WIDGET_LAYOUT: Record<string, { x: number; y: number; w: number; h: number }> = {
+    'latest-orders-widget': { x: 0, y: 0, w: 6, h: 7 },
+    'orders-summary-widget': { x: 6, y: 0, w: 6, h: 3 },
+    'ai-chat-widget': { x: 6, y: 3, w: 6, h: 4 },
+    'advanced-metrics': { x: 6, y: 7, w: 6, h: 4 },
+    'invoice-quota': { x: 0, y: 7, w: 6, h: 2 },
+    'ecommer-share-links': { x: 0, y: 9, w: 6, h: 4 },
+    'metrics-widget': { x: 0, y: 13, w: 12, h: 5 },
+};
+function ecommerLayoutsOverlap(
+    a: { x: number; y: number; w: number; h: number },
+    b: { x: number; y: number; w: number; h: number },
+): boolean {
+    return !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+}
+function ecommerHasOverlappingLayouts(
+    layout: Record<string, { x: number; y: number; w: number; h: number }>,
+): boolean {
+    const entries = Object.values(layout);
+    for (let i = 0; i < entries.length; i++) {
+        for (let j = i + 1; j < entries.length; j++) {
+            if (ecommerLayoutsOverlap(entries[i], entries[j])) return true;
+        }
+    }
+    return false;
+}
+const findNextPosition = (`,
+                    );
                 }
-            }`,
-                );
-            }
 
-            return nextCode === code ? null : nextCode;
-            // Quita el item "Explore Platform & Cloud" del menú de usuario (link a vendure.io/pricing)
-            if (normalizedId.includes('/@vendure/dashboard/src/lib/components/layout/nav-user')) {
                 nextCode = nextCode.replace(
-                    /<DropdownMenuGroup>\s*<DropdownMenuItem render={<a href="https:\/\/vendure\.io\/pricing"[\s\S]*?<\/DropdownMenuItem>\s*<\/DropdownMenuGroup>\s*<DropdownMenuSeparator \/>\s*/,
-                    '',
-                );
-            }
+                    `    useEffect(() => {
+        const savedLayouts = settings.widgetLayout || {};
 
-            // Profile query must select Administrator customFields subfields
-            if (
-                normalizedId.includes(
-                    '/@vendure/dashboard/src/app/routes/_authenticated/_profile/profile.graphql.ts',
-                )
-            ) {
+        const initialWidgets = Array.from(getDashboardWidgetRegistry().entries())`,
+                    `    useEffect(() => {
+        const savedLayouts = settings.widgetLayout || {};
+        const storedLayoutVersion =
+            typeof localStorage !== 'undefined'
+                ? Number.parseInt(localStorage.getItem(ECOMMER_LAYOUT_VERSION_KEY) ?? '0', 10)
+                : 0;
+        const layoutNeedsReset =
+            storedLayoutVersion < ECOMMER_LAYOUT_VERSION ||
+            (Object.keys(savedLayouts).length > 0 && ecommerHasOverlappingLayouts(savedLayouts));
+        const effectiveLayouts = layoutNeedsReset
+            ? { ...savedLayouts, ...ECOMMER_RECOMMENDED_WIDGET_LAYOUT }
+            : savedLayouts;
+
+        const initialWidgets = Array.from(getDashboardWidgetRegistry().entries())`,
+                );
+
                 nextCode = nextCode.replace(
-                    `            customFields`,
-                    `            customFields {
-                storeDescription
-                storeBannerUrl {
-                    id
-                    preview
-                }
-            }`,
+                    `                const savedLayout = savedLayouts[id];`,
+                    `                const savedLayout = effectiveLayouts[id];`,
+                );
+
+                nextCode = nextCode.replace(
+                    `                // Only find next position if we don't have a saved layout
+                if (!savedLayout) {
+                    const pos = findNextPosition(acc, {
+                        w: layout.w,
+                        h: layout.h,
+                    });
+                    layout.x = pos.x;
+                    layout.y = pos.y;
+                }`,
+                    `                const recommendedLayout = ECOMMER_RECOMMENDED_WIDGET_LAYOUT[id];
+                if (recommendedLayout && layoutNeedsReset) {
+                    layout.x = recommendedLayout.x;
+                    layout.y = recommendedLayout.y;
+                    layout.w = recommendedLayout.w;
+                    layout.h = recommendedLayout.h;
+                } else if (!savedLayout) {
+                    const pos = findNextPosition(acc, {
+                        w: layout.w,
+                        h: layout.h,
+                    });
+                    layout.x = pos.x;
+                    layout.y = pos.y;
+                }`,
+                );
+
+                nextCode = nextCode.replace(
+                    `        setWidgets(initialWidgets);
+        setIsInitialized(true);
+    }, [settings.widgetLayout, hasPermissions]);`,
+                    `        setWidgets(initialWidgets);
+        setIsInitialized(true);
+
+        if (layoutNeedsReset && typeof localStorage !== 'undefined') {
+            const layoutConfig: Record<string, { x: number; y: number; w: number; h: number }> = {};
+            initialWidgets.forEach(widget => {
+                layoutConfig[widget.widgetId] = {
+                    x: widget.layout.x,
+                    y: widget.layout.y,
+                    w: widget.layout.w,
+                    h: widget.layout.h,
+                };
+            });
+            setWidgetLayout(layoutConfig);
+            localStorage.setItem(ECOMMER_LAYOUT_VERSION_KEY, String(ECOMMER_LAYOUT_VERSION));
+        }
+    }, [settings.widgetLayout, hasPermissions, setWidgetLayout]);`,
                 );
             }
 
@@ -704,6 +904,22 @@ export default defineConfig({
     build: {
         outDir: `${__dirname}/dist/dashboard`,
         emptyOutDir: true,
+    },
+    server: {
+        fs: {
+            // En dev el plugin del dashboard usa como root el paquete dentro de
+            // node_modules, y las fuentes de marca (src/styles/fonts) quedan
+            // fuera de la lista permitida de @fs → 403. Permitimos el proyecto.
+            allow: [__dirname],
+        },
+    },
+    optimizeDeps: {
+        // @vendure-io/ui and @vendure/dashboard each ship their own nested
+        // recharts@2.x (the project's own recharts is a separate v3 copy).
+        // Without this, Vite's dev-server dependency scanner doesn't crawl
+        // into those nested copies, so their `import get from 'lodash/get'`
+        // hits an un-prebundled raw CJS file with no default export.
+        include: ['@vendure-io/ui > recharts', '@vendure/dashboard > recharts'],
     },
     plugins: [
         patchVendureDashboardChannelPermissions(),
@@ -737,6 +953,12 @@ export default defineConfig({
             // #6BB8FF Blue Mana         → hsl(209 100% 71%)
             // #F1F1F1 Beluga            → hsl(0 0% 95%)
             theme: {
+                // Pulido moderno (sombras, radius, micro-interacciones) en capa
+                // sobre los tokens de marca. Solo usa var(--…), sirve en ambos modos.
+                additionalStylesheets: [
+                    `${__dirname}/src/styles/brand-fonts.css`,
+                    `${__dirname}/src/styles/dashboard-modern.css`,
+                ],
                 light: {
                     background: 'hsl(0 0% 95%)',          // Beluga
                     foreground: 'hsl(240 56% 16%)',       // Deadly Depths
@@ -843,6 +1065,16 @@ export default defineConfig({
                 }
 
                 let html = indexHtml.source as string;
+
+                // Favicons de marca (archivos copiados por scripts/copy-favicons.mjs)
+                html = html.replace(
+                    '<link rel="icon" type="image/png" href="favicon.png" />',
+                    `<link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="manifest" href="site.webmanifest" />`,
+                );
 
                 // Inyectar título personalizado y scripts
                 html = html.replace(
@@ -985,6 +1217,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@/gql': `${__dirname}/src/gql/graphql.ts`,
+            // Mirrors the "@/plugins/*" path mapping in tsconfig.dashboard.json.
             '@/plugins': `${__dirname}/src/plugins`,
         },
     },

@@ -50,15 +50,17 @@ export function DatePicker({
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                    disabled={disabled}
-                >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {displayValue}
-                </Button>
+            <PopoverTrigger
+                render={
+                    <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                        disabled={disabled}
+                    />
+                }
+            >
+                <Calendar className="mr-2 h-4 w-4" />
+                {displayValue}
             </PopoverTrigger>
             <PopoverContent className="w-auto p-3" align="start">
                 <div className="space-y-2">
