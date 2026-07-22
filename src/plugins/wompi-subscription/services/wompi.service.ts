@@ -77,8 +77,7 @@ export class WompiService {
             Logger.debug('Created payment source: ' + response.data.data.id, 'WompiService');
             return response.data.data;
         } catch (error: any) {
-            Logger.error('Failed to create payment source: ' + error.message, 'WompiService');
-            throw new Error(`Failed to create payment source: ${error.response?.data?.message || error.message}`);
+            throw new Error(`Failed to create payment source: ${WompiService.formatApiError(error)}`);
         }
     }
 
@@ -87,19 +86,22 @@ export class WompiService {
         const reference = payload.reference;
         const signature = this.generateTransactionSignature(amountInCents, reference);
 
+        const body: Record<string, unknown> = { ...payload, signature };
+        if (!body.redirect_url) {
+            delete body.redirect_url;
+        }
+
         try {
-            const response = await this.apiClient.post('/transactions', {
-                ...payload,
-                signature,
-            });
+            const response = await this.apiClient.post('/transactions', body);
             Logger.debug(`Created transaction ${response.data.data.id} with status ${response.data.data.status}`, 'WompiService');
             return response.data.data;
         } catch (error: any) {
-            Logger.error(`Failed to create transaction: ${error.message}`, 'WompiService');
+            const detail = WompiService.formatApiError(error);
+            Logger.error(`Failed to create transaction: ${detail}`, 'WompiService');
             if (error.response?.data) {
                 Logger.error(`Wompi error details: ${JSON.stringify(error.response.data)}`, 'WompiService');
             }
-            throw new Error(`Failed to create transaction: ${error.response?.data?.message || error.message}`);
+            throw new Error(`Failed to create transaction: ${detail}`);
         }
     }
 
@@ -178,6 +180,32 @@ export class WompiService {
             process.env.PAYMENT_PUBLIC_KEY?.trim() ||
             ''
         );
+    }
+
+    /** Mensaje legible desde la respuesta de error de Wompi (422, etc.). */
+    static formatApiError(error: any): string {
+        const data = error?.response?.data;
+        const messages = data?.error?.messages;
+        if (messages && typeof messages === 'object') {
+            const parts: string[] = [];
+            for (const [field, value] of Object.entries(messages)) {
+                if (Array.isArray(value)) {
+                    for (const msg of value) {
+                        parts.push(`${field}: ${String(msg)}`);
+                    }
+                }
+            }
+            if (parts.length > 0) {
+                return parts.join('; ');
+            }
+        }
+        if (typeof data?.error?.reason === 'string' && data.error.reason.trim()) {
+            return data.error.reason;
+        }
+        if (typeof data?.message === 'string' && data.message.trim()) {
+            return data.message;
+        }
+        return error?.message || 'Error desconocido';
     }
 
     validateWebhookSignature(payload: any): boolean {
