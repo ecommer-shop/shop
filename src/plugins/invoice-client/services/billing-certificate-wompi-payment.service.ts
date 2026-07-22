@@ -82,7 +82,6 @@ export class BillingCertificateWompiPaymentService {
       payment_method: { type: paymentMethod },
       acceptance_token: acceptanceToken,
       accept_personal_auth: personalAuthToken,
-      redirect_url: '',
     });
 
     let applied = false;
