@@ -76,7 +76,7 @@ export class BillingCertificateWompiPaymentService {
 
     const transaction = await this.wompiService.createTransaction({
       amount_in_cents: amountInCents,
-      currency: 'COP',
+      currency: process.env.WOMPI_CURRENCY?.trim() || 'COP',
       reference,
       customer_email: adminEmail,
       payment_method: { type: paymentMethod },

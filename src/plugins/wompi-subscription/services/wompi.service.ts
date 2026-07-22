@@ -9,20 +9,37 @@ import {
 import axios, { AxiosInstance } from 'axios';
 import crypto from 'crypto';
 
+export type WompiCredentials = {
+    publicKey: string;
+    apiKey: string;
+    integritySecret: string;
+    eventsSecret: string;
+    apiUrl: string;
+    currency: string;
+};
+
 @Injectable()
 export class WompiService {
     private readonly apiClient: AxiosInstance;
     private readonly options: WompiSubscriptionPluginInitOptions;
 
     constructor() {
+        const creds = WompiService.resolveCredentialsFromEnv();
         this.options = {
-            wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
-            wompiApiKey: process.env.WOMPI_API_KEY || '',
-            wompiPublicKey: WompiService.resolvePublicKeyFromEnv(),
-            wompiEventsSecret: process.env.WOMPI_EVENTS_SECRET || '',
-            wompiIntegritySecret: process.env.WOMPI_INTEGRITY_SECRET || '',
-            currency: process.env.WOMPI_CURRENCY || 'COP',
+            wompiApiUrl: creds.apiUrl,
+            wompiApiKey: creds.apiKey,
+            wompiPublicKey: creds.publicKey,
+            wompiEventsSecret: creds.eventsSecret,
+            wompiIntegritySecret: creds.integritySecret,
+            currency: creds.currency,
         };
+
+        if (!this.options.wompiIntegritySecret) {
+            Logger.warn(
+                'WOMPI_INTEGRITY_SECRET (o PAYMENT_SECRET_KEY) no está configurado — las transacciones fallarán con firma inválida.',
+                'WompiService',
+            );
+        }
 
         this.apiClient = axios.create({
             baseURL: this.options.wompiApiUrl,
@@ -82,11 +99,18 @@ export class WompiService {
     }
 
     async createTransaction(payload: Record<string, any>): Promise<WompiCreateTransactionResponse> {
-        const amountInCents = payload.amount_in_cents;
-        const reference = payload.reference;
-        const signature = this.generateTransactionSignature(amountInCents, reference);
+        if (!this.options.wompiIntegritySecret) {
+            throw new Error(
+                'WOMPI_INTEGRITY_SECRET no está configurado en el servidor (debe ser del mismo comercio que WOMPI_PUBLIC_KEY y WOMPI_API_KEY).',
+            );
+        }
 
-        const body: Record<string, unknown> = { ...payload, signature };
+        const amountInCents = Number(payload.amount_in_cents);
+        const reference = String(payload.reference ?? '');
+        const currency = String(payload.currency ?? this.options.currency);
+        const signature = this.generateTransactionSignature(amountInCents, reference, currency);
+
+        const body: Record<string, unknown> = { ...payload, amount_in_cents: amountInCents, currency, signature };
         if (!body.redirect_url) {
             delete body.redirect_url;
         }
@@ -160,8 +184,9 @@ export class WompiService {
         }
     }
 
-    generateTransactionSignature(amountInCents: number, reference: string): string {
-        const concatenated = `${reference}${amountInCents}${this.options.currency}${this.options.wompiIntegritySecret}`;
+    generateTransactionSignature(amountInCents: number, reference: string, currency?: string): string {
+        const cur = currency ?? this.options.currency;
+        const concatenated = `${reference}${amountInCents}${cur}${this.options.wompiIntegritySecret}`;
         return crypto.createHash('sha256').update(concatenated).digest('hex');
     }
 
@@ -171,18 +196,73 @@ export class WompiService {
 
     /** Llave pública para tokenización en el dashboard (WompiJS). */
     getPublicKey(): string {
-        return WompiService.resolvePublicKeyFromEnv();
+        return this.options.wompiPublicKey;
+    }
+
+    getCredentials(): WompiCredentials {
+        return {
+            publicKey: this.options.wompiPublicKey,
+            apiKey: this.options.wompiApiKey,
+            integritySecret: this.options.wompiIntegritySecret,
+            eventsSecret: this.options.wompiEventsSecret,
+            apiUrl: this.options.wompiApiUrl,
+            currency: this.options.currency ?? 'COP',
+        };
+    }
+
+    /**
+     * Resuelve credenciales Wompi sin mezclar comercios.
+     * Prioriza el bloque WOMPI_* completo; si no, el bloque PAYMENT_* legacy.
+     */
+    static resolveCredentialsFromEnv(): WompiCredentials {
+        const trim = (value?: string) => value?.trim() ?? '';
+
+        const wompiPublic = trim(process.env.WOMPI_PUBLIC_KEY);
+        const wompiIntegrity = trim(process.env.WOMPI_INTEGRITY_SECRET);
+        const wompiApiKey = trim(process.env.WOMPI_API_KEY);
+        const wompiEvents = trim(process.env.WOMPI_EVENTS_SECRET);
+        const apiUrl = trim(process.env.WOMPI_API_URL) || 'https://sandbox.wompi.co/v1';
+        const currency = trim(process.env.WOMPI_CURRENCY) || 'COP';
+
+        if (wompiPublic && wompiIntegrity && wompiApiKey) {
+            return {
+                publicKey: wompiPublic,
+                apiKey: wompiApiKey,
+                integritySecret: wompiIntegrity,
+                eventsSecret: wompiEvents,
+                apiUrl,
+                currency,
+            };
+        }
+
+        const paymentPublic = trim(process.env.PAYMENT_PUBLIC_KEY);
+        const paymentSecret = trim(process.env.PAYMENT_SECRET_KEY);
+        const paymentPrivate = trim(process.env.PAYMENT_PRIVATE_KEY);
+
+        if (paymentPublic && paymentSecret && paymentPrivate) {
+            return {
+                publicKey: paymentPublic,
+                apiKey: paymentPrivate,
+                integritySecret: paymentSecret,
+                eventsSecret: wompiEvents,
+                apiUrl,
+                currency,
+            };
+        }
+
+        return {
+            publicKey: wompiPublic || paymentPublic,
+            apiKey: wompiApiKey || paymentPrivate,
+            integritySecret: wompiIntegrity || paymentSecret,
+            eventsSecret: wompiEvents,
+            apiUrl,
+            currency,
+        };
     }
 
     static resolvePublicKeyFromEnv(): string {
-        return (
-            process.env.WOMPI_PUBLIC_KEY?.trim() ||
-            process.env.PAYMENT_PUBLIC_KEY?.trim() ||
-            ''
-        );
+        return WompiService.resolveCredentialsFromEnv().publicKey;
     }
-
-    /** Mensaje legible desde la respuesta de error de Wompi (422, etc.). */
     static formatApiError(error: any): string {
         const data = error?.response?.data;
         const messages = data?.error?.messages;
