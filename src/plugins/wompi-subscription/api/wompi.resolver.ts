@@ -13,10 +13,13 @@ export class WompiResolver {
     @Query()
     @Allow(Permission.Authenticated)
     wompiDashboardConfig() {
-        const publicKey = this.wompiService.getPublicKey();
+        const creds = this.wompiService.getCredentials();
+        if (!creds.publicKey) {
+            return { publicKey: '', sandbox: true };
+        }
         return {
-            publicKey,
-            sandbox: publicKey.startsWith('pub_test_'),
+            publicKey: creds.publicKey,
+            sandbox: creds.publicKey.startsWith('pub_test_'),
         };
     }
 

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Channel, ChannelService, RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { createHash } from 'crypto';
 import { IsNull, Not } from 'typeorm';
+import { WompiService } from '../../wompi-subscription/services/wompi.service';
 import {
   CHANNEL_BILLING_CERT_DOC_CHAMBER_FIELD,
   CHANNEL_BILLING_CERT_DOC_NIT_FIELD,
@@ -151,14 +152,13 @@ export class BillingPlansService {
     }
   }
 
-  /** Firma de integridad Wompi (misma fórmula que PaymentPlugin). */
+  /** Firma de integridad Wompi (misma fórmula que WompiService). */
   buildWompiPaymentSignature(amountInCents: number, paymentReference: string): string {
-    const currency = process.env.WOMPI_CURRENCY || 'COP';
-    const secret = process.env.WOMPI_INTEGRITY_SECRET || process.env.WOMPI_INTEGRITY_SECRET_KEY || '';
-    if (!secret) {
+    const creds = WompiService.resolveCredentialsFromEnv();
+    if (!creds.integritySecret) {
       throw new UserInputError('WOMPI_INTEGRITY_SECRET no está configurado en el servidor.');
     }
-    const concatenated = `${paymentReference}${amountInCents}${currency}${secret}`;
+    const concatenated = `${paymentReference}${amountInCents}${creds.currency}${creds.integritySecret}`;
     return createHash('sha256').update(concatenated).digest('hex');
   }
 
