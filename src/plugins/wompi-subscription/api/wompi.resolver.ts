@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Resolver, Query, Args } from '@nestjs/graphql';
 import { WompiService } from '../services/wompi.service';
 
@@ -15,5 +15,32 @@ export class WompiResolver {
         @Args('paymentReference') paymentReference: string,
     ) {
         return this.wompiService.generateWidgetIntegritySignature(amountInCents, paymentReference);
+    }
+
+    @Query('getAdminWompiTransactionStatus')
+    async getAdminWompiTransactionStatus(
+        @Args('transactionId') transactionId: string,
+    ) {
+        try {
+            const txn = await this.wompiService.getTransaction(transactionId);
+            const extra = (txn as any).payment_method?.extra ?? null;
+            const asyncPaymentUrl = extra?.async_payment_url ?? null;
+            const qrImage = extra?.qr_image ?? null;
+            const url = extra?.url ?? null;
+
+            Logger.debug(`Admin poll - txn ${transactionId} status=${txn.status} asyncPaymentUrl=${asyncPaymentUrl ? '✓' : '✗'} qrImage=${qrImage ? '✓' : '✗'} url=${url ? '✓' : '✗'}`, 'WompiResolver');
+
+            return {
+                id: txn.id,
+                status: txn.status,
+                statusMessage: (txn as any).status_message ?? null,
+                asyncPaymentUrl,
+                qrImage,
+                url,
+            };
+        } catch (error: any) {
+            Logger.error(`getAdminWompiTransactionStatus failed: ${error.message}`, 'WompiResolver');
+            throw error;
+        }
     }
 }

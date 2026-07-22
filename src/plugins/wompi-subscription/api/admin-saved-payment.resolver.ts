@@ -13,16 +13,31 @@ export class AdminSavedPaymentResolver {
 
     @Query()
     async mySavedPaymentMethods(@Ctx() ctx: RequestContext): Promise<any[]> {
-        const adminId = ctx.activeUserId;
-        if (!adminId) {
+        const userId = ctx.activeUserId;
+        if (!userId) {
             return [];
         }
 
         const repo = this.connection.getRepository(ctx, SavedPaymentMethod);
-        const methods = await repo.find({
-            where: { customerId: adminId.toString() },
+        let methods = await repo.find({
+            where: { customerId: userId.toString() },
             order: { isDefault: 'DESC', createdAt: 'DESC' },
         });
+
+        // Fallback: if no results with userId, try with administrator ID(s)
+        if (methods.length === 0) {
+            const adminRepo = this.connection.rawConnection.getRepository(Administrator);
+            const admins = await adminRepo.find({
+                where: { user: { id: Number(userId) } },
+            });
+            for (const admin of admins) {
+                const adminMethods = await repo.find({
+                    where: { customerId: admin.id.toString() },
+                    order: { isDefault: 'DESC', createdAt: 'DESC' },
+                });
+                methods = [...methods, ...adminMethods];
+            }
+        }
 
         return methods.map(m => ({
             id: m.id.toString(),
@@ -53,15 +68,24 @@ export class AdminSavedPaymentResolver {
             throw new Error('Not authenticated');
         }
 
-        const admin = await this.connection.getEntityOrThrow(ctx, Administrator, adminId);
+        const adminRepo = this.connection.rawConnection.getRepository(Administrator);
+        const admin = await adminRepo.findOne({
+            where: { user: { id: Number(adminId) } },
+            relations: ['user'],
+        });
+        if (!admin || !admin.emailAddress) {
+            throw new Error('Administrator not found');
+        }
         const customerEmail = admin.emailAddress;
+
+        const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
 
         const paymentSource = await this.wompiService.createPaymentSource(
             type,
             token,
             customerEmail,
-            '',
-            '',
+            acceptanceToken,
+            personalAuthToken,
         );
 
         if (!paymentSource?.id) {

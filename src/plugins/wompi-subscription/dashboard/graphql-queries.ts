@@ -280,6 +280,28 @@ export interface SavedPaymentMethod {
   createdAt: string;
 }
 
+export const GET_WOMPI_TRANSACTION_STATUS = `
+  query GetAdminWompiTransactionStatus($transactionId: String!) {
+    getAdminWompiTransactionStatus(transactionId: $transactionId) {
+      id
+      status
+      statusMessage
+      asyncPaymentUrl
+      qrImage
+      url
+    }
+  }
+`;
+
+export interface WompiTransactionStatus {
+  id: string;
+  status: string;
+  statusMessage?: string | null;
+  asyncPaymentUrl?: string | null;
+  qrImage?: string | null;
+  url?: string | null;
+}
+
 export function statusColor(status: string): 'success' | 'warning' | 'danger' | 'default' | 'destructive' {
   switch (status) {
     case 'ACTIVE': return 'success';

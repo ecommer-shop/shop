@@ -208,7 +208,7 @@ export class SubscriptionResolver {
                 });
 
                 const saved = savedRepo.create({
-                    customerId: administratorId.toString(),
+                    customerId: ctx.activeUserId?.toString() || administratorId.toString(),
                     type: paymentMethod,
                     wompiPaymentSourceId: paymentSource.id,
                     lastFour,
@@ -237,7 +237,7 @@ export class SubscriptionResolver {
 
         try {
             const paymentMethodInfo = paymentMethod === 'CARD'
-                ? { type: 'CARD', installments: 1 }
+                ? { installments: 1 }
                 : undefined;
 
             const transaction = await this.wompiService.createRecurringTransaction(
@@ -312,18 +312,42 @@ export class SubscriptionResolver {
         }
         const amountInCents = Math.round(targetPlan.price * 100);
 
-        const transaction = await this.wompiService.createTransaction({
+        const planName = targetPlan.name;
+        const channelCode = ctx.channel?.code || 'Ecommer';
+        const paymentDesc = `Pago suscripcion ${planName} por ${channelCode}`;
+
+        const payload: Record<string, any> = {
             amount_in_cents: amountInCents,
             currency: 'COP',
             reference,
             customer_email: admin.emailAddress,
-            payment_method: {
-                type: paymentMethod,
-            },
             acceptance_token: acceptanceToken,
             accept_personal_auth: personalAuthToken,
-            redirect_url: '',
-        });
+            payment_method: {
+                type: paymentMethod,
+                payment_description: paymentDesc,
+            },
+        };
+
+        if (paymentMethod === 'BANCOLOMBIA_QR' || paymentMethod === 'BANCOLOMBIA_COLLECT') {
+            payload.payment_method.sandbox_status = 'APPROVED';
+        }
+
+        if (paymentMethod === 'BANCOLOMBIA_BNPL') {
+            payload.payment_method.user_legal_id_type = 'CC';
+            payload.payment_method.user_legal_id = '1234567890';
+            payload.payment_method.name = admin.firstName || 'Admin';
+            payload.payment_method.last_name = admin.lastName || 'User';
+            payload.payment_method.phone_code = '57';
+            payload.payment_method.phone_number = '3000000000';
+        }
+
+        if (paymentMethod === 'SU_PLUS') {
+            payload.payment_method.user_legal_id_type = 'CC';
+            payload.payment_method.user_legal_id = '1234567890';
+        }
+
+        const transaction = await this.wompiService.createTransaction(payload);
 
         const asyncPaymentUrl = transaction.payment_method?.extra?.async_payment_url
             || transaction.payment_method?.extra?.url
