@@ -2,10 +2,11 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { JobQueue, JobQueueService, ProcessContext, TransactionalConnection, Product, ProductVariant, ProductTranslation, ProductVariantTranslation } from '@vendure/core';
 import { LanguageCode } from '@vendure/common/lib/generated-types';
 import { MoreThan } from 'typeorm';
-import { hasValidTranslation, getProductFallbackName, getVariantFallbackName } from '../subscribers/translation-utils';
+import { hasValidTranslation, getProductFallbackName, getVariantFallbackName, getNameFromExisting, getSlugFromName } from '../subscribers/translation-utils';
 
 const BATCH_SIZE = 200;
 const CONCURRENCY = 3;
+const LANGUAGES = [LanguageCode.es, LanguageCode.en];
 
 @Injectable()
 export class FixTranslationJobService implements OnModuleInit {
@@ -93,7 +94,7 @@ export class FixTranslationJobService implements OnModuleInit {
             do {
                 batch = await conn.getRepository(Product).find({
                     where: { id: MoreThan(lastId) },
-                    relations: ['translations'],
+                    relations: ['translations', 'channels'],
                     take: BATCH_SIZE,
                     order: { id: 'ASC' },
                 });
@@ -101,28 +102,43 @@ export class FixTranslationJobService implements OnModuleInit {
                 const toFix: Product[] = [];
                 for (const product of batch) {
                     lastId = product.id as number;
-                    if (hasValidTranslation(product.translations)) continue;
+                    if (LANGUAGES.every(lang => hasValidTranslation(product.translations, lang))) continue;
                     toFix.push(product);
                 }
 
                 if (toFix.length > 0) {
-                    const ptBatch = toFix.map(product => {
-                        const { name, slug, description } = getProductFallbackName(product.id as number, 'default');
-                        return { product, name, slug, description };
+                    const ptBatch = toFix.flatMap(product => {
+                        const channelCode = product.channels?.[0]?.code || '__default_channel__';
+                        return LANGUAGES.filter(lang => !hasValidTranslation(product.translations, lang)).map(lang => {
+                            const name = getNameFromExisting(product.translations, lang, () => {
+                                const fb = getProductFallbackName(product.id as number, channelCode);
+                                return fb.name;
+                            });
+                            const slug = getSlugFromName(name);
+                            return { product, lang, name, slug };
+                        });
                     });
 
-                    await this.withConcurrency(ptBatch, CONCURRENCY, async ({ product, name, slug, description }) => {
-                        const esTranslation = product.translations?.find(t => t.languageCode === LanguageCode.es);
-                        if (esTranslation) {
-                            await ptRepo.update(esTranslation.id, { name, slug, description });
+                    await this.withConcurrency(ptBatch, CONCURRENCY, async ({ product, lang, name, slug }) => {
+                        const existing = product.translations?.find(t => t.languageCode === lang);
+                        if (existing) {
+                            await ptRepo.update(existing.id, { name, slug, description: '' });
                         } else {
-                            await ptRepo.save({ base: { id: product.id }, languageCode: LanguageCode.es, name, slug, description } as any);
+                            try {
+                                await ptRepo.insert({ base: { id: product.id }, languageCode: lang, name, slug, description: '' } as any);
+                            } catch {
+                                const retry = await ptRepo.findOne({
+                                    where: { base: { id: product.id } as any, languageCode: lang },
+                                });
+                                if (retry) {
+                                    await ptRepo.update(retry.id, { name, slug, description: '' });
+                                }
+                            }
                         }
                     });
                     productsFixed += toFix.length;
                 }
-
-                this.logger.log(`[FixTranslations] Products batch: ${toFix.length} fixed`);
+                this.logger.log(`[Translations] Products batch: ${toFix.length} fixed`);
             } while (batch.length === BATCH_SIZE);
         }
 
@@ -133,7 +149,7 @@ export class FixTranslationJobService implements OnModuleInit {
             do {
                 batch = await conn.getRepository(ProductVariant).find({
                     where: { id: MoreThan(lastId) },
-                    relations: ['translations', 'product'],
+                    relations: ['translations'],
                     take: BATCH_SIZE,
                     order: { id: 'ASC' },
                 });
@@ -141,29 +157,42 @@ export class FixTranslationJobService implements OnModuleInit {
                 const toFix: ProductVariant[] = [];
                 for (const variant of batch) {
                     lastId = variant.id as number;
-                    if (hasValidTranslation(variant.translations)) continue;
+                    if (LANGUAGES.every(lang => hasValidTranslation(variant.translations, lang))) continue;
                     toFix.push(variant);
                 }
 
                 if (toFix.length > 0) {
-                    const pvtBatch = toFix.map(variant => {
-                        const productId = variant.product?.id || 0;
-                        const name = getVariantFallbackName(variant.id as number, productId as number, 'default');
-                        return { variant, name };
-                    });
+                    const pvtBatch = toFix.flatMap(variant =>
+                        LANGUAGES.filter(lang => !hasValidTranslation(variant.translations, lang)).map(lang => {
+                            const name = getNameFromExisting(variant.translations, lang, () => {
+                                return getVariantFallbackName(variant.id as number, variant.productId as number, 'default');
+                            });
+                            return { variant, lang, name };
+                        }),
+                    );
 
-                    await this.withConcurrency(pvtBatch, CONCURRENCY, async ({ variant, name }) => {
-                        const esTranslation = variant.translations?.find(t => t.languageCode === LanguageCode.es);
-                        if (esTranslation) {
-                            await pvtRepo.update(esTranslation.id, { name });
+                    await this.withConcurrency(pvtBatch, CONCURRENCY, async ({ variant, lang, name }) => {
+                        const existing = await pvtRepo.findOne({
+                            where: { base: { id: variant.id } as any, languageCode: lang },
+                        });
+                        if (existing) {
+                            await pvtRepo.update(existing.id, { name });
                         } else {
-                            await pvtRepo.save({ base: { id: variant.id }, languageCode: LanguageCode.es, name } as any);
+                            try {
+                                await pvtRepo.insert({ base: { id: variant.id }, languageCode: lang, name } as any);
+                            } catch {
+                                const retry = await pvtRepo.findOne({
+                                    where: { base: { id: variant.id } as any, languageCode: lang },
+                                });
+                                if (retry) {
+                                    await pvtRepo.update(retry.id, { name });
+                                }
+                            }
                         }
                     });
                     variantsFixed += toFix.length;
                 }
-
-                this.logger.log(`[FixTranslations] Variants batch: ${toFix.length} fixed`);
+                this.logger.log(`[Translations] Variants batch: ${toFix.length} fixed`);
             } while (batch.length === BATCH_SIZE);
         }
 
