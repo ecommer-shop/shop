@@ -67,6 +67,7 @@ import { MetricsApiPlugin } from '../plugins/metrics-api/metrics-api.plugin';
 import { EnviaShippingPlugin } from '../plugins/envia-shipping';
 import { ChannelStockLocationPlugin } from '../plugins/channel-stock-location/channel-stock-location.plugin';
 import { SellerUxPlugin } from '../plugins/seller-ux/seller-ux.plugin';
+import { TranslationsPlugin } from '../plugins/translations/translations.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -113,7 +114,7 @@ const emailPlugin = EmailPlugin.init({
 
 export const plugins: VendureConfig['plugins'] = [
   AutoSkuPlugin,
-
+  TranslationsPlugin,
   MultivendorPlugin.init({
     platformFeePercent: 10,
     platformFeeSKU: "FEE"
