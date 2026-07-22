@@ -89,7 +89,7 @@ export class WompiSubscriptionPlugin {
         this.options = {
             wompiApiUrl: options.wompiApiUrl || 'https://sandbox.wompi.co',
             wompiApiKey: options.wompiApiKey || process.env.WOMPI_API_KEY || '',
-            wompiPublicKey: options.wompiPublicKey || process.env.WOMPI_PUBLIC_KEY || '',
+            wompiPublicKey: options.wompiPublicKey || WompiService.resolvePublicKeyFromEnv(),
             wompiEventsSecret: options.wompiEventsSecret || process.env.WOMPI_EVENTS_SECRET || '',
             wompiIntegritySecret: options.wompiIntegritySecret || process.env.WOMPI_INTEGRITY_SECRET || '',
             currency: options.currency || 'COP',

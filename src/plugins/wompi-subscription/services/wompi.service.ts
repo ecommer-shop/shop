@@ -18,7 +18,7 @@ export class WompiService {
         this.options = {
             wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
             wompiApiKey: process.env.WOMPI_API_KEY || '',
-            wompiPublicKey: process.env.WOMPI_PUBLIC_KEY || '',
+            wompiPublicKey: WompiService.resolvePublicKeyFromEnv(),
             wompiEventsSecret: process.env.WOMPI_EVENTS_SECRET || '',
             wompiIntegritySecret: process.env.WOMPI_INTEGRITY_SECRET || '',
             currency: process.env.WOMPI_CURRENCY || 'COP',
@@ -165,6 +165,19 @@ export class WompiService {
 
     generateWidgetIntegritySignature(amountInCents: number, reference: string): string {
         return this.generateTransactionSignature(amountInCents, reference);
+    }
+
+    /** Llave pública para tokenización en el dashboard (WompiJS). */
+    getPublicKey(): string {
+        return WompiService.resolvePublicKeyFromEnv();
+    }
+
+    static resolvePublicKeyFromEnv(): string {
+        return (
+            process.env.WOMPI_PUBLIC_KEY?.trim() ||
+            process.env.PAYMENT_PUBLIC_KEY?.trim() ||
+            ''
+        );
     }
 
     validateWebhookSignature(payload: any): boolean {
