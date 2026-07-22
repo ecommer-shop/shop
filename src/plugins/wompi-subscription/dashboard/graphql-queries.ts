@@ -280,15 +280,29 @@ export interface SavedPaymentMethod {
     createdAt: string;
 }
 
-export function statusColor(status: string): 'success' | 'warning' | 'destructive' | 'default' {
-    switch (status) {
-        case 'ACTIVE': return 'success';
-        case 'PENDING_PAYMENT':
-        case 'GRACE_PERIOD': return 'warning';
-        case 'SUSPENDED':
-        case 'CANCELLED': return 'destructive';
-        default: return 'default';
+export const GET_WOMPI_TRANSACTION_STATUS = `
+  query GetAdminWompiTransactionStatus($transactionId: String!) {
+    getAdminWompiTransactionStatus(transactionId: $transactionId) {
+      id
+      status
+      statusMessage
+      asyncPaymentUrl
+      qrImage
+      url
     }
+  }
+`;
+
+export interface WompiTransactionStatus {
+  id: string;
+  status: string;
+  statusMessage?: string | null;
+  asyncPaymentUrl?: string | null;
+  qrImage?: string | null;
+  url?: string | null;
+}
+
+export function statusColor(status: string): 'success' | 'warning' | 'destructive' | 'default' {
 }
 
 export function statusLabel(status: string): string {

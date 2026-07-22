@@ -36,6 +36,14 @@ export class SavedPaymentService {
         cardHolderName?: string;
         channelToken: string;
     }): Promise<SavedPaymentMethod> {
+        // Avoid duplicates by payment source ID
+        const existingBySource = await this.repo.findOne({
+            where: { wompiPaymentSourceId: data.wompiPaymentSourceId },
+        });
+        if (existingBySource) {
+            return existingBySource;
+        }
+
         const existing = await this.repo.findOne({
             where: { customerId: data.customerId, channelToken: data.channelToken },
             order: { createdAt: 'ASC' },

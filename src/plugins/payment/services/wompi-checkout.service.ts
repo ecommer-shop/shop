@@ -92,6 +92,9 @@ export class WompiCheckoutService {
             payment_method: { type: methodCode } as Record<string, any>,
         };
 
+        // Payment description (required for PSE, QR, Collect, BNPL, etc.)
+        payload.payment_method.payment_description = input.paymentDescription || 'Pago en Ecommer';
+
         // PSE fields
         if (input.financialInstitutionCode) {
             payload.payment_method.financial_institution_code = input.financialInstitutionCode;
@@ -104,9 +107,6 @@ export class WompiCheckoutService {
         }
         if (input.userLegalId) {
             payload.payment_method.user_legal_id = input.userLegalId;
-        }
-        if (input.paymentDescription) {
-            payload.payment_method.payment_description = input.paymentDescription;
         }
 
         // Bancolombia QR / Recaudo - sandbox_status required in sandbox (safe to always send)

@@ -127,14 +127,6 @@ export const wompiSubscriptionShopApiExtensions = gql`
     ): PendingSubscriptionResult
     stopAutoRenew(subscriptionId: Int!, customerEmail: String): CustomerSubscription
     cancelSubscription(subscriptionId: Int!, customerEmail: String): CustomerSubscription
-    fixProductTranslations(dryRun: Boolean! = false): FixTranslationsResult!
-  }
-
-  type FixTranslationsResult {
-    productsScanned: Int!
-    productsFixed: Int!
-    variantsScanned: Int!
-    variantsFixed: Int!
   }
 
   type AdminSavedPaymentMethod {
@@ -149,8 +141,18 @@ export const wompiSubscriptionShopApiExtensions = gql`
     createdAt: DateTime!
   }
 
+  type WompiTransactionStatusResult {
+    id: String!
+    status: String!
+    statusMessage: String
+    asyncPaymentUrl: String
+    qrImage: String
+    url: String
+  }
+
   extend type Query {
     mySavedPaymentMethods: [AdminSavedPaymentMethod!]!
+    getAdminWompiTransactionStatus(transactionId: String!): WompiTransactionStatusResult!
   }
 
   extend type Mutation {
