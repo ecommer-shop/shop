@@ -1,0 +1,270 @@
+/*
+ * Pulido visual "moderno" del dashboard, en capa sobre el tema de marca
+ * (vite.config.mts → vendureDashboardPlugin.theme). Se inyecta por la vía
+ * oficial `theme.additionalStylesheets`, así que participa del pipeline de
+ * Tailwind y usa solo tokens (var(--…)) para funcionar en claro y oscuro.
+ */
+
+/* ── tipografía y rendering ─────────────────────────────────────────── */
+html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* ── escala de radius restaurada ────────────────────────────────────── */
+/* El paquete UI aplana toda la escala a 0.2rem (~3px, look cuadrado).
+   Se restaura una escala real derivada del token del tema (10px) para que
+   botones, chips y menús acompañen a inputs (10px) y cards (14px).
+   Los utilities compilan valores literales, así que se sobreescriben las
+   clases, no los tokens. */
+/* Los tokens también: los tamaños chicos de botón usan clases arbitrarias
+   tipo rounded-[min(var(--radius-md),10px)] que leen la VARIABLE, no la
+   clase .rounded-md. */
+:root {
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+}
+
+.rounded-sm {
+    border-radius: calc(var(--radius) - 4px);
+}
+.rounded-md {
+    border-radius: calc(var(--radius) - 2px);
+}
+.rounded-lg {
+    border-radius: var(--radius);
+}
+.rounded-xl {
+    border-radius: calc(var(--radius) + 4px);
+}
+
+/* ── scrollbars finos ───────────────────────────────────────────────── */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 25%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--muted-foreground) 22%, transparent);
+    border-radius: 9999px;
+}
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* ── cards: sin borde, definidas por superficie + sombra suave ──────── */
+[data-slot='card'] {
+    border-color: transparent;
+    border-radius: calc(var(--radius) + 4px);
+    box-shadow:
+        0 1px 2px rgb(0 0 0 / 0.04),
+        0 6px 16px -8px rgb(0 0 0 / 0.08);
+    transition: box-shadow 0.2s ease;
+}
+
+/* ── botones: micro-interacciones táctiles ──────────────────────────── */
+[data-slot='button'] {
+    transition:
+        transform 0.12s ease,
+        box-shadow 0.15s ease,
+        background-color 0.15s ease,
+        color 0.15s ease;
+}
+[data-slot='button']:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+/* ── sidebar: items tipo "pill" con transición ──────────────────────── */
+[data-sidebar='menu-button'],
+[data-sidebar='menu-sub-button'] {
+    border-radius: calc(var(--radius) - 2px);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+[data-sidebar='menu-button'][data-active='true'] {
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    color: var(--primary);
+    font-weight: 500;
+}
+[data-sidebar='menu-button'][data-active='true'] svg {
+    color: var(--primary);
+}
+
+/* ── contenedor de tablas: de marco con borde a card con sombra ─────── */
+/* El DataTable del core envuelve la tabla en un div "rounded-md border
+   bg-card"; se le da el mismo aspecto que las cards (sombra suave). */
+.bg-card.border:has(> [data-slot='table-container']) {
+    border-color: transparent;
+    border-radius: calc(var(--radius) + 4px);
+    overflow: hidden;
+    box-shadow:
+        0 1px 2px rgb(0 0 0 / 0.04),
+        0 6px 16px -8px rgb(0 0 0 / 0.08);
+}
+
+/* ── tablas sin bordes: tono en vez de líneas ───────────────────────── */
+[data-slot='table'] [data-slot='table-row'] {
+    border-bottom: 0;
+}
+[data-slot='table-footer'] {
+    border-top: 0;
+}
+[data-slot='table-header'] [data-slot='table-row'] {
+    background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+[data-slot='table-header'] [data-slot='table-head'] {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted-foreground);
+}
+[data-slot='table-body'] [data-slot='table-row'] {
+    transition: background-color 0.12s ease;
+}
+[data-slot='table-body'] [data-slot='table-row']:nth-child(even) {
+    background: color-mix(in srgb, var(--muted) 28%, transparent);
+}
+[data-slot='table-body'] [data-slot='table-row']:hover {
+    background: color-mix(in srgb, var(--muted) 65%, transparent);
+}
+
+/* ── superficies flotantes: más profundidad ─────────────────────────── */
+[data-slot='dialog-content'],
+[data-slot='dropdown-menu-content'],
+[data-slot='popover-content'],
+[data-slot='select-content'] {
+    border-radius: calc(var(--radius) + 4px);
+    box-shadow:
+        0 2px 6px rgb(0 0 0 / 0.06),
+        0 16px 40px -12px rgb(0 0 0 / 0.18);
+}
+[data-slot='dialog-overlay'] {
+    backdrop-filter: blur(3px);
+}
+
+/* ── header pegajoso con efecto vidrio ──────────────────────────────── */
+header.border-b.border-border {
+    background: color-mix(in srgb, var(--background) 82%, transparent) !important;
+    backdrop-filter: blur(10px) saturate(1.4) !important;
+    -webkit-backdrop-filter: blur(10px) saturate(1.4) !important;
+    box-shadow: 0 1px 0 var(--border) !important;
+}
+
+/* ── badges como pastillas, la variante outline pasa a tonal ────────── */
+[data-slot='badge'] {
+    border-radius: 9999px;
+}
+[data-slot='badge'].border-border,
+[data-slot='badge'].text-foreground {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+/* ── botones outline → tonales (sin borde, fondo suave) ─────────────── */
+/* Sin [data-slot='button']: los triggers de Base UI (popover/dropdown/tooltip
+   con render={<Button/>}) sobreescriben el data-slot del botón, así que se
+   selecciona por la combinación de clases de la variante outline. */
+.border-border.bg-background {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+.border-border.bg-background:hover {
+    background: var(--muted);
+}
+
+/* ── trigger del command palette: borde degradado "vivo" (look IA) ──── */
+@property --ai-glow-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+@keyframes ai-glow-spin {
+    to {
+        --ai-glow-angle: 360deg;
+    }
+}
+.ai-glow-trigger {
+    border: 1.5px solid transparent;
+    background:
+        linear-gradient(
+                color-mix(in srgb, var(--muted) 45%, var(--background)),
+                color-mix(in srgb, var(--muted) 45%, var(--background))
+            )
+            padding-box,
+        conic-gradient(
+                from var(--ai-glow-angle),
+                var(--primary),
+                var(--secondary),
+                color-mix(in srgb, var(--primary) 35%, var(--border)),
+                var(--primary)
+            )
+            border-box;
+    animation: ai-glow-spin 5s linear infinite;
+    transition: color 0.2s ease, box-shadow 0.3s ease;
+}
+.ai-glow-trigger:hover {
+    color: var(--foreground);
+    box-shadow:
+        0 0 14px color-mix(in srgb, var(--primary) 30%, transparent),
+        0 0 3px color-mix(in srgb, var(--secondary) 25%, transparent);
+    animation-duration: 2s;
+}
+.ai-glow-trigger kbd {
+    border-color: color-mix(in srgb, var(--primary) 25%, var(--border)) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    .ai-glow-trigger {
+        animation: none;
+    }
+}
+
+/* ── selección de texto con tinte de marca ──────────────────────────── */
+::selection {
+    background: color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+/* ── anillo de foco para navegación por teclado ─────────────────────── */
+/* Los campos de formulario quedan fuera: tienen su propio foco (abajo). */
+:focus-visible:not(input):not(textarea):not(select):not([data-slot='select-trigger']) {
+    outline: 2px solid color-mix(in srgb, var(--primary) 65%, transparent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* ── inputs y selects rellenos: tono en vez de borde ────────────────── */
+/* Se seleccionan los ELEMENTOS nativos (no data-slot): los wrappers de
+   Base UI y los composites (combobox, input-group…) reescriben o omiten
+   el data-slot, igual que pasó con los botones. radius = token del tema
+   (10px): anida con las cards de 14px; el rounded-md de los componentes
+   es de solo 0.2rem y se ve cuadrado.
+   Excluidos: checkbox/radio/range/file/color (otra affordance) y los
+   inputs "invisibles" de combobox-chips y paletas de comandos. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([data-slot='combobox-chip-input']):not([data-slot='command-input']),
+textarea,
+select,
+[data-slot='select-trigger'] {
+    border-radius: var(--radius);
+    border-color: transparent;
+    background: color-mix(in srgb, var(--muted) 55%, transparent);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([data-slot='combobox-chip-input']):not([data-slot='command-input']):hover:not(:focus-visible),
+textarea:hover:not(:focus-visible),
+[data-slot='select-trigger']:hover {
+    background: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+/* Foco moderno: borde primary fino + halo amplio y suave, sin anillo grueso */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([data-slot='combobox-chip-input']):not([data-slot='command-input']):focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[data-slot='select-trigger']:focus-visible,
+[data-slot='select-trigger'][data-popup-open] {
+    outline: none;
+    background: var(--background);
+    border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+}

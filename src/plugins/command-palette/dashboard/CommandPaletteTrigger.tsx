@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Search } from 'lucide-react';
+import { useIsMobile } from '@vendure/dashboard';
 import { CommandPaletteDialog } from './CommandPaletteDialog';
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 export function CommandPaletteTrigger() {
     const [open, setOpen] = useState(false);
+    const isMobile = useIsMobile();
 
     const handleOpen = useCallback(() => {
         setOpen(true);
@@ -31,76 +35,46 @@ export function CommandPaletteTrigger() {
 
     return (
         <>
-            {/* Toolbar button */}
+            {/* Header trigger: pill de búsqueda en desktop, icono en móvil */}
             <button
                 onClick={handleOpen}
-                title="Buscar comandos (⌘K)"
+                title={`Buscar comandos (${isMac ? '⌘K' : 'Ctrl+K'})`}
+                aria-label="Buscar comandos"
+                className="ai-glow-trigger"
                 style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 36,
-                    height: 36,
-                    border: 'none',
-                    background: 'transparent',
-                    borderRadius: 8,
+                    gap: 8,
+                    height: 34,
+                    padding: isMobile ? '0 8px' : '0 10px',
+                    borderRadius: 9999,
                     cursor: 'pointer',
                     color: 'var(--muted-foreground)',
-                    transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                    e.currentTarget.style.background = 'var(--accent, hsl(var(--accent)))';
-                    e.currentTarget.style.color = 'var(--accent-foreground, var(--foreground))';
-                    e.currentTarget.style.opacity = '0.8';
-                }}
-                onMouseLeave={e => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'var(--muted-foreground)';
-                    e.currentTarget.style.opacity = '1';
                 }}
             >
-                <Search style={{ width: 18, height: 18 }} />
+                <Search style={{ width: 16, height: 16, flexShrink: 0 }} />
+                {!isMobile && (
+                    <>
+                        <span style={{ fontSize: 13 }}>Buscar</span>
+                        <kbd
+                            style={{
+                                fontSize: 11,
+                                fontFamily: 'inherit',
+                                lineHeight: 1,
+                                padding: '3px 5px',
+                                borderRadius: 6,
+                                border: '1px solid var(--border)',
+                                background: 'var(--background)',
+                                color: 'var(--muted-foreground)',
+                            }}
+                        >
+                            {isMac ? '⌘K' : 'Ctrl K'}
+                        </kbd>
+                    </>
+                )}
             </button>
 
-            {/* Floating FAB via portal */}
-            {createPortal(
-                <>
-                    <button
-                        onClick={handleOpen}
-                        title="Buscar comandos (⌘K)"
-                        style={{
-                            position: 'fixed',
-                            bottom: 140,
-                            right: 24,
-                            width: 48,
-                            height: 48,
-                            borderRadius: 14,
-                            border: 'none',
-                            background: 'var(--primary, hsl(var(--primary)))',
-                            color: 'var(--primary-foreground, white)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                            zIndex: 9997,
-                            transition: 'transform 0.15s, box-shadow 0.15s',
-                        }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.transform = 'scale(1.08)';
-                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)';
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
-                        }}
-                    >
-                        <Search style={{ width: 22, height: 22 }} />
-                    </button>
-                    <CommandPaletteDialog open={open} onClose={handleClose} />
-                </>,
-                document.body,
-            )}
+            {createPortal(<CommandPaletteDialog open={open} onClose={handleClose} />, document.body)}
         </>
     );
 }
