@@ -13,6 +13,7 @@ import { SlugShareDisplay } from './slug-share-display';
 import { ShareLinksWidget } from './share-links-widget';
 
 defineDashboardExtension({
+    routes: [],
     customFormComponents: {
         customFields: [
             { id: 'ecommer-store-featured-star', component: StoreFeaturedStarInput },

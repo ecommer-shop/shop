@@ -10,10 +10,9 @@ import { WompiTokenController } from './api/wompi-token.controller';
 import { PlanResolver } from './api/plan.resolver';
 import { SubscriptionResolver } from './api/subscription.resolver';
 import { WompiResolver } from './api/wompi.resolver';
-import { FixTranslationsResolver } from './api/fix-translations.resolver';
+import { AdminSavedPaymentResolver } from './api/admin-saved-payment.resolver';
 import { shopApiExtensions } from './api/api-extensions';
 import { FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAccessGuard, PlanGuard } from './guards';
-import { ProductTranslationSubscriber } from './subscribers/product-translation.subscriber';
 
 @Global()
 @Module({
@@ -32,14 +31,13 @@ import { ProductTranslationSubscriber } from './subscribers/product-translation.
         PlanResolver,
         SubscriptionResolver,
         WompiResolver,
-        FixTranslationsResolver,
+        AdminSavedPaymentResolver,
         // ProductLimitResolver,
         FeatureGuard,
         ProductLimitGuard,
         ProductVariationLimitGuard,
         FeatureAccessGuard,
         PlanGuard,
-        ProductTranslationSubscriber,
     ],
     exports: [
         SubscriptionQueryService,
@@ -74,7 +72,7 @@ export class WompiSubscriptionModule { }
     },
     adminApiExtensions: {
         schema: shopApiExtensions,
-        resolvers: [PlanResolver, SubscriptionResolver, WompiResolver, FixTranslationsResolver],
+        resolvers: [PlanResolver, SubscriptionResolver, WompiResolver, AdminSavedPaymentResolver],
     },
     dashboard: './dashboard/index.tsx',
     configuration: (config) => {

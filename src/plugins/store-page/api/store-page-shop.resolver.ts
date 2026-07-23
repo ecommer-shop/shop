@@ -3,15 +3,17 @@ import {
     Administrator,
     Allow,
     Asset,
-    Collection,
     Channel,
+    Collection,
     Ctx,
     Permission,
     Product,
     RequestContext,
+    Seller,
     TransactionalConnection,
 } from '@vendure/core';
 
+import { parseSocialLinksJson } from '../services/social-links.service';
 type AssetFieldValue = string | { preview?: string | null; source?: string | null } | null;
 
 type AdminStoreFields = {
@@ -25,6 +27,7 @@ type StorePageProfile = {
     storeDescription: string | null;
     storeBannerUrl: string | null;
     storeHeaderBannerUrl: string | null;
+    socialLinks: Array<{ platform: string; username: string; dmLink: string; profileUrl: string; displayName: string | null; inPipeline: boolean }>
 };
 
 const STORE_ASSET_FIELDS = ['storeBannerUrl', 'storeHeaderBannerUrl'] as const;
@@ -50,8 +53,8 @@ function resolveAssetUrl(field: AssetFieldValue | undefined, preferSource = fals
         typeof field === 'string'
             ? field
             : preferSource
-              ? field.source || field.preview || null
-              : field.preview || field.source || null;
+                ? field.source || field.preview || null
+                : field.preview || field.source || null;
     const absolute = absolutizeAssetUrl(raw);
     return preferSource && absolute ? preferSourcePath(absolute) : absolute;
 }
@@ -86,7 +89,7 @@ function isHydratedAsset(field: AssetFieldValue | undefined): boolean {
 
 @Resolver()
 export class StorePageShopResolver {
-    constructor(private connection: TransactionalConnection) {}
+    constructor(private connection: TransactionalConnection) { }
 
     /** Carga Administrator con custom fields (incluyendo Assets de tienda). */
     private async loadAdminWithStoreFields(
@@ -146,12 +149,25 @@ export class StorePageShopResolver {
     private profileFromAdminFields(
         storeName: string,
         adminFields: AdminStoreFields | undefined,
+        seller?: Seller,
     ): StorePageProfile {
+        const socialLinks = seller?.customFields?.socialLinks
+            ? parseSocialLinksJson(seller.customFields.socialLinks).map(l => ({
+                platform: l.platform,
+                username: l.username,
+                dmLink: l.dmLink,
+                profileUrl: l.profileUrl,
+                displayName: l.displayName ?? null,
+                inPipeline: l.inPipeline,
+            }))
+            : [];
+
         return {
             storeName,
             storeDescription: adminFields?.storeDescription ?? null,
             storeBannerUrl: resolveAssetUrl(adminFields?.storeBannerUrl),
             storeHeaderBannerUrl: resolveAssetUrl(adminFields?.storeHeaderBannerUrl, true),
+            socialLinks,
         };
     }
 
@@ -264,11 +280,23 @@ export class StorePageShopResolver {
                 resolveAssetUrl(adminFields?.storeHeaderBannerUrl, true) || storeHeaderBannerUrl;
         }
 
+        const socialLinks = seller?.customFields?.socialLinks
+            ? parseSocialLinksJson(seller.customFields.socialLinks).map(l => ({
+                platform: l.platform,
+                username: l.username,
+                dmLink: l.dmLink,
+                profileUrl: l.profileUrl,
+                displayName: l.displayName ?? null,
+                inPipeline: l.inPipeline,
+            }))
+            : [];
+
         return {
             storeName: sellerName,
             storeDescription,
             storeBannerUrl,
             storeHeaderBannerUrl,
+            socialLinks,
         };
     }
 
@@ -284,6 +312,7 @@ export class StorePageShopResolver {
                 storeDescription: null,
                 storeBannerUrl: null,
                 storeHeaderBannerUrl: null,
+                socialLinks: [],
             };
         }
 
@@ -292,6 +321,28 @@ export class StorePageShopResolver {
         const administrator = await this.loadAdminWithStoreFields(ctx, ctx.channelId);
         const adminFields = administrator?.customFields as AdminStoreFields | undefined;
 
-        return this.profileFromAdminFields(storeName, adminFields);
+        return this.profileFromAdminFields(storeName, adminFields, channel.seller);
+    }
+
+    @Query()
+    @Allow(Permission.Public)
+    async storeSocialLinks(
+        @Ctx() ctx: RequestContext,
+        @Args('channelCode') channelCode: string,
+    ) {
+        const channel = await this.connection.getRepository(ctx, Channel).findOne({
+            where: { code: channelCode },
+            relations: ['seller'],
+        });
+        if (!channel?.seller?.customFields?.socialLinks) return [];
+
+        return parseSocialLinksJson(channel.seller.customFields.socialLinks).map(l => ({
+            platform: l.platform,
+            username: l.username,
+            dmLink: l.dmLink,
+            profileUrl: l.profileUrl,
+            displayName: l.displayName ?? null,
+            inPipeline: l.inPipeline,
+        }));
     }
 }

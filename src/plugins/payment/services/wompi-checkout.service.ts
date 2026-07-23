@@ -32,43 +32,133 @@ export class WompiCheckoutService {
         paymentMethodCode: string;
         sessionId?: string;
         deviceId?: string;
+        financialInstitutionCode?: string;
+        userType?: string;
+        userLegalIdType?: string;
+        userLegalId?: string;
+        paymentDescription?: string;
+        paymentMethodDetails?: Record<string, any>;
+        installments?: number;
     }) {
         const methodCode = input.paymentMethodCode || 'CARD';
+        const installments = input.installments || 1;
 
-        if (methodCode === 'CARD' || methodCode === 'CARD_SAVED') {
-            const payload: Record<string, any> = {
+        const requiresPaymentSource = ['CARD', 'NEQUI', 'DAVIPLATA', 'BANCOLOMBIA_TRANSFER'];
+
+        if (requiresPaymentSource.includes(methodCode) && input.token) {
+            const { acceptanceToken: acceptToken, personalAuthToken } =
+                await this.wompiService.getAcceptanceTokens();
+
+            const finalAcceptToken = input.acceptanceToken || acceptToken;
+
+            const paymentSource = await this.wompiService.createPaymentSource(
+                methodCode === 'BANCOLOMBIA_TRANSFER' ? 'BANCOLOMBIA_TRANSFER' : methodCode,
+                input.token,
+                input.customerEmail,
+                finalAcceptToken,
+                personalAuthToken,
+                input.sessionId,
+                input.deviceId,
+            );
+
+            const txnPayload: Record<string, any> = {
                 amount_in_cents: input.amountInCents,
                 currency: input.currency,
                 reference: input.reference,
                 customer_email: input.customerEmail,
-                acceptance_token: input.acceptanceToken,
-                payment_method: {
-                    type: 'CARD',
-                    token: input.token,
-                    is_three_ds: true,
-                },
+                payment_source_id: paymentSource.id,
             };
 
-            if (input.sessionId) payload.session_id = input.sessionId;
-            if (input.deviceId) payload.customer_data = { device_id: input.deviceId };
+            if (methodCode === 'CARD') {
+                txnPayload.payment_method = {
+                    installments,
+                };
+            }
 
-            return this.wompiService.createTransaction(payload);
+            if (input.sessionId) txnPayload.session_id = input.sessionId;
+            if (input.deviceId) txnPayload.customer_data = { device_id: input.deviceId };
+
+            return this.wompiService.createTransaction(txnPayload);
         }
+
+        const { acceptanceToken } = await this.wompiService.getAcceptanceTokens();
 
         const payload: Record<string, any> = {
             amount_in_cents: input.amountInCents,
             currency: input.currency,
             reference: input.reference,
             customer_email: input.customerEmail,
-            payment_method: {
-                type: methodCode,
-            },
+            acceptance_token: input.acceptanceToken || acceptanceToken || '',
+            payment_method: { type: methodCode } as Record<string, any>,
         };
 
+        // Payment description (required for PSE, QR, Collect, BNPL, etc.)
+        payload.payment_method.payment_description = input.paymentDescription || 'Pago en Ecommer';
+
+        // PSE fields
+        if (input.financialInstitutionCode) {
+            payload.payment_method.financial_institution_code = input.financialInstitutionCode;
+        }
+        if (input.userType !== undefined) {
+            payload.payment_method.user_type = input.userType;
+        }
+        if (input.userLegalIdType) {
+            payload.payment_method.user_legal_id_type = input.userLegalIdType;
+        }
+        if (input.userLegalId) {
+            payload.payment_method.user_legal_id = input.userLegalId;
+        }
+
+        // Bancolombia QR / Recaudo - sandbox_status required in sandbox (safe to always send)
+        if (methodCode === 'BANCOLOMBIA_QR' || methodCode === 'BANCOLOMBIA_COLLECT') {
+            payload.payment_method.sandbox_status = 'APPROVED';
+        }
+
+        // Bancolombia BNPL (Cuotas) - requires personal data
+        if (methodCode === 'BANCOLOMBIA_BNPL') {
+            payload.payment_method.user_legal_id_type = input.userLegalIdType || 'CC';
+            payload.payment_method.user_legal_id = input.userLegalId || '1234567890';
+            payload.payment_method.name = input.paymentMethodDetails?.name || 'Test';
+            payload.payment_method.last_name = input.paymentMethodDetails?.lastName || 'User';
+            payload.payment_method.phone_code = input.paymentMethodDetails?.phoneCode || '57';
+            payload.payment_method.phone_number = input.paymentMethodDetails?.phoneNumber || '3000000000';
+            payload.payment_method.payment_description = input.paymentDescription || 'Pago Ecommer';
+        }
+
+        // Su Plus - requires document info
+        if (methodCode === 'SU_PLUS') {
+            payload.payment_method.user_legal_id_type = input.userLegalIdType || 'CC';
+            payload.payment_method.user_legal_id = input.userLegalId || '1234567890';
+        }
+
+        if (input.paymentMethodDetails) {
+            Object.assign(payload.payment_method, input.paymentMethodDetails);
+        }
         if (input.sessionId) payload.session_id = input.sessionId;
         if (input.deviceId) payload.customer_data = { device_id: input.deviceId };
 
         return this.wompiService.createTransaction(payload);
+    }
+
+    async createPaymentSource(input: {
+        token: string;
+        type: string;
+        customerEmail: string;
+    }) {
+        const { acceptanceToken, personalAuthToken } = await this.wompiService.getAcceptanceTokens();
+
+        if (!acceptanceToken || !personalAuthToken) {
+            throw new Error('No se pudieron obtener los tokens de aceptación de Wompi');
+        }
+
+        const paymentSource = await this.wompiService.createPaymentSource(
+            input.type,
+            input.token,
+            input.customerEmail,
+            acceptanceToken,
+            personalAuthToken,
+        );
+        return paymentSource;
     }
 
     async initSavedCardTransaction(input: {
@@ -78,25 +168,29 @@ export class WompiCheckoutService {
         amountInCents: number;
         reference: string;
         currency: string;
+        type?: string;
+        installments?: number;
     }) {
         const customerId = input.customerEmail;
         if (!this.rateLimitService.checkLimit(customerId)) {
             throw new Error('Demasiados intentos. Intenta de nuevo en una hora.');
         }
 
-        return this.wompiService.createTransaction({
+        const payload: Record<string, any> = {
             payment_source_id: input.paymentSourceId,
             amount_in_cents: input.amountInCents,
             currency: input.currency,
             reference: input.reference,
             customer_email: input.customerEmail,
-            acceptance_token: input.acceptanceToken,
-            payment_method: {
-                type: 'CARD',
-                is_three_ds: true,
-                recurrent: false,
-            },
-        });
+        };
+
+        if (input.type === 'CARD') {
+            payload.payment_method = {
+                installments: input.installments || 1,
+            };
+        }
+
+        return this.wompiService.createTransaction(payload);
     }
 
     async getTransactionStatus(transactionId: string) {
@@ -125,45 +219,11 @@ export class WompiCheckoutService {
             }
 
             const reference = transaction.reference;
-            const order = await this.orderService.findOneByCode(ctx, reference);
+            const orderCode = reference.lastIndexOf('-') > 0 ? reference.substring(0, reference.lastIndexOf('-')) : reference;
+            const order = await this.orderService.findOneByCode(ctx, orderCode);
             if (!order) {
                 return { success: false, orderCode: null, errorMessage: 'Orden no encontrada', receiptUrl: null };
             }
-
-            const txn = transaction as any;
-            if (input.saveCard && txn.payment_method?.extra) {
-                const extra = txn.payment_method.extra;
-                const paymentSource = await this.wompiService.createPaymentSource(
-                    'CARD',
-                    input.transactionId,
-                    txn.customer_email || '',
-                    '',
-                    '',
-                );
-
-                if (paymentSource?.id) {
-                    await this.savedPaymentService.save({
-                        customerId: ctx.activeUserId?.toString() ?? txn.customer_email ?? '',
-                        type: 'CARD',
-                        wompiPaymentSourceId: paymentSource.id,
-                        lastFour: extra.last_four || '',
-                        brand: extra.brand || '',
-                        expiryMonth: String(extra.exp_month || '').padStart(2, '0'),
-                        expiryYear: String(extra.exp_year || ''),
-                        cardHolderName: extra.card_holder || '',
-                        channelToken: ctx.channel?.token ?? '',
-                    });
-                }
-            }
-
-            await this.orderService.transitionToState(ctx, order.id, 'ArrangingPayment');
-
-            await this.orderService.addPaymentToOrder(ctx, order.id, {
-                method: PAYMENT_METHOD.code,
-                metadata: {
-                    wompiTransactionId: input.transactionId,
-                },
-            });
 
             const processed = this.processedRepo.create({
                 wompiTransactionId: input.transactionId,
@@ -195,7 +255,8 @@ export class WompiCheckoutService {
         const rcs = new (RequestContextService as any)({} as any);
         const ctx = await rcs.create({ languageCode: LanguageCode.es, apiType: 'shop' });
 
-        const order = await this.orderService.findOneByCode(ctx, reference);
+        const orderCode = reference.lastIndexOf('-') > 0 ? reference.substring(0, reference.lastIndexOf('-')) : reference;
+        const order = await this.orderService.findOneByCode(ctx, orderCode);
         if (!order) return;
 
         if (transaction.status === 'APPROVED') {

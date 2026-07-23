@@ -450,6 +450,26 @@ export const customFields: VendureConfig['customFields'] = {
         },
       ],
     },
+    {
+      name: 'socialLinks',
+      type: 'text',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Social Links' },
+        { languageCode: LanguageCode.es, value: 'Redes sociales' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Seller social media links (WhatsApp, Facebook, Instagram)',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Redes sociales vinculadas del vendedor (WhatsApp, Facebook, Instagram)',
+        },
+      ],
+    },
   ],
   Channel: [
     { name: 'invoiceBillingActive', type: 'boolean', defaultValue: false },

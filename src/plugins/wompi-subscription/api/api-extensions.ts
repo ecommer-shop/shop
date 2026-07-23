@@ -108,6 +108,11 @@ export const wompiSubscriptionShopApiExtensions = gql`
       customerEmail: String
       sessionId: String
       deviceId: String
+      lastFour: String
+      brand: String
+      expiryMonth: String
+      expiryYear: String
+      cardHolderName: String
     ): CustomerSubscription
     createPendingSubscription(
       planId: Int!
@@ -116,14 +121,50 @@ export const wompiSubscriptionShopApiExtensions = gql`
     ): PendingSubscriptionResult
     stopAutoRenew(subscriptionId: Int!, customerEmail: String): CustomerSubscription
     cancelSubscription(subscriptionId: Int!, customerEmail: String): CustomerSubscription
-    fixProductTranslations(dryRun: Boolean! = false): FixTranslationsResult!
   }
 
-  type FixTranslationsResult {
-    productsScanned: Int!
-    productsFixed: Int!
-    variantsScanned: Int!
-    variantsFixed: Int!
+  type AdminSavedPaymentMethod {
+    id: ID!
+    type: String!
+    lastFour: String!
+    brand: String!
+    expiryMonth: String!
+    expiryYear: String!
+    cardHolderName: String
+    isDefault: Boolean!
+    createdAt: DateTime!
+  }
+
+  type WompiTransactionStatusResult {
+    id: String!
+    status: String!
+    statusMessage: String
+    asyncPaymentUrl: String
+    qrImage: String
+    url: String
+  }
+
+  extend type Query {
+    mySavedPaymentMethods: [AdminSavedPaymentMethod!]!
+    getAdminWompiTransactionStatus(transactionId: String!): WompiTransactionStatusResult!
+  }
+
+  extend type Mutation {
+    savePaymentMethodForSubscription(
+      token: String!
+      type: String!
+      lastFour: String!
+      brand: String!
+      expiryMonth: String!
+      expiryYear: String!
+      cardHolderName: String
+    ): AdminSavedPaymentMethod!
+
+    deleteSavedPaymentMethodForSubscription(id: ID!): Boolean!
+
+    setDefaultPaymentMethodForSubscription(id: ID!): AdminSavedPaymentMethod!
+
+    useSavedPaymentMethodForSubscription(paymentMethodId: ID!): CustomerSubscription!
   }
 `;
 
