@@ -7,6 +7,7 @@ import {
     TransactionalConnection,
     RequestContext,
     ProductVariant,
+    Product,
 } from '@vendure/core';
 import { Subscription } from 'rxjs';
 
@@ -75,8 +76,7 @@ export class ProductVariantEnforcementSubscriber
         const shouldBeEnabled = activeVariantCount > 0;
 
         if (product.enabled !== shouldBeEnabled) {
-            await this.productService.update(ctx, {
-                id,
+            await this.connection.getRepository(ctx, Product).update(id, {
                 enabled: shouldBeEnabled,
             });
         }
