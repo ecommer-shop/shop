@@ -25,7 +25,7 @@ async function resolveWompiPublicKey(): Promise<string> {
     const data = await api.query<{ wompiDashboardConfig: { publicKey: string } }>(WOMPI_DASHBOARD_CONFIG);
     const key = data.wompiDashboardConfig?.publicKey?.trim() ?? '';
     if (!key) {
-        throw new Error('Wompi no está configurado en el servidor (falta WOMPI_PUBLIC_KEY).');
+        throw new Error('Wompi no está configurado.');
     }
     cachedPublicKey = key;
     (window as unknown as { __WOMPI_PUBLIC_KEY__?: string }).__WOMPI_PUBLIC_KEY__ = key;
