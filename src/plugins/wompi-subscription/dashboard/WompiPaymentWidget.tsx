@@ -1,19 +1,46 @@
-import { Button } from '@vendure/dashboard';
+import { api, Button } from '@vendure/dashboard';
 import { CheckCircle2, Loader2, Smartphone } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PAYMENT_METHODS } from './graphql-queries';
 
+const WOMPI_DASHBOARD_CONFIG = `
+  query WompiDashboardConfig {
+    wompiDashboardConfig {
+      publicKey
+      sandbox
+    }
+  }
+`;
+
+let cachedPublicKey: string | null = null;
+
+async function resolveWompiPublicKey(): Promise<string> {
+    const fromWindow = (window as unknown as { __WOMPI_PUBLIC_KEY__?: string }).__WOMPI_PUBLIC_KEY__?.trim();
+    if (fromWindow) {
+        return fromWindow;
+    }
+    if (cachedPublicKey) {
+        return cachedPublicKey;
+    }
+    const data = await api.query<{ wompiDashboardConfig: { publicKey: string } }>(WOMPI_DASHBOARD_CONFIG);
+    const key = data.wompiDashboardConfig?.publicKey?.trim() ?? '';
+    if (!key) {
+        throw new Error('Wompi no está configurado.');
+    }
+    cachedPublicKey = key;
+    (window as unknown as { __WOMPI_PUBLIC_KEY__?: string }).__WOMPI_PUBLIC_KEY__ = key;
+    return key;
+}
+
 // ─── Wompi API helpers ──────────────────────────────────────────
 
-function getWompiApiBaseUrl(): string {
-    const key = (window as any).__WOMPI_PUBLIC_KEY__;
-    return key?.startsWith('pub_test_') ? 'https://sandbox.wompi.co' : 'https://production.wompi.co';
+function getWompiApiBaseUrl(publicKey: string): string {
+    return publicKey.startsWith('pub_test_') ? 'https://sandbox.wompi.co' : 'https://production.wompi.co';
 }
 
 async function wompiFetch(path: string, options?: RequestInit): Promise<any> {
-    const publicKey = (window as any).__WOMPI_PUBLIC_KEY__;
-    if (!publicKey) throw new Error('Wompi no está configurado');
-    const res = await fetch(`${getWompiApiBaseUrl()}${path}`, {
+    const publicKey = await resolveWompiPublicKey();
+    const res = await fetch(`${getWompiApiBaseUrl(publicKey)}${path}`, {
         ...options,
         headers: {
             'Authorization': `Bearer ${publicKey}`,
@@ -31,11 +58,13 @@ async function wompiFetch(path: string, options?: RequestInit): Promise<any> {
 const WOMPI_JS_URL = 'https://wompijs.wompi.com/libs/js/v1.js';
 const WOMPI_JS_ID = 'wompi-js-script';
 
-function loadWompiJSScript(): Promise<void> {
+function loadWompiJSScript(publicKey: string): Promise<void> {
     return new Promise((resolve, reject) => {
         if (typeof window === 'undefined') return reject();
         if ((window as any).$wompi) return resolve();
-        if (document.getElementById(WOMPI_JS_ID)) {
+        const existing = document.getElementById(WOMPI_JS_ID) as HTMLScriptElement | null;
+        if (existing) {
+            existing.setAttribute('data-public-key', publicKey);
             const check = () => {
                 if ((window as any).$wompi) return resolve();
                 setTimeout(check, 100);
@@ -46,7 +75,7 @@ function loadWompiJSScript(): Promise<void> {
         const script = document.createElement('script');
         script.id = WOMPI_JS_ID;
         script.src = WOMPI_JS_URL;
-        script.setAttribute('data-public-key', (window as any).__WOMPI_PUBLIC_KEY__);
+        script.setAttribute('data-public-key', publicKey);
         script.onload = () => resolve();
         script.onerror = () => reject(new Error('Failed to load WompiJS'));
         document.head.appendChild(script);
@@ -54,19 +83,21 @@ function loadWompiJSScript(): Promise<void> {
 }
 
 function initWompiJS(): Promise<{ sessionId: string; deviceId: string }> {
-    return new Promise((resolve, reject) => {
-        loadWompiJSScript()
-            .then(() => {
-                (window as any).$wompi.initialize((data: any, error: any) => {
-                    if (error) return reject(error);
-                    resolve({
-                        sessionId: data.sessionId,
-                        deviceId: data.deviceData?.deviceID || '',
-                    });
-                });
-            })
-            .catch(reject);
-    });
+    return resolveWompiPublicKey()
+        .then((publicKey) =>
+            loadWompiJSScript(publicKey).then(
+                () =>
+                    new Promise<{ sessionId: string; deviceId: string }>((resolve, reject) => {
+                        (window as any).$wompi.initialize((data: any, error: any) => {
+                            if (error) return reject(error);
+                            resolve({
+                                sessionId: data.sessionId,
+                                deviceId: data.deviceData?.deviceID || '',
+                            });
+                        });
+                    }),
+            ),
+        );
 }
 
 // ─── Tokenization Form (router) ─────────────────────────────────
@@ -102,7 +133,8 @@ export function WompiTokenizationForm({
                 setEnvLoading(false);
             })
             .catch((e) => {
-                setEnvError('Error al inicializar WompiJS');
+                const msg = e instanceof Error ? e.message : 'Error al inicializar WompiJS';
+                setEnvError(msg.includes('Wompi') ? msg : 'Error al inicializar WompiJS');
                 setEnvLoading(false);
             });
     }, []);
