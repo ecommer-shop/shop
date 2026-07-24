@@ -2,6 +2,7 @@ import { defineDashboardExtension } from '@vendure/dashboard';
 import { App } from './App';
 import { LoginLogo } from './components/LoginLogo';
 import { DeleteAccountSection } from './components/DeleteAccountSection';
+import { SocialLinksSection } from '../../store-page/dashboard/social-links-section';
 
 defineDashboardExtension({
     routes: [{
@@ -33,6 +34,15 @@ defineDashboardExtension({
     },
 
     pageBlocks: [
+        {
+            id: 'social-links-section',
+            location: {
+                pageId: 'profile',
+                column: 'main',
+                position: { blockId: 'custom-fields', order: 'after' },
+            },
+            component: SocialLinksSection,
+        },
         {
             id: 'delete-account-section',
             location: {

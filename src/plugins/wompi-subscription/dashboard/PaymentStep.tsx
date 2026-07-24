@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, Card, CardContent, Tabs, TabsList, TabsTrigger, Spinner } from '@vendure/dashboard';
-import { ExternalLink } from 'lucide-react';
-import { Plan, PAYMENT_METHODS, isRecurrent, isManual } from './graphql-queries';
+import { ExternalLink, Loader2 } from 'lucide-react';
+import { Plan, PAYMENT_METHODS, isRecurrent, isManual, gql, GET_WOMPI_TRANSACTION_STATUS, WompiTransactionStatus } from './graphql-queries';
 import { WompiTokenizationForm } from './WompiPaymentWidget';
 
 export function PaymentStep({
@@ -28,12 +28,70 @@ export function PaymentStep({
     paymentProcessing: boolean;
     showTokenForm: boolean;
     onCloseTokenForm: () => void;
-    onTokenReceived: (token: string, sessionId?: string, deviceId?: string) => void;
+    onTokenReceived: (token: string, sessionId?: string, deviceId?: string, cardDetails?: { lastFour?: string; brand?: string; expiryMonth?: string; expiryYear?: string; cardHolderName?: string }) => void;
     pendingResult: any;
     onSuccess: () => void;
     onBack: () => void;
 }) {
-    if (pendingResult?.asyncPaymentUrl) {
+    const [pollUrl, setPollUrl] = useState<string | null>(null);
+    const [pollQr, setPollQr] = useState<string | null>(null);
+    const [polling, setPolling] = useState(false);
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const [formVisible, setFormVisible] = useState(false);
+
+    useEffect(() => {
+        if (pendingResult?.transactionId && !pendingResult?.asyncPaymentUrl && !pendingResult?.qrImage) {
+            setPolling(true);
+            let attempts = 0;
+            const maxAttempts = 60;
+            const poll = setInterval(async () => {
+                attempts++;
+                try {
+                    const data = await gql<{ getWompiTransactionStatus: WompiTransactionStatus }>(
+                        GET_WOMPI_TRANSACTION_STATUS,
+                        { transactionId: pendingResult.transactionId },
+                    );
+                    const status = data.getWompiTransactionStatus;
+
+                    if (status.asyncPaymentUrl) setPollUrl(status.asyncPaymentUrl);
+                    if (status.qrImage) setPollQr(status.qrImage);
+                    if (status.url && !status.asyncPaymentUrl) setPollUrl(status.url);
+
+                    if (status.status === 'APPROVED') {
+                        clearInterval(poll);
+                        setPolling(false);
+                        onSuccess();
+                        return;
+                    }
+
+                    if (status.asyncPaymentUrl || status.qrImage || status.url) {
+                        clearInterval(poll);
+                        setPolling(false);
+                    }
+                } catch { }
+
+                if (attempts >= maxAttempts) {
+                    clearInterval(poll);
+                    setPolling(false);
+                }
+            }, 2000);
+            pollRef.current = poll;
+
+            return () => {
+                if (pollRef.current) clearInterval(pollRef.current);
+            };
+        }
+    }, [pendingResult?.transactionId]);
+
+    useEffect(() => {
+        if (showTokenForm && selectedMethod) setFormVisible(true);
+    }, [showTokenForm, selectedMethod]);
+
+    const rawQr = pendingResult?.qrImage || pollQr;
+    const displayUrl = pendingResult?.asyncPaymentUrl || pollUrl;
+    const displayQr = rawQr ? (rawQr.startsWith('data:') ? rawQr : `data:image/svg+xml;base64,${rawQr}`) : null;
+
+    if (displayUrl) {
         return (
             <Card>
                 <CardContent className="text-center py-10 space-y-4">
@@ -58,13 +116,13 @@ export function PaymentStep({
         );
     }
 
-    if (pendingResult?.qrImage) {
+    if (displayQr) {
         return (
             <Card>
                 <CardContent className="text-center py-10 space-y-4">
                     <h3 className="text-lg font-semibold">Pago por QR</h3>
                     <img
-                        src={pendingResult.qrImage}
+                        src={displayQr}
                         alt="QR de pago"
                         className="mx-auto w-48 h-48 object-contain"
                     />
@@ -79,10 +137,19 @@ export function PaymentStep({
         );
     }
 
-    const [formVisible, setFormVisible] = useState(false);
-    useEffect(() => {
-        if (showTokenForm && selectedMethod) setFormVisible(true);
-    }, [showTokenForm, selectedMethod]);
+    if (polling) {
+        return (
+            <Card>
+                <CardContent className="text-center py-10 space-y-4">
+                    <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin" />
+                    <h3 className="text-lg font-semibold">Procesando pago...</h3>
+                    <p className="text-sm text-muted-foreground">
+                        Esperando confirmación. Esto puede tomar unos segundos.
+                    </p>
+                </CardContent>
+            </Card>
+        );
+    }
 
     if (formVisible && selectedMethod) {
         return (

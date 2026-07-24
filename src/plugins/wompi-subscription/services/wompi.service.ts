@@ -94,7 +94,12 @@ export class WompiService {
             Logger.debug('Created payment source: ' + response.data.data.id, 'WompiService');
             return response.data.data;
         } catch (error: any) {
-            throw new Error(`Failed to create payment source: ${WompiService.formatApiError(error)}`);
+            const detail = WompiService.formatApiError(error);
+            Logger.error(`Failed to create payment source: ${detail}`, 'WompiService');
+            if (error.response?.data) {
+                Logger.error(`Wompi error details: ${JSON.stringify(error.response.data)}`, 'WompiService');
+            }
+            throw new Error(`Failed to create payment source: ${detail}`);
         }
     }
 
@@ -136,7 +141,7 @@ export class WompiService {
         customerEmail: string,
         acceptanceToken: string,
         personalAuthToken?: string,
-        paymentMethod?: { type: string; installments: number },
+        paymentMethod?: { installments: number },
     ): Promise<WompiCreateTransactionResponse> {
         return this.createTransaction({
             payment_source_id: paymentSourceId,

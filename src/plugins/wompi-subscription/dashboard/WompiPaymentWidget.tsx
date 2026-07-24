@@ -105,13 +105,21 @@ function initWompiJS(): Promise<{ sessionId: string; deviceId: string }> {
 const WOMPI_TOKEN_POLL_INTERVAL = 2000;
 const WOMPI_TOKEN_MAX_ATTEMPTS = 30;
 
+export interface CardDetails {
+    lastFour?: string;
+    brand?: string;
+    expiryMonth?: string;
+    expiryYear?: string;
+    cardHolderName?: string;
+}
+
 export function WompiTokenizationForm({
     paymentMethod,
     onToken,
     onBack,
 }: {
     paymentMethod: string;
-    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onToken: (token: string, sessionId?: string, deviceId?: string, cardDetails?: CardDetails) => void;
     onBack: () => void;
 }) {
     const [wompiEnv, setWompiEnv] = useState<{ sessionId: string; deviceId: string } | null>(null);
@@ -175,6 +183,16 @@ export function WompiTokenizationForm({
 
 // ─── CARD Token Form ────────────────────────────────────────────
 
+function detectBrandLocal(number: string): string {
+    const n = number.replace(/\s/g, '');
+    if (/^4/.test(n)) return 'Visa';
+    if (/^5[1-5]/.test(n) || /^2[2-7]/.test(n)) return 'Mastercard';
+    if (/^3[47]/.test(n)) return 'American Express';
+    if (/^6(?:011|5)/.test(n)) return 'Discover';
+    if (/^3(?:0[0-5]|[68])/.test(n)) return 'Diners Club';
+    return '';
+}
+
 function CardTokenForm({
     wompiEnv,
     onToken,
@@ -225,7 +243,18 @@ function CardTokenForm({
                 }),
             });
             setStep('done');
-            setTimeout(() => onToken(res.data.id, wompiEnv.sessionId, wompiEnv.deviceId), 500);
+            setTimeout(() => onToken(
+                res.data.id,
+                wompiEnv.sessionId,
+                wompiEnv.deviceId,
+                {
+                    lastFour: number.replace(/\s/g, '').slice(-4),
+                    brand: detectBrandLocal(number) || 'Card',
+                    expiryMonth,
+                    expiryYear,
+                    cardHolderName: cardHolder,
+                },
+            ), 500);
         } catch (e: any) {
             setErrorMsg(e.message || 'Error al tokenizar tarjeta');
             setStep('error');
@@ -316,7 +345,7 @@ function NequiTokenForm({
     onBack,
 }: {
     wompiEnv: { sessionId: string; deviceId: string };
-    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onToken: (token: string, sessionId?: string, deviceId?: string, cardDetails?: CardDetails) => void;
     onBack: () => void;
 }) {
     const [phone, setPhone] = useState('');
@@ -347,7 +376,13 @@ function NequiTokenForm({
                     if (statusRes.data.status === 'APPROVED') {
                         clearInterval(poll);
                         setStep('done');
-                        setTimeout(() => onToken(statusRes.data.id, wompiEnv.sessionId, wompiEnv.deviceId), 500);
+                        const cleanPhone = phone.replace(/\D/g, '');
+                        setTimeout(() => onToken(
+                            statusRes.data.id,
+                            wompiEnv.sessionId,
+                            wompiEnv.deviceId,
+                            { lastFour: cleanPhone.slice(-4), brand: 'Nequi', cardHolderName: cleanPhone },
+                        ), 500);
                     } else if (statusRes.data.status === 'DECLINED' || statusRes.data.status === 'ERROR') {
                         clearInterval(poll);
                         setStep('error');
@@ -425,7 +460,7 @@ function DaviplataTokenForm({
     onBack,
 }: {
     wompiEnv: { sessionId: string; deviceId: string };
-    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onToken: (token: string, sessionId?: string, deviceId?: string, cardDetails?: CardDetails) => void;
     onBack: () => void;
 }) {
     const [docType, setDocType] = useState('CC');
@@ -501,7 +536,13 @@ function DaviplataTokenForm({
                     if (statusRes.data.status === 'APPROVED') {
                         clearInterval(poll);
                         setStep('done');
-                        setTimeout(() => onToken(statusRes.data.id, wompiEnv.sessionId, wompiEnv.deviceId), 500);
+                        const cleanPhone = phone.replace(/\D/g, '');
+                        setTimeout(() => onToken(
+                            statusRes.data.id,
+                            wompiEnv.sessionId,
+                            wompiEnv.deviceId,
+                            { lastFour: cleanPhone.slice(-4), brand: 'Daviplata', cardHolderName: cleanPhone },
+                        ), 500);
                     } else if (statusRes.data.status === 'DECLINED' || statusRes.data.status === 'ERROR') {
                         clearInterval(poll);
                         setStep('error');

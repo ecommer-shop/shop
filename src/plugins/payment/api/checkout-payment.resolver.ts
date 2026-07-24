@@ -26,19 +26,38 @@ export class CheckoutPaymentResolver {
             paymentMethodCode: string;
             sessionId?: string;
             deviceId?: string;
+            financialInstitutionCode?: string;
+            userType?: string;
+            userLegalIdType?: string;
+            userLegalId?: string;
+            paymentDescription?: string;
+            paymentMethodDetails?: Record<string, any>;
+            installments?: number;
         },
     ) {
         try {
             const result = await this.checkoutService.initTransaction(input);
-            const extra = (result as any).payment_method?.extra ?? null;
+            const txn = result as any;
+            const extra = txn.payment_method?.extra ?? null;
+
+            let asyncPaymentUrl = extra?.async_payment_url ?? null;
+            const qrImage = extra?.qr_image ?? null;
+
+            if (!asyncPaymentUrl && txn.redirect_url) {
+                asyncPaymentUrl = txn.redirect_url;
+            }
+
+            Logger.debug(`Transaction ${txn.id} created - status=${txn.status} asyncPaymentUrl=${asyncPaymentUrl ? '✓' : '✗'} qrImage=${qrImage ? '✓' : '✗'}`, 'CheckoutPaymentResolver');
+
             return {
-                transactionId: result.id,
-                status: result.status,
-                reference: result.reference,
-                amountInCents: result.amount_in_cents,
+                transactionId: txn.id,
+                status: txn.status,
+                reference: txn.reference,
+                amountInCents: txn.amount_in_cents,
                 paymentMethodExtra: extra,
-                asyncPaymentUrl: extra?.async_payment_url ?? null,
-                qrImage: extra?.qr_image ?? null,
+                asyncPaymentUrl,
+                qrImage,
+                url: extra?.url ?? null,
             };
         } catch (error: any) {
             Logger.error(`initWompiTransaction failed: ${error.message}`, 'CheckoutPaymentResolver');
@@ -57,16 +76,22 @@ export class CheckoutPaymentResolver {
             amountInCents: number;
             reference: string;
             currency: string;
+            type?: string;
+            installments?: number;
         },
     ) {
         try {
             const result = await this.checkoutService.initSavedCardTransaction(input);
+            const ext = (result as any).payment_method?.extra ?? null;
             return {
                 transactionId: result.id,
                 status: result.status,
                 reference: result.reference,
                 amountInCents: result.amount_in_cents,
-                paymentMethodExtra: result.payment_method?.extra ?? null,
+                paymentMethodExtra: ext,
+                asyncPaymentUrl: ext?.async_payment_url ?? null,
+                qrImage: ext?.qr_image ?? null,
+                url: ext?.url ?? null,
             };
         } catch (error: any) {
             Logger.error(`initWompiSavedCardTransaction failed: ${error.message}`, 'CheckoutPaymentResolver');
@@ -82,14 +107,43 @@ export class CheckoutPaymentResolver {
     ) {
         try {
             const result = await this.checkoutService.getTransactionStatus(transactionId);
+            const txn = result as any;
+            const extra = txn.payment_method?.extra ?? null;
             return {
-                id: result.id,
-                status: result.status,
-                statusMessage: (result as any).status_message ?? null,
-                paymentMethodExtra: result.payment_method?.extra ?? null,
+                id: txn.id,
+                status: txn.status,
+                statusMessage: txn.status_message ?? null,
+                paymentMethodExtra: extra,
+                url: extra?.url ?? null,
+                asyncPaymentUrl: extra?.async_payment_url ?? null,
+                qrImage: extra?.qr_image ?? null,
             };
         } catch (error: any) {
             Logger.error(`getWompiTransactionStatus failed: ${error.message}`, 'CheckoutPaymentResolver');
+            throw error;
+        }
+    }
+
+    @Mutation()
+    @Allow(Permission.Owner)
+async createWompiPaymentSource(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: {
+        token: string;
+        type: string;
+        customerEmail: string;
+    },
+) {
+    try {
+        const result = await this.checkoutService.createPaymentSource(input);
+            return {
+                id: result.id,
+                type: result.type,
+                status: result.status,
+                publicData: (result as any).public_data || null,
+            };
+        } catch (error: any) {
+            Logger.error(`createWompiPaymentSource failed: ${error.message}`, 'CheckoutPaymentResolver');
             throw error;
         }
     }
@@ -135,5 +189,42 @@ export class CheckoutPaymentResolver {
         const customerId = ctx.activeUserId?.toString();
         if (!customerId) return null;
         return this.savedPaymentService.setDefault(id, customerId, ctx.channel?.token ?? '');
+    }
+
+    @Mutation()
+    @Allow(Permission.Owner)
+    async saveWompiPaymentMethod(
+        @Ctx() ctx: RequestContext,
+        @Args('input') input: {
+            wompiPaymentSourceId: string;
+            type: string;
+            lastFour: string;
+            brand: string;
+            expiryMonth?: string;
+            expiryYear?: string;
+            cardHolderName?: string;
+        },
+    ) {
+        const customerId = ctx.activeUserId?.toString();
+        if (!customerId) {
+            throw new Error('Not authenticated');
+        }
+
+        try {
+            return await this.savedPaymentService.save({
+                customerId,
+                type: input.type,
+                wompiPaymentSourceId: input.wompiPaymentSourceId,
+                lastFour: input.lastFour,
+                brand: input.brand,
+                expiryMonth: input.expiryMonth || '',
+                expiryYear: input.expiryYear || '',
+                cardHolderName: input.cardHolderName || '',
+                channelToken: ctx.channel?.token ?? '',
+            });
+        } catch (error: any) {
+            Logger.error(`saveWompiPaymentMethod failed: ${error.message}`, 'CheckoutPaymentResolver');
+            throw error;
+        }
     }
 }

@@ -337,6 +337,19 @@ export const SECTION_LABELS: Record<string, string> = {
     'Acciones': 'Acciones',
 };
 
+export const RESTRICTED_COMMAND_IDS = [
+    'sellers',
+    'channels',
+    'administrators',
+    'roles',
+    'countries',
+    'zones',
+    'global-settings',
+    'store-management',
+    'store-analytics',
+    'shipping-methods',
+];
+
 export function getCommandsBySection(): Record<string, Command[]> {
     const grouped: Record<string, Command[]> = {};
     for (const cmd of ALL_COMMANDS) {
