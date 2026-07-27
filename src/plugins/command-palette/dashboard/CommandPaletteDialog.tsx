@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useNavigate, useIsMobile } from '@vendure/dash
 import { Search, ArrowRight, Clock, Sparkles, ExternalLink, RefreshCw, Bot } from 'lucide-react';
 import { ALL_COMMANDS, RESTRICTED_COMMAND_IDS, type Command } from './commands';
 import { getRecentCommands, addRecentCommand } from './recent-searches';
+import { useIsSuperAdmin } from '../../superadminvisibility/dashboard/hooks';
 
 interface Props {
     open: boolean;
@@ -31,6 +32,7 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
     const navigate = useNavigate();
     const isMobile = useIsMobile();
 
+    const isSuperAdmin = useIsSuperAdmin();
     const [isDefaultChannel, setIsDefaultChannel] = useState<boolean | null>(null);
 
     useEffect(() => {
@@ -47,7 +49,7 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
             .catch(() => setIsDefaultChannel(false));
     }, []);
 
-    const showRestricted = isDefaultChannel === true;
+    const showRestricted = isSuperAdmin === true && isDefaultChannel === true;
 
     const availableCommands = useMemo(() =>
         ALL_COMMANDS.filter(cmd =>
