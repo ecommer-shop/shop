@@ -181,7 +181,7 @@ export class InvoicePlanWompiPaymentService {
     let transactionId: string | null = null;
 
     try {
-      const transaction = await this.wompiService.createRecurringTransaction(
+      let transaction = await this.wompiService.createRecurringTransaction(
         paymentSource.id,
         amountInCents,
         reference,
@@ -192,6 +192,18 @@ export class InvoicePlanWompiPaymentService {
       );
       transactionStatus = transaction.status ?? null;
       transactionId = transaction.id ?? null;
+
+      if (transaction.status === 'PENDING' && transaction.id) {
+        try {
+          transaction = await this.wompiService.pollTransactionUntilFinal(transaction.id, 15, 2000);
+          transactionStatus = transaction.status ?? null;
+        } catch (pollError) {
+          Logger.debug(
+            `Invoice plan payment ${transaction.id} still pending after poll: ${pollError}`,
+            'InvoicePlanWompiPaymentService',
+          );
+        }
+      }
 
       if (transaction.status === 'APPROVED') {
         await this.billingPlans.applyPlanPurchaseFromWebhook(
@@ -236,7 +248,14 @@ export class InvoicePlanWompiPaymentService {
     const cleanTransactionId = transactionId?.trim() || null;
 
     if (cleanTransactionId) {
-      const transaction = await this.wompiService.getTransaction(cleanTransactionId);
+      let transaction = await this.wompiService.getTransaction(cleanTransactionId);
+      if (transaction.status === 'PENDING') {
+        try {
+          transaction = await this.wompiService.pollTransactionUntilFinal(cleanTransactionId, 10, 2000);
+        } catch {
+          // Sigue pendiente; el cliente puede reintentar el polling.
+        }
+      }
       transactionStatus = transaction.status ?? null;
 
       if (transaction.status === 'APPROVED') {
@@ -270,6 +289,11 @@ export class InvoicePlanWompiPaymentService {
   }
 
   private async resolveAdminEmail(ctx: RequestContext): Promise<string> {
+    const fromEnv = process.env.BILLING_PAYER_EMAIL?.trim();
+    if (fromEnv && this.isValidEmail(fromEnv)) {
+      return fromEnv;
+    }
+
     if (!ctx.activeUserId) {
       throw new UserInputError('No autenticado.');
     }
@@ -278,10 +302,17 @@ export class InvoicePlanWompiPaymentService {
       where: { user: { id: Number(ctx.activeUserId) } },
       relations: ['user'],
     });
-    if (!admin?.emailAddress) {
-      throw new UserInputError('Administrador no encontrado o sin correo.');
+    const email = admin?.emailAddress?.trim() ?? '';
+    if (!this.isValidEmail(email)) {
+      throw new UserInputError(
+        'Tu cuenta no tiene un correo válido para Wompi. Actualiza el email del administrador o define BILLING_PAYER_EMAIL en el servidor.',
+      );
     }
-    return admin.emailAddress;
+    return email;
+  }
+
+  private isValidEmail(value: string): boolean {
+    return /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(value);
   }
 
   private blockedPurchaseMessage(state: BillingPlanState): string {

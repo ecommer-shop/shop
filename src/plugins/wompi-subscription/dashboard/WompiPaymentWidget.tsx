@@ -117,10 +117,13 @@ export function WompiTokenizationForm({
     paymentMethod,
     onToken,
     onBack,
+    afterTokenMessage = 'Procesando pago…',
 }: {
     paymentMethod: string;
     onToken: (token: string, sessionId?: string, deviceId?: string, cardDetails?: CardDetails) => void;
     onBack: () => void;
+    /** Texto tras tokenizar exitosamente (antes de llamar onToken). */
+    afterTokenMessage?: string;
 }) {
     const [wompiEnv, setWompiEnv] = useState<{ sessionId: string; deviceId: string } | null>(null);
     const [envLoading, setEnvLoading] = useState(true);
@@ -160,15 +163,15 @@ export function WompiTokenizationForm({
     }
 
     if (paymentMethod === 'NEQUI') {
-        return <NequiTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} />;
+        return <NequiTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} afterTokenMessage={afterTokenMessage} />;
     }
 
     if (paymentMethod === 'DAVIPLATA') {
-        return <DaviplataTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} />;
+        return <DaviplataTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} afterTokenMessage={afterTokenMessage} />;
     }
 
     if (paymentMethod === 'CARD') {
-        return <CardTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} />;
+        return <CardTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} afterTokenMessage={afterTokenMessage} />;
     }
 
     return (
@@ -197,10 +200,12 @@ function CardTokenForm({
     wompiEnv,
     onToken,
     onBack,
+    afterTokenMessage,
 }: {
     wompiEnv: { sessionId: string; deviceId: string };
     onToken: (token: string, sessionId?: string, deviceId?: string) => void;
     onBack: () => void;
+    afterTokenMessage: string;
 }) {
     const [number, setNumber] = useState('');
     const [expMonth, setExpMonth] = useState('');
@@ -268,7 +273,7 @@ function CardTokenForm({
             <div className="text-center py-8 space-y-4">
                 <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
                 <h3 className="font-semibold">Tarjeta tokenizada exitosamente</h3>
-                <p className="text-sm text-muted-foreground">Creando suscripción...</p>
+                <p className="text-sm text-muted-foreground">{afterTokenMessage}</p>
             </div>
         );
     }
@@ -343,10 +348,12 @@ function NequiTokenForm({
     wompiEnv,
     onToken,
     onBack,
+    afterTokenMessage,
 }: {
     wompiEnv: { sessionId: string; deviceId: string };
     onToken: (token: string, sessionId?: string, deviceId?: string, cardDetails?: CardDetails) => void;
     onBack: () => void;
+    afterTokenMessage: string;
 }) {
     const [phone, setPhone] = useState('');
     const [step, setStep] = useState<'form' | 'waiting' | 'done' | 'error'>('form');
@@ -421,7 +428,7 @@ function NequiTokenForm({
             <div className="text-center py-8 space-y-4">
                 <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
                 <h3 className="font-semibold">Nequi tokenizado exitosamente</h3>
-                <p className="text-sm text-muted-foreground">Creando suscripción...</p>
+                <p className="text-sm text-muted-foreground">{afterTokenMessage}</p>
             </div>
         );
     }
@@ -458,10 +465,12 @@ function DaviplataTokenForm({
     wompiEnv,
     onToken,
     onBack,
+    afterTokenMessage,
 }: {
     wompiEnv: { sessionId: string; deviceId: string };
     onToken: (token: string, sessionId?: string, deviceId?: string, cardDetails?: CardDetails) => void;
     onBack: () => void;
+    afterTokenMessage: string;
 }) {
     const [docType, setDocType] = useState('CC');
     const [docNumber, setDocNumber] = useState('');
@@ -577,7 +586,7 @@ function DaviplataTokenForm({
             <div className="text-center py-8 space-y-4">
                 <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
                 <h3 className="font-semibold">Daviplata tokenizado exitosamente</h3>
-                <p className="text-sm text-muted-foreground">Creando suscripción...</p>
+                <p className="text-sm text-muted-foreground">{afterTokenMessage}</p>
             </div>
         );
     }

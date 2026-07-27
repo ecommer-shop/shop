@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Order, RequestContext, TransactionalConnection } from '@vendure/core';
 import { DataSource } from 'typeorm';
 import { humanizeInvoiceEmissionError } from './format-invoice-emission-error';
+import { isDefaultAdminChannel } from './invoice-channel-scope.util';
 
 export interface InvoiceCreationFailureRow {
   orderId: string;
@@ -52,6 +53,17 @@ export class InvoiceFailureQueryService {
       .where(`${errCol} IS NOT NULL`)
       .andWhere(`trim(coalesce(${errCol}, '')) <> ''`)
       .orderBy('o.updatedAt', 'DESC');
+
+    if (!isDefaultAdminChannel(ctx)) {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM order_line ol
+          WHERE ol."orderId" = o.id
+            AND ol."sellerChannelId" = :channelId
+        )`,
+        { channelId: ctx.channelId },
+      );
+    }
 
     const total = await qb.getCount();
 

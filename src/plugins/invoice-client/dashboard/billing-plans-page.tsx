@@ -283,19 +283,24 @@ export function BillingPlansPage() {
         const id = setInterval(() => {
             pollCountRef.current += 1;
             void (async () => {
-                if (paymentRef?.startsWith('PLAN') && paymentTransactionId) {
-                    const data = await api.mutate<{
-                        checkInvoicePlanPurchaseStatus: InvoicePlanPendingResult;
-                    }>(CHECK_INVOICE_PLAN_PURCHASE_STATUS, {
-                        reference: paymentRef,
-                        transactionId: paymentTransactionId,
-                    });
-                    if (data.checkInvoicePlanPurchaseStatus.applied) {
-                        setWompiPolling(false);
-                        clearPendingPayment();
-                        setPaymentNotice('Paquete de facturas acreditado correctamente.');
-                        await refetch();
-                        return;
+                if (paymentRef?.startsWith('PLAN')) {
+                    if (paymentTransactionId) {
+                        const data = await api.mutate<{
+                            checkInvoicePlanPurchaseStatus: InvoicePlanPendingResult;
+                        }>(CHECK_INVOICE_PLAN_PURCHASE_STATUS, {
+                            reference: paymentRef,
+                            transactionId: paymentTransactionId,
+                        });
+                        if (data.checkInvoicePlanPurchaseStatus.applied) {
+                            setWompiPolling(false);
+                            clearPendingPayment();
+                            setPlanPendingResult(null);
+                            setSelectedPlan(null);
+                            setStep('overview');
+                            setPaymentNotice('Paquete de facturas acreditado correctamente.');
+                            await refetch();
+                            return;
+                        }
                     }
                 }
                 if (paymentRef?.startsWith('CERT') && paymentTransactionId) {
@@ -333,6 +338,9 @@ export function BillingPlansPage() {
                 ) {
                     setWompiPolling(false);
                     clearPendingPayment();
+                    setPlanPendingResult(null);
+                    setSelectedPlan(null);
+                    setStep('overview');
                     setPaymentNotice('Paquete de facturas acreditado correctamente.');
                 }
             })().catch((e) => {
@@ -341,7 +349,7 @@ export function BillingPlansPage() {
             if (pollCountRef.current >= 40) {
                 setWompiPolling(false);
                 setPaymentNotice(
-                    'Si ya pagaste, espera unos minutos y recarga la p?gina. Si el saldo no cambia, contacta soporte con la referencia de pago.',
+                    'Si ya pagaste, espera unos minutos y recarga la página. Si el saldo no cambia, contacta soporte con la referencia de pago.',
                 );
             }
         }, 3000);
@@ -429,7 +437,9 @@ export function BillingPlansPage() {
 
     const handleCertificateTokenReceived = async (token: string, sessionId?: string, deviceId?: string) => {
         if (!selectedMethod) return;
+        setShowTokenForm(false);
         setPaymentProcessing(true);
+        setPaymentNotice(null);
         try {
             const data = await api.mutate<{
                 purchaseBillingCertificateWithPayment: InvoicePlanPendingResult;
@@ -443,7 +453,6 @@ export function BillingPlansPage() {
             });
             const result = data.purchaseBillingCertificateWithPayment;
             setPlanPendingResult(result);
-            setShowTokenForm(false);
             setPaymentRef(result.reference);
             setPaymentTransactionId(result.transactionId ?? null);
             if (result.reference) {
@@ -462,6 +471,7 @@ export function BillingPlansPage() {
                 setPaymentNotice('Pago en proceso. Actualizaremos el estado al confirmarse.');
             }
         } catch (e: unknown) {
+            setPlanPendingResult(null);
             setPaymentNotice(e instanceof Error ? e.message : 'Error al procesar el pago del certificado.');
         } finally {
             setPaymentProcessing(false);
@@ -535,7 +545,9 @@ export function BillingPlansPage() {
 
     const handlePlanTokenReceived = async (token: string, sessionId?: string, deviceId?: string) => {
         if (!selectedPlan || !selectedMethod) return;
+        setShowTokenForm(false);
         setPaymentProcessing(true);
+        setPaymentNotice(null);
         try {
             const data = await api.mutate<{
                 purchaseInvoicePlanWithPayment: InvoicePlanPendingResult;
@@ -564,16 +576,19 @@ export function BillingPlansPage() {
                 setPaymentNotice('Paquete de facturas acreditado correctamente.');
                 setSelectedPlan(null);
                 setStep('overview');
+                setPlanPendingResult(result);
                 await refetch();
             } else {
+                setPlanPendingResult(result);
                 setWompiPolling(true);
+                pollCountRef.current = 0;
                 setPaymentNotice('Pago en proceso. Si ya se cobró, el cupo se actualizará en unos segundos.');
             }
         } catch (e: unknown) {
+            setPlanPendingResult(null);
             setPaymentNotice(e instanceof Error ? e.message : 'Error al procesar el pago.');
         } finally {
             setPaymentProcessing(false);
-            setShowTokenForm(false);
         }
     };
 
