@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Allow, Permission, Logger } from '@vendure/core';
 import { Resolver, Query, Args } from '@nestjs/graphql';
 import { WompiService } from '../services/wompi.service';
 
@@ -8,6 +9,19 @@ export class WompiResolver {
     constructor(
         private wompiService: WompiService,
     ) { }
+
+    @Query()
+    @Allow(Permission.Authenticated)
+    wompiDashboardConfig() {
+        const creds = this.wompiService.getCredentials();
+        if (!creds.publicKey) {
+            return { publicKey: '', sandbox: true };
+        }
+        return {
+            publicKey: creds.publicKey,
+            sandbox: creds.publicKey.startsWith('pub_test_'),
+        };
+    }
 
     @Query('GetWompiIntegritySignature')
     async getWompiIntegritySignature(

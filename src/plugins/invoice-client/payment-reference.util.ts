@@ -18,7 +18,8 @@ export function buildPlanPaymentReference(channelCode: string, planCode: string)
 }
 
 export function buildCertPaymentReference(channelCode: string): string {
-  return `${CERT_PREFIX}${channelCode}::${Date.now()}`;
+  // Wompi acepta alfanumérico, guiones y guiones bajos (no `::`).
+  return `CERT-${channelCode}-${Date.now()}`;
 }
 
 export function parsePlanPaymentReference(
