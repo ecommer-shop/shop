@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { INVOICE_JOB_QUEUE_NAME } from '../constants';
+import { isDefaultAdminChannel } from './invoice-channel-scope.util';
 
 export interface InvoiceEmissionQueueStatus {
   pendingCount: number;
@@ -17,13 +18,17 @@ export interface InvoiceEmissionQueueStatus {
 export class InvoiceEmissionQueueStatusService {
   constructor(private readonly connection: TransactionalConnection) {}
 
-  async getStatus(_ctx: RequestContext): Promise<InvoiceEmissionQueueStatus> {
+  async getStatus(ctx: RequestContext): Promise<InvoiceEmissionQueueStatus> {
     const empty: InvoiceEmissionQueueStatus = {
       pendingCount: 0,
       runningCount: 0,
       retryingCount: 0,
       activeTotal: 0,
     };
+
+    if (!isDefaultAdminChannel(ctx)) {
+      return empty;
+    }
 
     try {
       const ds = this.connection.rawConnection;
