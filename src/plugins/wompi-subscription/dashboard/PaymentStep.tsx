@@ -167,6 +167,7 @@ export function PaymentStep({
                     <WompiTokenizationForm
                         paymentMethod={selectedMethod}
                         onToken={onTokenReceived}
+                        afterTokenMessage="Creando suscripción…"
                         onBack={() => { setFormVisible(false); onCloseTokenForm(); }}
                     />
                 </CardContent>

@@ -39,6 +39,15 @@ export function InvoicePlanPaymentStep({
     onBack: () => void;
     productKind?: 'invoice-plan' | 'certificate';
 }) {
+    const [formVisible, setFormVisible] = useState(false);
+    useEffect(() => {
+        if (showTokenForm && selectedMethod) {
+            setFormVisible(true);
+        } else {
+            setFormVisible(false);
+        }
+    }, [showTokenForm, selectedMethod]);
+
     const isCertificate = productKind === 'certificate';
     const detailLine =
         plan.detailLine ??
@@ -109,10 +118,28 @@ export function InvoicePlanPaymentStep({
         );
     }
 
-    const [formVisible, setFormVisible] = useState(false);
-    useEffect(() => {
-        if (showTokenForm && selectedMethod) setFormVisible(true);
-    }, [showTokenForm, selectedMethod]);
+    if (paymentProcessing || (pendingResult && !pendingResult.applied)) {
+        return (
+            <Card>
+                <CardContent className="text-center py-10 space-y-4">
+                    <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin" />
+                    <h3 className="text-lg font-semibold">
+                        {paymentProcessing ? 'Procesando pago…' : 'Verificando pago con Wompi…'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                        {isCertificate
+                            ? 'Al confirmarse el cobro, el certificado quedará registrado.'
+                            : 'Al confirmarse el cobro, las facturas se acreditarán a tu tienda.'}
+                    </p>
+                    {!paymentProcessing ? (
+                        <Button variant="outline" className="w-full sm:w-auto" onClick={onSuccess}>
+                            Ya pagué
+                        </Button>
+                    ) : null}
+                </CardContent>
+            </Card>
+        );
+    }
 
     if (formVisible && selectedMethod) {
         return (
@@ -132,6 +159,11 @@ export function InvoicePlanPaymentStep({
                     <WompiTokenizationForm
                         paymentMethod={selectedMethod}
                         onToken={onTokenReceived}
+                        afterTokenMessage={
+                            isCertificate
+                                ? 'Procesando pago del certificado…'
+                                : 'Procesando pago del paquete…'
+                        }
                         onBack={() => {
                             setFormVisible(false);
                             onCloseTokenForm();
