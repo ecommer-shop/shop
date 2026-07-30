@@ -29,9 +29,11 @@ import { multivendorOrderProcess } from './config/mv-order-process';
 import { MultivendorSellerStrategy } from './config/mv-order-seller-strategy';
 import { multivendorPaymentMethodHandler } from './config/mv-payment-handler';
 import { multivendorShippingEligibilityChecker } from './config/mv-shipping-eligibility-checker';
+import { enviaShippingEligibilityChecker } from './config/mv-envia-shipping-eligibility-checker';
 import { MultivendorShippingLineAssignmentStrategy } from './config/mv-shipping-line-assignment-strategy';
 import {
     CONNECTED_PAYMENT_METHOD_CODE,
+    ENVIA_SHIPPING_METHOD_CODE,
     MESSENGER_DOMIS_SHIPPING_METHOD_CODE,
     MESSENGER_DOMIS_SHIPPING_METHOD_DESCRIPTION,
     MESSENGER_DOMIS_SHIPPING_METHOD_NAME,
@@ -68,6 +70,7 @@ const loggerCtx = 'MultivendorPlugin';
                 syncPricesAcrossChannels: true,
             });
         config.shippingOptions.shippingEligibilityCheckers.push(multivendorShippingEligibilityChecker);
+        config.shippingOptions.shippingEligibilityCheckers.push(enviaShippingEligibilityChecker);
         config.shippingOptions.shippingLineAssignmentStrategy =
             new MultivendorShippingLineAssignmentStrategy();
         return config;
@@ -113,6 +116,7 @@ export class MultivendorPlugin implements OnApplicationBootstrap {
     async onApplicationBootstrap() {
         await this.ensureConnectedPaymentMethodExists();
         await this.ensureMessengerDomisShippingMethodExists();
+        await this.backfillEnviaToSellerChannels();
     }
 
     private async ensureConnectedPaymentMethodExists() {
@@ -196,11 +200,64 @@ export class MultivendorPlugin implements OnApplicationBootstrap {
             );
         }
 
+        const enviaShippingMethod = await repository.findOne({
+            where: {
+                code: ENVIA_SHIPPING_METHOD_CODE,
+            },
+            relations: ['channels'],
+        });
+
         await this.removeNonMessengerShippingMethodsFromSellerChannels(
             ctx,
             sellerChannels,
             refreshedShippingMethod.id,
+            enviaShippingMethod?.id,
         );
+    }
+
+    private async backfillEnviaToSellerChannels() {
+        const ctx = await this.requestContextService.create({ apiType: 'admin' });
+        const allChannels = await this.connection.getRepository(ctx, Channel).find();
+        const sellerChannels = await this.getSellerChannels(ctx, allChannels);
+
+        if (sellerChannels.length === 0) {
+            return;
+        }
+
+        const repository = this.connection.rawConnection.getRepository(ShippingMethod);
+        const enviaMethod = await repository.findOne({
+            where: { code: ENVIA_SHIPPING_METHOD_CODE },
+            relations: ['channels'],
+        });
+
+        if (!enviaMethod) {
+            Logger.warn(
+                `Backfill: Shipping method ${ENVIA_SHIPPING_METHOD_CODE} not found, skipping Envia backfill`,
+                loggerCtx,
+            );
+            return;
+        }
+
+        const assignedChannelIds = new Set(
+            (enviaMethod.channels ?? []).map(c => String(c.id)),
+        );
+
+        const missingChannelIds = sellerChannels
+            .map(c => c.id)
+            .filter(id => !assignedChannelIds.has(String(id)));
+
+        if (missingChannelIds.length > 0) {
+            await this.channelService.assignToChannels(
+                ctx,
+                ShippingMethod,
+                enviaMethod.id,
+                missingChannelIds,
+            );
+            Logger.info(
+                `Backfill: Assigned Envia shipping method to ${missingChannelIds.length} seller channels`,
+                loggerCtx,
+            );
+        }
     }
 
     private async getSellerChannels(ctx: RequestContext, channels: Channel[]) {
@@ -212,18 +269,24 @@ export class MultivendorPlugin implements OnApplicationBootstrap {
         ctx: RequestContext,
         sellerChannels: Channel[],
         messengerShippingMethodId: ID,
+        enviaShippingMethodId: ID | undefined,
     ) {
         if (sellerChannels.length === 0) {
             return;
         }
 
         const sellerChannelIds = new Set(sellerChannels.map(channel => String(channel.id)));
-        const shippingMethods = await this.connection
+        const qb = this.connection
             .getRepository(ctx, ShippingMethod)
             .createQueryBuilder('shippingMethod')
             .leftJoinAndSelect('shippingMethod.channels', 'channel')
-            .where('shippingMethod.id != :messengerShippingMethodId', { messengerShippingMethodId })
-            .getMany();
+            .where('shippingMethod.id != :messengerShippingMethodId', { messengerShippingMethodId });
+
+        if (enviaShippingMethodId) {
+            qb.andWhere('shippingMethod.id != :enviaShippingMethodId', { enviaShippingMethodId });
+        }
+
+        const shippingMethods = await qb.getMany();
 
         for (const shippingMethod of shippingMethods) {
             const channelIdsToRemove = (shippingMethod.channels ?? [])
