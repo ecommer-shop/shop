@@ -84,7 +84,7 @@ export const adminApiExtensions = gql`
         createPayoutBatch(input: CreatePayoutBatchInput!): PayoutBatch!
         confirmPayoutBatch(id: ID!): PayoutBatch!
         cancelPayoutBatch(id: ID!): PayoutBatch!
-        downloadPayoutCsv(id: ID!): String!
+        downloadPayoutCsv(id: ID!, format: String): String!
         saveMyPayoutInfo(input: SavePayoutInfoInput!): SellerPayoutInfo!
     }
 `;

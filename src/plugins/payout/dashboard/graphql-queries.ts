@@ -66,8 +66,14 @@ export const CANCEL_PAYOUT_BATCH = `
 `;
 
 export const DOWNLOAD_PAYOUT_CSV = `
-    mutation DownloadPayoutCsv($id: ID!) {
-        downloadPayoutCsv(id: $id)
+    mutation DownloadPayoutCsv($id: ID!, $format: String) {
+        downloadPayoutCsv(id: $id, format: $format)
+    }
+`;
+
+export const DOWNLOAD_PAYOUT_PAB = `
+    mutation DownloadPayoutPab($id: ID!, $format: String) {
+        downloadPayoutCsv(id: $id, format: $format)
     }
 `;
 

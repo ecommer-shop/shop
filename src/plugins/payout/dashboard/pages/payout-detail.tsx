@@ -24,6 +24,7 @@ import {
     GET_PAYOUT_BATCH,
     CONFIRM_PAYOUT_BATCH,
     DOWNLOAD_PAYOUT_CSV,
+    DOWNLOAD_PAYOUT_PAB,
 } from '../graphql-queries';
 
 const statusBadge = (status: string) => {
@@ -58,7 +59,7 @@ export function PayoutDetailPage({ route }: any) {
     });
 
     const csvMutation = useMutation({
-        mutationFn: () => api.mutate(DOWNLOAD_PAYOUT_CSV, { id: batchId }),
+        mutationFn: () => api.mutate(DOWNLOAD_PAYOUT_CSV, { id: batchId, format: 'csv' }),
         onSuccess: (result: any) => {
             const csv = result?.downloadPayoutCsv;
             if (csv) {
@@ -67,6 +68,22 @@ export function PayoutDetailPage({ route }: any) {
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `${batch?.reference || `payout-${batchId}`}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        },
+    });
+
+    const pabMutation = useMutation({
+        mutationFn: () => api.mutate(DOWNLOAD_PAYOUT_PAB, { id: batchId, format: 'pab' }),
+        onSuccess: (result: any) => {
+            const txt = result?.downloadPayoutCsv;
+            if (txt) {
+                const blob = new Blob([txt], { type: 'text/plain;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${batch?.reference || `payout-${batchId}`}.txt`;
                 a.click();
                 URL.revokeObjectURL(url);
             }
@@ -133,7 +150,10 @@ export function PayoutDetailPage({ route }: any) {
                                 {(batch.status === 'pending' || batch.status === 'csv_downloaded') && (
                                     <>
                                         <Button variant="default" onClick={() => csvMutation.mutate()} disabled={csvMutation.isPending}>
-                                            {csvMutation.isPending ? 'Generando...' : 'Descargar CSV'}
+                                            {csvMutation.isPending ? 'Generando...' : 'CSV LibreFormato'}
+                                        </Button>
+                                        <Button variant="default" onClick={() => pabMutation.mutate()} disabled={pabMutation.isPending}>
+                                            {pabMutation.isPending ? 'Generando...' : 'TXT PAB Bancolombia'}
                                         </Button>
                                         <Button variant="default" onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}>
                                             {confirmMutation.isPending ? 'Confirmando...' : 'Confirmar pago'}

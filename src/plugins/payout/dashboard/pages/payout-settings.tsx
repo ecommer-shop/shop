@@ -27,20 +27,24 @@ import {
     GET_MY_PAYOUT_BATCHES,
     SAVE_MY_PAYOUT_INFO,
 } from '../graphql-queries';
+import { BANKS } from '../../constants';
 
-const BANKS: Record<string, { name: string; help: string }> = {
-    '001': { name: 'Bancolombia', help: 'Ingresa tu numero de cuenta de ahorros o corriente Bancolombia.' },
-    '051': { name: 'Davivienda / Daviplata', help: 'Para Daviplata ingresa tu celular registrado. Para cuenta Davivienda ingresa el numero de cuenta.' },
-    '507': { name: 'Nequi', help: 'Ingresa tu numero de celular registrado en Nequi. El dinero llega automaticamente.' },
-    '013': { name: 'BBVA', help: 'Ingresa tu numero de cuenta BBVA.' },
-    '002': { name: 'Banco Popular', help: 'Ingresa tu numero de cuenta del Banco Popular.' },
-    '003': { name: 'Banco de Bogota', help: 'Ingresa tu numero de cuenta de Banco de Bogota.' },
+const BANK_HELP: Record<string, string> = {
+    '1007': 'Ingresa tu numero de cuenta de ahorros o corriente Bancolombia.',
+    '1051': 'Para Daviplata ingresa tu celular registrado. Para cuenta Davivienda ingresa el numero de cuenta.',
+    '1507': 'Ingresa tu numero de celular registrado en Nequi. El dinero llega automaticamente.',
+    '1551': 'Ingresa tu numero de celular registrado en Daviplata. El dinero llega automaticamente.',
+    '1013': 'Ingresa tu numero de cuenta BBVA.',
+    '1002': 'Ingresa tu numero de cuenta del Banco Popular.',
+    '1001': 'Ingresa tu numero de cuenta de Banco de Bogota.',
 };
 
 const DOC_TYPES: Record<string, string> = {
     CC: 'Cedula de Ciudadania (CC)',
     NIT: 'NIT',
     CE: 'Cedula de Extranjeria (CE)',
+    TI: 'Tarjeta de Identidad (TI)',
+    PP: 'Pasaporte (PP)',
 };
 
 const ACCOUNT_TYPES: Record<string, string> = {
@@ -114,7 +118,7 @@ export function PayoutSettingsPage() {
         });
     };
 
-    const isPhoneField = bankCode === '507' || bankCode === '051';
+    const isPhoneField = bankCode === '1507' || bankCode === '1551';
 
     if (infoLoading) {
         return (
@@ -170,6 +174,8 @@ export function PayoutSettingsPage() {
                                                 <SelectItem value="CC">Cedula de Ciudadania (CC)</SelectItem>
                                                 <SelectItem value="NIT">NIT</SelectItem>
                                                 <SelectItem value="CE">Cedula de Extranjeria (CE)</SelectItem>
+                                                <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
+                                                <SelectItem value="PP">Pasaporte (PP)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -182,14 +188,11 @@ export function PayoutSettingsPage() {
                                 <div className="space-y-1">
                                     <Label>Banco</Label>
                                     <Select value={bankCode} onValueChange={setBankCode}>
-                                        <SelectTrigger><SelectValue placeholder="Selecciona tu banco...">{bankCode ? (BANKS[bankCode]?.name || bankCode) : undefined}</SelectValue></SelectTrigger>
+                                        <SelectTrigger><SelectValue placeholder="Selecciona tu banco...">{bankCode ? (BANKS[bankCode] || bankCode) : undefined}</SelectValue></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="001">Bancolombia - Cuenta de ahorros o corriente</SelectItem>
-                                            <SelectItem value="051">Davivienda / Daviplata - Celular o cuenta</SelectItem>
-                                            <SelectItem value="507">Nequi - Solo numero de celular</SelectItem>
-                                            <SelectItem value="013">BBVA - Cuenta bancaria</SelectItem>
-                                            <SelectItem value="002">Banco Popular - Cuenta bancaria</SelectItem>
-                                            <SelectItem value="003">Banco de Bogota - Cuenta bancaria</SelectItem>
+                                            {Object.entries(BANKS).map(([code, name]) => (
+                                                <SelectItem key={code} value={code}>{name}</SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -216,9 +219,9 @@ export function PayoutSettingsPage() {
                                             onChange={e => setAccountNumber(e.target.value)}
                                             placeholder={isPhoneField ? '3001234567' : 'Numero de cuenta bancaria'}
                                         />
-                                        {bankCode && BANKS[bankCode] && (
+                                        {bankCode && BANK_HELP[bankCode] && (
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                {BANKS[bankCode].help}
+                                                {BANK_HELP[bankCode]}
                                             </p>
                                         )}
                                     </div>

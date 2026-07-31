@@ -62,7 +62,10 @@ export class PayoutResolver {
     }
 
     @Mutation('downloadPayoutCsv')
-    async downloadPayoutCsv(@Context() ctx: RequestContext, @Args('id') id: number) {
+    async downloadPayoutCsv(@Context() ctx: RequestContext, @Args('id') id: number, @Args('format') format?: string) {
+        if (format === 'pab') {
+            return this.payoutCsvService.generatePabTxt(id);
+        }
         return this.payoutCsvService.generateCsv(id);
     }
 }
