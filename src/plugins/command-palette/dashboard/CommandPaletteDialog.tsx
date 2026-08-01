@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useNavigate, useIsMobile } from '@vendure/dashboard';
 import { Search, ArrowRight, Clock, Sparkles, ExternalLink, RefreshCw, Bot } from 'lucide-react';
-import { ALL_COMMANDS, type Command } from './commands';
+import { ALL_COMMANDS, RESTRICTED_COMMAND_IDS, type Command } from './commands';
 import { getRecentCommands, addRecentCommand } from './recent-searches';
+import { useIsSuperAdmin } from '../../superadminvisibility/dashboard/hooks';
 
 interface Props {
     open: boolean;
@@ -31,14 +32,22 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
     const navigate = useNavigate();
     const isMobile = useIsMobile();
 
+    const isSuperAdmin = useIsSuperAdmin() === true;
+
+    const availableCommands = useMemo(() =>
+        ALL_COMMANDS.filter(cmd =>
+            RESTRICTED_COMMAND_IDS.includes(cmd.id) ? isSuperAdmin : true,
+        ),
+    [isSuperAdmin]);
+
     const recentIds = useMemo(() => {
         if (!open) return [];
         return getRecentCommands();
     }, [open]);
 
     const askAiCommand = useMemo(() =>
-        ALL_COMMANDS.find(c => c.id === 'ask-ai')!,
-    []);
+        availableCommands.find(c => c.id === 'ask-ai')!,
+    [availableCommands]);
 
     const { filtered, flatItems } = useMemo(() => {
         if (!open) return { filtered: [], flatItems: [] as Command[] };
@@ -50,9 +59,9 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
         const q = normalize(query).trim();
         if (!q) {
             const recent = recentIds
-                .map(id => ALL_COMMANDS.find(c => c.id === id))
+                .map(id => availableCommands.find(c => c.id === id))
                 .filter(Boolean) as Command[];
-            const rest = ALL_COMMANDS.filter(c => !recentIds.includes(c.id) && c.id !== 'ask-ai');
+            const rest = availableCommands.filter(c => !recentIds.includes(c.id) && c.id !== 'ask-ai');
             const groupedRecent: { section: string; commands: Command[] }[] = [];
             if (recent.length > 0) {
                 groupedRecent.push({ section: 'Recientes', commands: recent });
@@ -71,7 +80,7 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
             return { filtered: grouped, flatItems: flat };
         }
 
-        const matched = ALL_COMMANDS.filter(cmd => {
+        const matched = availableCommands.filter(cmd => {
             if (cmd.id === 'ask-ai') return false;
             const search = normalize(cmd.label) + ' ' + cmd.keywords.map(normalize).join(' ');
             return search.includes(q);
@@ -229,7 +238,6 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
                             position: 'fixed',
                             top: isMobile ? '4px' : '15%',
                             left: isMobile ? '4px' : '50%',
-                            transform: isMobile ? 'none' : 'translateX(-50%)',
                             width: isMobile ? 'calc(100vw - 8px)' : 'min(90vw, 560px)',
                             maxHeight: isMobile ? '80vh' : '60vh',
                             background: 'var(--popover, var(--card))',
@@ -241,9 +249,9 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
                             zIndex: 9999,
                             overflow: 'hidden',
                         }}
-                        initial={{ opacity: 0, scale: 0.96, y: -20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.96, y: -20 }}
+                        initial={{ opacity: 0, scale: 0.96, y: -20, x: isMobile ? 0 : '-50%' }}
+                        animate={{ opacity: 1, scale: 1, y: 0, x: isMobile ? 0 : '-50%' }}
+                        exit={{ opacity: 0, scale: 0.96, y: -20, x: isMobile ? 0 : '-50%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                         onKeyDown={handleKeyDown}
                     >
@@ -384,6 +392,18 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
                                     }}>
                                         <button
                                             onClick={() => {
+                                                const existing = (() => {
+                                                    try {
+                                                        const saved = sessionStorage.getItem('ecommer-chat-messages');
+                                                        if (saved) return JSON.parse(saved);
+                                                    } catch {}
+                                                    return [];
+                                                })();
+                                                const newMsgs = [
+                                                    { id: `${Date.now()}-q`, role: 'user', content: query, timestamp: new Date().toISOString() },
+                                                    { id: `${Date.now()}-a`, role: 'assistant', content: aiState.response, timestamp: new Date().toISOString() },
+                                                ];
+                                                sessionStorage.setItem('ecommer-chat-messages', JSON.stringify([...existing, ...newMsgs]));
                                                 onClose();
                                                 navigate({ to: '/ai-chat' });
                                             }}
@@ -500,9 +520,17 @@ export function CommandPaletteDialog({ open, onClose }: Props) {
                                                                 position: 'relative',
                                                                 zIndex: 1,
                                                             }}>
-                                                                {cmd.id === 'ask-ai' && (
-                                                                    <Sparkles style={{ width: 15, height: 15, color: 'var(--primary)', flexShrink: 0 }} />
-                                                                )}
+                                                                <cmd.icon
+                                                                    style={{
+                                                                        width: 15,
+                                                                        height: 15,
+                                                                        color: cmd.id === 'ask-ai' || isSelected
+                                                                            ? 'var(--primary)'
+                                                                            : 'var(--muted-foreground)',
+                                                                        flexShrink: 0,
+                                                                        transition: 'color 0.15s',
+                                                                    }}
+                                                                />
                                                                 <span style={{ fontSize: 14, color: 'var(--foreground)' }}>
                                                                     {cmd.label}
                                                                 </span>

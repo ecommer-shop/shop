@@ -12,6 +12,8 @@ export interface ListInvoicesFilter {
   status?: string;
   /** Filtrar por código de orden Vendure. */
   orderCode?: string;
+  /** Prefijo DIAN del canal vendedor (filtro interno por tienda). */
+  prefix?: string;
 }
 
 /**

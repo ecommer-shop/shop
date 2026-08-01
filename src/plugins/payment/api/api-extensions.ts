@@ -23,6 +23,7 @@ const paymentShopApiExtensions = gql`
     paymentMethodExtra: PaymentMethodExtra
     asyncPaymentUrl: String
     qrImage: String
+    url: String
   }
 
   type WompiTransactionStatus {
@@ -30,6 +31,9 @@ const paymentShopApiExtensions = gql`
     status: String!
     statusMessage: String
     paymentMethodExtra: PaymentMethodExtra
+    url: String
+    asyncPaymentUrl: String
+    qrImage: String
   }
 
   type ConfirmPaymentResult {
@@ -67,6 +71,13 @@ const paymentShopApiExtensions = gql`
     paymentMethodCode: String!
     sessionId: String
     deviceId: String
+    financialInstitutionCode: String
+    userType: String
+    userLegalIdType: String
+    userLegalId: String
+    paymentDescription: String
+    paymentMethodDetails: JSON
+    installments: Int
   }
 
   input InitWompiSavedCardTransactionInput {
@@ -76,6 +87,8 @@ const paymentShopApiExtensions = gql`
     amountInCents: Int!
     reference: String!
     currency: String!
+    type: String
+    installments: Int
   }
 
   input ConfirmWompiPaymentInput {
@@ -89,12 +102,37 @@ const paymentShopApiExtensions = gql`
     savedPaymentMethods: [SavedPaymentMethod!]!
   }
 
+  type WompiPaymentSourceResult {
+    id: Int!
+    type: String!
+    status: String!
+    publicData: JSON
+  }
+
+  input CreateWompiPaymentSourceInput {
+    token: String!
+    type: String!
+    customerEmail: String!
+  }
+
+  input SaveWompiPaymentMethodInput {
+    wompiPaymentSourceId: String!
+    type: String!
+    lastFour: String!
+    brand: String!
+    expiryMonth: String
+    expiryYear: String
+    cardHolderName: String
+  }
+
   extend type Mutation {
     initWompiTransaction(input: InitWompiTransactionInput!): WompiTransactionResult!
     initWompiSavedCardTransaction(input: InitWompiSavedCardTransactionInput!): WompiTransactionResult!
+    createWompiPaymentSource(input: CreateWompiPaymentSourceInput!): WompiPaymentSourceResult!
     confirmWompiPayment(input: ConfirmWompiPaymentInput!): ConfirmPaymentResult!
     deleteSavedPaymentMethod(id: ID!): DeletePaymentMethodResult!
     setDefaultPaymentMethod(id: ID!): SavedPaymentMethod
+    saveWompiPaymentMethod(input: SaveWompiPaymentMethodInput!): SavedPaymentMethod!
   }
 `;
 

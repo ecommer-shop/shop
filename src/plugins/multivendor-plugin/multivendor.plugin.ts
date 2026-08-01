@@ -38,6 +38,7 @@ import {
     MULTIVENDOR_PLUGIN_OPTIONS,
 } from './constants';
 import { AutoFulfillService } from './service/auto-fulfill.service';
+import { CustomerChannelService } from './service/customer-channel.service';
 import { MultivendorService } from './service/mv.service';
 import { MultivendorPluginOptions } from './types';
 
@@ -89,6 +90,7 @@ const loggerCtx = 'MultivendorPlugin';
     providers: [
         MultivendorService,
         AutoFulfillService,
+        CustomerChannelService,
         { provide: MULTIVENDOR_PLUGIN_OPTIONS, useFactory: () => MultivendorPlugin.options },
     ],
 })
