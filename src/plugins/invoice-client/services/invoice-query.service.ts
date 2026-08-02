@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RequestContext } from '@vendure/core';
+import { Channel, RequestContext, TransactionalConnection } from '@vendure/core';
 import type {
   ListInvoicesFilter,
   ListInvoicesPagination,
@@ -8,19 +8,41 @@ import type {
   InvoiceTotalsByMonth,
 } from './invoice-query.types';
 import { InvoiceMicroHttpClient } from './invoice-micro-http.client';
+import { isDefaultAdminChannel, readChannelInvoicePrefix } from './invoice-channel-scope.util';
 
 /**
  * Consultas de facturas vía API del microservicio (sin tablas locales en Vendure).
  */
 @Injectable()
 export class InvoiceQueryService {
-  constructor(private readonly microHttp: InvoiceMicroHttpClient) {}
+  constructor(
+    private readonly microHttp: InvoiceMicroHttpClient,
+    private readonly connection: TransactionalConnection,
+  ) {}
+
+  private async resolveStorePrefixFilter(ctx: RequestContext): Promise<string | undefined> {
+    if (isDefaultAdminChannel(ctx)) {
+      return undefined;
+    }
+    const channel = await this.connection.getRepository(ctx, Channel).findOne({
+      where: { id: ctx.channelId },
+    });
+    if (!channel) {
+      return '';
+    }
+    return readChannelInvoicePrefix(channel) ?? '';
+  }
 
   async listInvoices(
-    _ctx: RequestContext,
+    ctx: RequestContext,
     filter: ListInvoicesFilter,
     pagination?: ListInvoicesPagination,
   ): Promise<ListInvoicesResult> {
+    const storePrefix = await this.resolveStorePrefixFilter(ctx);
+    if (storePrefix === '') {
+      return { items: [], total: 0 };
+    }
+
     const res = await this.microHttp.axios.get<{
       success: boolean;
       data?: { items: Array<Record<string, unknown>>; total: number };
@@ -33,6 +55,7 @@ export class InvoiceQueryService {
         customerDni: filter.customerDni,
         status: filter.status,
         orderCode: filter.orderCode,
+        prefix: storePrefix ?? filter.prefix,
         take: pagination?.take,
         skip: pagination?.skip,
       },
@@ -78,10 +101,15 @@ export class InvoiceQueryService {
   }
 
   async getTotalsByDay(
-    _ctx: RequestContext,
+    ctx: RequestContext,
     dateFrom: Date,
     dateTo: Date,
   ): Promise<InvoiceTotalsByDay[]> {
+    const storePrefix = await this.resolveStorePrefixFilter(ctx);
+    if (storePrefix === '') {
+      return [];
+    }
+
     const res = await this.microHttp.axios.get<{
       success: boolean;
       data?: InvoiceTotalsByDay[];
@@ -89,6 +117,7 @@ export class InvoiceQueryService {
       params: {
         dateFrom: dateFrom.toISOString(),
         dateTo: dateTo.toISOString(),
+        prefix: storePrefix,
       },
       validateStatus: (s) => s < 500,
     });
@@ -103,10 +132,15 @@ export class InvoiceQueryService {
   }
 
   async getTotalsByMonth(
-    _ctx: RequestContext,
+    ctx: RequestContext,
     dateFrom: Date,
     dateTo: Date,
   ): Promise<InvoiceTotalsByMonth[]> {
+    const storePrefix = await this.resolveStorePrefixFilter(ctx);
+    if (storePrefix === '') {
+      return [];
+    }
+
     const res = await this.microHttp.axios.get<{
       success: boolean;
       data?: InvoiceTotalsByMonth[];
@@ -114,6 +148,7 @@ export class InvoiceQueryService {
       params: {
         dateFrom: dateFrom.toISOString(),
         dateTo: dateTo.toISOString(),
+        prefix: storePrefix,
       },
       validateStatus: (s) => s < 500,
     });

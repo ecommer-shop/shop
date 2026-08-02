@@ -63,6 +63,10 @@ import { SafeShippingPlugin } from '../plugins/safe-shipping/safe-shipping.plugi
 import { StoresManagementPlugin } from '../plugins/stores-management/stores-management.plugin';
 import { SellerSettingsVisibilityPlugin } from '../plugins/seller-settings-visibility/seller-settings-visibility.plugin';
 import { CommandPalettePlugin } from '../plugins/command-palette/command-palette.plugin';
+import { EnviaShippingPlugin } from '../plugins/envia-shipping';
+import { ChannelStockLocationPlugin } from '../plugins/channel-stock-location/channel-stock-location.plugin';
+import { SellerUxPlugin } from '../plugins/seller-ux/seller-ux.plugin';
+import { TranslationsPlugin } from '../plugins/translations/translations.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -109,7 +113,7 @@ const emailPlugin = EmailPlugin.init({
 
 export const plugins: VendureConfig['plugins'] = [
   AutoSkuPlugin,
-
+  TranslationsPlugin,
   MultivendorPlugin.init({
     platformFeePercent: 10,
     platformFeeSKU: "FEE"
@@ -156,6 +160,8 @@ export const plugins: VendureConfig['plugins'] = [
 
   SafeShippingPlugin,
 
+  EnviaShippingPlugin.init({}),
+
   PaymentPlugin.init({
     secretKey: process.env.WOMPI_INTEGRITY_SECRET || process.env.PAYMENT_SECRET_KEY,
     currency: CURRENCY,
@@ -197,13 +203,19 @@ export const plugins: VendureConfig['plugins'] = [
 
   CommandPalettePlugin,
 
+  ChannelStockLocationPlugin,
+
+  SellerUxPlugin,
+
   WompiSubscriptionPlugin.init({
-    wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co',
-    wompiApiKey: process.env.WOMPI_API_KEY || '',
+    wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co/v1',
+    wompiApiKey: process.env.WOMPI_API_KEY || process.env.PAYMENT_PRIVATE_KEY || '',
     wompiEventsSecret: process.env.WOMPI_EVENTS_SECRET || '',
-    wompiIntegritySecret: process.env.WOMPI_INTEGRITY_SECRET || '',
+    wompiIntegritySecret:
+      process.env.WOMPI_INTEGRITY_SECRET || process.env.PAYMENT_SECRET_KEY || '',
     currency: process.env.WOMPI_CURRENCY || 'COP',
-    wompiPublicKey: process.env.WOMPI_PUBLIC_KEY || '',
+    wompiPublicKey:
+      process.env.WOMPI_PUBLIC_KEY || process.env.PAYMENT_PUBLIC_KEY || '',
   }),
 
   MetricsApiPlugin,

@@ -1,4 +1,4 @@
-import { Args, Query, Resolver } from '@nestjs/graphql';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   Allow,
   Ctx,
@@ -8,13 +8,15 @@ import {
   TransactionalConnection,
 } from '@vendure/core';
 import { InvoiceQueryService } from '../services/invoice-query.service';
+import { BillingPlansService, BillingCertificateType } from '../services/billing-plans.service';
 
 @Resolver()
 export class InvoiceShopResolver {
   constructor(
     private connection: TransactionalConnection,
     private invoiceQuery: InvoiceQueryService,
-  ) {}
+    private billingPlans: BillingPlansService,
+  ) { }
 
   @Query()
   @Allow(Permission.Authenticated)
@@ -54,6 +56,43 @@ export class InvoiceShopResolver {
       items: result.items,
       total: result.total,
     };
+  }
+
+  @Query()
+  @Allow(Permission.Authenticated)
+  async myBillingPlanState(@Ctx() ctx: RequestContext) {
+    return this.billingPlans.getCurrentChannelPlanState(ctx);
+  }
+
+  @Query()
+  @Allow(Permission.Authenticated)
+  async billingInvoicePlans() {
+    return this.billingPlans.getPlanCatalog();
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async submitBillingCertificate(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: {
+      chamber: string;
+      rut: string;
+      nit: string;
+      dianResolution: string;
+      storeLogo: string;
+      certificateType: string;
+    },
+  ) {
+    const type = input.certificateType === 'MONTHLY' ? 'MONTHLY' : 'ANNUAL';
+    return this.billingPlans.submitCertificateDocuments(ctx, {
+      chamber: input.chamber,
+      rut: input.rut,
+      nit: input.nit,
+      dianResolution: input.dianResolution,
+      storeLogo: input.storeLogo,
+      certificateType: type as BillingCertificateType,
+    });
   }
 }
 

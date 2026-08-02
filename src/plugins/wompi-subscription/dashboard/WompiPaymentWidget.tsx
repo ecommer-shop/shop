@@ -1,19 +1,46 @@
-import { Button, Spinner } from '@vendure/dashboard';
+import { api, Button } from '@vendure/dashboard';
 import { CheckCircle2, Loader2, Smartphone } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PAYMENT_METHODS } from './graphql-queries';
 
+const WOMPI_DASHBOARD_CONFIG = `
+  query WompiDashboardConfig {
+    wompiDashboardConfig {
+      publicKey
+      sandbox
+    }
+  }
+`;
+
+let cachedPublicKey: string | null = null;
+
+async function resolveWompiPublicKey(): Promise<string> {
+    const fromWindow = (window as unknown as { __WOMPI_PUBLIC_KEY__?: string }).__WOMPI_PUBLIC_KEY__?.trim();
+    if (fromWindow) {
+        return fromWindow;
+    }
+    if (cachedPublicKey) {
+        return cachedPublicKey;
+    }
+    const data = await api.query<{ wompiDashboardConfig: { publicKey: string } }>(WOMPI_DASHBOARD_CONFIG);
+    const key = data.wompiDashboardConfig?.publicKey?.trim() ?? '';
+    if (!key) {
+        throw new Error('Wompi no está configurado.');
+    }
+    cachedPublicKey = key;
+    (window as unknown as { __WOMPI_PUBLIC_KEY__?: string }).__WOMPI_PUBLIC_KEY__ = key;
+    return key;
+}
+
 // ─── Wompi API helpers ──────────────────────────────────────────
 
-function getWompiApiBaseUrl(): string {
-    const key = (window as any).__WOMPI_PUBLIC_KEY__;
-    return key?.startsWith('pub_test_') ? 'https://sandbox.wompi.co' : 'https://production.wompi.co';
+function getWompiApiBaseUrl(publicKey: string): string {
+    return publicKey.startsWith('pub_test_') ? 'https://sandbox.wompi.co' : 'https://production.wompi.co';
 }
 
 async function wompiFetch(path: string, options?: RequestInit): Promise<any> {
-    const publicKey = (window as any).__WOMPI_PUBLIC_KEY__;
-    if (!publicKey) throw new Error('Wompi no está configurado');
-    const res = await fetch(`${getWompiApiBaseUrl()}${path}`, {
+    const publicKey = await resolveWompiPublicKey();
+    const res = await fetch(`${getWompiApiBaseUrl(publicKey)}${path}`, {
         ...options,
         headers: {
             'Authorization': `Bearer ${publicKey}`,
@@ -31,11 +58,13 @@ async function wompiFetch(path: string, options?: RequestInit): Promise<any> {
 const WOMPI_JS_URL = 'https://wompijs.wompi.com/libs/js/v1.js';
 const WOMPI_JS_ID = 'wompi-js-script';
 
-function loadWompiJSScript(): Promise<void> {
+function loadWompiJSScript(publicKey: string): Promise<void> {
     return new Promise((resolve, reject) => {
         if (typeof window === 'undefined') return reject();
         if ((window as any).$wompi) return resolve();
-        if (document.getElementById(WOMPI_JS_ID)) {
+        const existing = document.getElementById(WOMPI_JS_ID) as HTMLScriptElement | null;
+        if (existing) {
+            existing.setAttribute('data-public-key', publicKey);
             const check = () => {
                 if ((window as any).$wompi) return resolve();
                 setTimeout(check, 100);
@@ -46,7 +75,7 @@ function loadWompiJSScript(): Promise<void> {
         const script = document.createElement('script');
         script.id = WOMPI_JS_ID;
         script.src = WOMPI_JS_URL;
-        script.setAttribute('data-public-key', (window as any).__WOMPI_PUBLIC_KEY__);
+        script.setAttribute('data-public-key', publicKey);
         script.onload = () => resolve();
         script.onerror = () => reject(new Error('Failed to load WompiJS'));
         document.head.appendChild(script);
@@ -54,19 +83,21 @@ function loadWompiJSScript(): Promise<void> {
 }
 
 function initWompiJS(): Promise<{ sessionId: string; deviceId: string }> {
-    return new Promise((resolve, reject) => {
-        loadWompiJSScript()
-            .then(() => {
-                (window as any).$wompi.initialize((data: any, error: any) => {
-                    if (error) return reject(error);
-                    resolve({
-                        sessionId: data.sessionId,
-                        deviceId: data.deviceData?.deviceID || '',
-                    });
-                });
-            })
-            .catch(reject);
-    });
+    return resolveWompiPublicKey()
+        .then((publicKey) =>
+            loadWompiJSScript(publicKey).then(
+                () =>
+                    new Promise<{ sessionId: string; deviceId: string }>((resolve, reject) => {
+                        (window as any).$wompi.initialize((data: any, error: any) => {
+                            if (error) return reject(error);
+                            resolve({
+                                sessionId: data.sessionId,
+                                deviceId: data.deviceData?.deviceID || '',
+                            });
+                        });
+                    }),
+            ),
+        );
 }
 
 // ─── Tokenization Form (router) ─────────────────────────────────
@@ -74,14 +105,25 @@ function initWompiJS(): Promise<{ sessionId: string; deviceId: string }> {
 const WOMPI_TOKEN_POLL_INTERVAL = 2000;
 const WOMPI_TOKEN_MAX_ATTEMPTS = 30;
 
+export interface CardDetails {
+    lastFour?: string;
+    brand?: string;
+    expiryMonth?: string;
+    expiryYear?: string;
+    cardHolderName?: string;
+}
+
 export function WompiTokenizationForm({
     paymentMethod,
     onToken,
     onBack,
+    afterTokenMessage = 'Procesando pago…',
 }: {
     paymentMethod: string;
-    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onToken: (token: string, sessionId?: string, deviceId?: string, cardDetails?: CardDetails) => void;
     onBack: () => void;
+    /** Texto tras tokenizar exitosamente (antes de llamar onToken). */
+    afterTokenMessage?: string;
 }) {
     const [wompiEnv, setWompiEnv] = useState<{ sessionId: string; deviceId: string } | null>(null);
     const [envLoading, setEnvLoading] = useState(true);
@@ -94,7 +136,8 @@ export function WompiTokenizationForm({
                 setEnvLoading(false);
             })
             .catch((e) => {
-                setEnvError('Error al inicializar WompiJS');
+                const msg = e instanceof Error ? e.message : 'Error al inicializar WompiJS';
+                setEnvError(msg.includes('Wompi') ? msg : 'Error al inicializar WompiJS');
                 setEnvLoading(false);
             });
     }, []);
@@ -102,7 +145,7 @@ export function WompiTokenizationForm({
     if (envLoading) {
         return (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Spinner />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Inicializando entorno seguro...
             </div>
         );
@@ -120,15 +163,15 @@ export function WompiTokenizationForm({
     }
 
     if (paymentMethod === 'NEQUI') {
-        return <NequiTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} />;
+        return <NequiTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} afterTokenMessage={afterTokenMessage} />;
     }
 
     if (paymentMethod === 'DAVIPLATA') {
-        return <DaviplataTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} />;
+        return <DaviplataTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} afterTokenMessage={afterTokenMessage} />;
     }
 
     if (paymentMethod === 'CARD') {
-        return <CardTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} />;
+        return <CardTokenForm wompiEnv={wompiEnv!} onToken={onToken} onBack={onBack} afterTokenMessage={afterTokenMessage} />;
     }
 
     return (
@@ -143,14 +186,26 @@ export function WompiTokenizationForm({
 
 // ─── CARD Token Form ────────────────────────────────────────────
 
+function detectBrandLocal(number: string): string {
+    const n = number.replace(/\s/g, '');
+    if (/^4/.test(n)) return 'Visa';
+    if (/^5[1-5]/.test(n) || /^2[2-7]/.test(n)) return 'Mastercard';
+    if (/^3[47]/.test(n)) return 'American Express';
+    if (/^6(?:011|5)/.test(n)) return 'Discover';
+    if (/^3(?:0[0-5]|[68])/.test(n)) return 'Diners Club';
+    return '';
+}
+
 function CardTokenForm({
     wompiEnv,
     onToken,
     onBack,
+    afterTokenMessage,
 }: {
     wompiEnv: { sessionId: string; deviceId: string };
     onToken: (token: string, sessionId?: string, deviceId?: string) => void;
     onBack: () => void;
+    afterTokenMessage: string;
 }) {
     const [number, setNumber] = useState('');
     const [expMonth, setExpMonth] = useState('');
@@ -193,7 +248,18 @@ function CardTokenForm({
                 }),
             });
             setStep('done');
-            setTimeout(() => onToken(res.data.id, wompiEnv.sessionId, wompiEnv.deviceId), 500);
+            setTimeout(() => onToken(
+                res.data.id,
+                wompiEnv.sessionId,
+                wompiEnv.deviceId,
+                {
+                    lastFour: number.replace(/\s/g, '').slice(-4),
+                    brand: detectBrandLocal(number) || 'Card',
+                    expiryMonth,
+                    expiryYear,
+                    cardHolderName: cardHolder,
+                },
+            ), 500);
         } catch (e: any) {
             setErrorMsg(e.message || 'Error al tokenizar tarjeta');
             setStep('error');
@@ -207,7 +273,7 @@ function CardTokenForm({
             <div className="text-center py-8 space-y-4">
                 <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
                 <h3 className="font-semibold">Tarjeta tokenizada exitosamente</h3>
-                <p className="text-sm text-muted-foreground">Creando suscripción...</p>
+                <p className="text-sm text-muted-foreground">{afterTokenMessage}</p>
             </div>
         );
     }
@@ -268,7 +334,7 @@ function CardTokenForm({
             )}
             <div className="flex gap-3">
                 <Button variant="default" onClick={handleTokenize} disabled={loading}>
-                    {loading ? <><Spinner /> Tokenizando...</> : 'Tokenizar tarjeta'}
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Tokenizando...</> : 'Tokenizar tarjeta'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>Volver</Button>
             </div>
@@ -282,10 +348,12 @@ function NequiTokenForm({
     wompiEnv,
     onToken,
     onBack,
+    afterTokenMessage,
 }: {
     wompiEnv: { sessionId: string; deviceId: string };
-    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onToken: (token: string, sessionId?: string, deviceId?: string, cardDetails?: CardDetails) => void;
     onBack: () => void;
+    afterTokenMessage: string;
 }) {
     const [phone, setPhone] = useState('');
     const [step, setStep] = useState<'form' | 'waiting' | 'done' | 'error'>('form');
@@ -315,7 +383,13 @@ function NequiTokenForm({
                     if (statusRes.data.status === 'APPROVED') {
                         clearInterval(poll);
                         setStep('done');
-                        setTimeout(() => onToken(statusRes.data.id, wompiEnv.sessionId, wompiEnv.deviceId), 500);
+                        const cleanPhone = phone.replace(/\D/g, '');
+                        setTimeout(() => onToken(
+                            statusRes.data.id,
+                            wompiEnv.sessionId,
+                            wompiEnv.deviceId,
+                            { lastFour: cleanPhone.slice(-4), brand: 'Nequi', cardHolderName: cleanPhone },
+                        ), 500);
                     } else if (statusRes.data.status === 'DECLINED' || statusRes.data.status === 'ERROR') {
                         clearInterval(poll);
                         setStep('error');
@@ -344,7 +418,7 @@ function NequiTokenForm({
                 <p className="text-sm text-muted-foreground">
                     Revisa la app de Nequi en tu celular y acepta la suscripción.
                 </p>
-                <Spinner />
+                <Loader2 className="h-4 w-4 animate-spin" />
             </div>
         );
     }
@@ -354,7 +428,7 @@ function NequiTokenForm({
             <div className="text-center py-8 space-y-4">
                 <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
                 <h3 className="font-semibold">Nequi tokenizado exitosamente</h3>
-                <p className="text-sm text-muted-foreground">Creando suscripción...</p>
+                <p className="text-sm text-muted-foreground">{afterTokenMessage}</p>
             </div>
         );
     }
@@ -377,7 +451,7 @@ function NequiTokenForm({
             )}
             <div className="flex gap-3">
                 <Button variant="default" onClick={handleStart} disabled={loading}>
-                    {loading ? <><Spinner /> Tokenizando...</> : 'Tokenizar con Nequi'}
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Tokenizando...</> : 'Tokenizar con Nequi'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>Volver</Button>
             </div>
@@ -391,10 +465,12 @@ function DaviplataTokenForm({
     wompiEnv,
     onToken,
     onBack,
+    afterTokenMessage,
 }: {
     wompiEnv: { sessionId: string; deviceId: string };
-    onToken: (token: string, sessionId?: string, deviceId?: string) => void;
+    onToken: (token: string, sessionId?: string, deviceId?: string, cardDetails?: CardDetails) => void;
     onBack: () => void;
+    afterTokenMessage: string;
 }) {
     const [docType, setDocType] = useState('CC');
     const [docNumber, setDocNumber] = useState('');
@@ -469,7 +545,13 @@ function DaviplataTokenForm({
                     if (statusRes.data.status === 'APPROVED') {
                         clearInterval(poll);
                         setStep('done');
-                        setTimeout(() => onToken(statusRes.data.id, wompiEnv.sessionId, wompiEnv.deviceId), 500);
+                        const cleanPhone = phone.replace(/\D/g, '');
+                        setTimeout(() => onToken(
+                            statusRes.data.id,
+                            wompiEnv.sessionId,
+                            wompiEnv.deviceId,
+                            { lastFour: cleanPhone.slice(-4), brand: 'Daviplata', cardHolderName: cleanPhone },
+                        ), 500);
                     } else if (statusRes.data.status === 'DECLINED' || statusRes.data.status === 'ERROR') {
                         clearInterval(poll);
                         setStep('error');
@@ -504,7 +586,7 @@ function DaviplataTokenForm({
             <div className="text-center py-8 space-y-4">
                 <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
                 <h3 className="font-semibold">Daviplata tokenizado exitosamente</h3>
-                <p className="text-sm text-muted-foreground">Creando suscripción...</p>
+                <p className="text-sm text-muted-foreground">{afterTokenMessage}</p>
             </div>
         );
     }
@@ -528,7 +610,7 @@ function DaviplataTokenForm({
                 )}
                 <div className="flex gap-3">
                     <Button variant="default" onClick={handleVerifyOtp} disabled={loading}>
-                        {loading ? <><Spinner /> Verificando...</> : 'Verificar OTP'}
+                        {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Verificando...</> : 'Verificar OTP'}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setStep('form')} disabled={loading}>Volver</Button>
                 </div>
@@ -573,7 +655,7 @@ function DaviplataTokenForm({
             )}
             <div className="flex gap-3">
                 <Button variant="default" onClick={handleTokenize} disabled={loading}>
-                    {loading ? <><Spinner /> Tokenizando...</> : 'Tokenizar con Daviplata'}
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Tokenizando...</> : 'Tokenizar con Daviplata'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>Volver</Button>
             </div>

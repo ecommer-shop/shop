@@ -13,9 +13,12 @@ import { SlugShareDisplay } from './slug-share-display';
 import { ShareLinksWidget } from './share-links-widget';
 
 defineDashboardExtension({
+    routes: [],
     customFormComponents: {
         customFields: [
             { id: 'ecommer-store-featured-star', component: StoreFeaturedStarInput },
+            { id: 'ecommer-store-logo-asset-picker', component: StoreBannerAssetPickerInput },
+            { id: 'ecommer-store-header-banner-asset-picker', component: StoreBannerAssetPickerInput },
             { id: 'ecommer-store-banner-asset-picker', component: StoreBannerAssetPickerInput },
             { id: 'ecommer-store-pickup-map-preview', component: StorePickupMapPreviewInput },
             { id: 'ecommer-store-pickup-address-input', component: StorePickupAddressInput },
@@ -63,9 +66,9 @@ defineDashboardExtension({
             id: 'ecommer-share-links',
             name: 'Links para compartir',
             component: ShareLinksWidget,
-            defaultSize: { w: 6, h: 4 },
+            defaultSize: { w: 6, h: 4, x: 0, y: 9 },
             minSize: { w: 4, h: 3 },
-            maxSize: { w: 12, h: 6 },
+            maxSize: { w: 6, h: 6 },
         },
     ],
 });
