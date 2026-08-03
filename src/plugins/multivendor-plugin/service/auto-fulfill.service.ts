@@ -82,7 +82,7 @@ try {
         .getRepository(ctx, Order)
         .findOne({
             where: { id: order.id as any },
-            relations: ['lines', 'fulfillments', 'fulfillments.lines'],
+            relations: ['lines', 'fulfillments', 'fulfillments.lines', 'shippingLines', 'shippingLines.shippingMethod'],
         });
 
     if(!orderWithLines) return;
@@ -112,11 +112,48 @@ Logger.info(
     loggerCtx,
 );
 
-const result = await this.orderService.createFulfillment(ctx, {
-    handler: {
+const shippingMethod = (orderWithLines as any).shippingLines?.[0]?.shippingMethod;
+const fulfillmentHandlerCode = shippingMethod?.fulfillmentHandlerCode;
+
+let handler: { code: string; arguments: { name: string; value: string }[] };
+if (fulfillmentHandlerCode === 'envia-fulfillment-handler' && shippingMethod) {
+    const calculatorArgs: { name: string; value: string }[] =
+        (shippingMethod as any).calculator?.args ?? [];
+    const carrier = calculatorArgs.find(a => a.name === 'carrier')?.value || '';
+    const service = calculatorArgs.find(a => a.name === 'service')?.value || '';
+    if (carrier && service) {
+        handler = {
+            code: 'envia-fulfillment-handler',
+            arguments: [
+                { name: 'carrier', value: carrier },
+                { name: 'service', value: service },
+            ],
+        };
+    } else {
+        Logger.warn(
+            `AutoFulfill: Envia handler detectado para Order ${order.code} pero sin carrier/service en calculator args, fallback a manual`,
+            loggerCtx,
+        );
+        handler = {
+            code: manualFulfillmentHandler.code,
+            arguments: [{ name: 'method', value: 'Auto' }],
+        };
+    }
+} else {
+    if (fulfillmentHandlerCode && fulfillmentHandlerCode !== 'manual-fulfillment') {
+        Logger.warn(
+            `AutoFulfill: Shipping method fulfillment handler "${fulfillmentHandlerCode}" no soportado, usando manual para Order ${order.code}`,
+            loggerCtx,
+        );
+    }
+    handler = {
         code: manualFulfillmentHandler.code,
         arguments: [{ name: 'method', value: 'Auto' }],
-    },
+    };
+}
+
+const result = await this.orderService.createFulfillment(ctx, {
+    handler,
     lines: linesToFulfill.map(({ line, remaining }) => ({
         orderLineId: line.id,
         quantity: remaining,
