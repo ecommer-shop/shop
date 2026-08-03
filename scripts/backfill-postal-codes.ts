@@ -25,7 +25,7 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
     const response = await fetch(url);
 
     if (!response.ok) {
-        console.error(`  Geocoding API HTTP ${response.status} para lat=${lat} lng=${lng}`);
+        console.error(`Geocoding API HTTP ${response.status} para lat=${lat} lng=${lng}`);
         return null;
     }
 
@@ -35,7 +35,7 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
     };
 
     if (data.status !== 'OK' || !data.results?.length) {
-        console.error(`  Geocoding API status=${data.status} para lat=${lat} lng=${lng}`);
+        console.error(`Geocoding API status=${data.status} para lat=${lat} lng=${lng}`);
         return null;
     }
 
@@ -54,7 +54,7 @@ async function forwardGeocode(address: string): Promise<string | null> {
     const response = await fetch(url);
 
     if (!response.ok) {
-        console.error(`  Geocoding API HTTP ${response.status} para address="${address.substring(0, 60)}..."`);
+        console.error(`Geocoding API HTTP ${response.status} para address="${address.substring(0, 60)}..."`);
         return null;
     }
 
@@ -64,12 +64,11 @@ async function forwardGeocode(address: string): Promise<string | null> {
     };
 
     if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-        console.error(`  Geocoding API status=${data.status} para address="${address.substring(0, 60)}..."`);
+        console.error(`Geocoding API status=${data.status} para address="${address.substring(0, 60)}..."`);
         return null;
     }
 
     if (!data.results?.length) {
-        console.error(`  Sin resultados para address="${address.substring(0, 60)}..."`);
         return null;
     }
 
@@ -97,9 +96,8 @@ async function main() {
     const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
     try {
-        // =================================================================
-        // PASO 1 — Reverse geocode: lat/lng → postal code
-        // =================================================================
+        console.log('Backfill de códigos postales — iniciando...\n');
+
         const { rows: coordRows } = await pool.query<AdminRow>(`
             SELECT
                 id,
@@ -116,20 +114,14 @@ async function main() {
               AND ("customFieldsStorepickuppostalcode" IS NULL OR "customFieldsStorepickuppostalcode" = '')
         `);
 
-        console.log(`\n=== PASO 1: Reverse geocode (coordenadas → postal code) ===`);
-        console.log(`Encontrados ${coordRows.length} Administrators con coordenadas pero sin postal code\n`);
-
         let coordUpdated = 0;
         let coordFailed = 0;
         const coordProcessedIds = new Set<string>();
 
         for (let i = 0; i < coordRows.length; i++) {
             const row = coordRows[i];
-            const name = `${row.firstName} ${row.lastName}`.trim() || row.emailAddress;
             const lat = row.customFieldsStorepickuplatitude!;
             const lng = row.customFieldsStorepickuplongitude!;
-
-            console.log(`[${i + 1}/${coordRows.length}] ${name} (${lat}, ${lng})`);
 
             try {
                 const postalCode = await reverseGeocode(lat, lng);
@@ -139,25 +131,20 @@ async function main() {
                         `UPDATE administrator SET "customFieldsStorepickuppostalcode" = $1 WHERE id = $2`,
                         [postalCode, row.id],
                     );
-                    console.log(`  Postal code: ${postalCode}`);
                     coordUpdated++;
                     coordProcessedIds.add(row.id);
                 } else {
-                    console.log(`  No se encontró postal_code`);
                     coordFailed++;
                 }
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
-                console.error(`  Error: ${message}`);
+                console.error(`Error reverse geocode (id=${row.id}): ${message}`);
                 coordFailed++;
             }
 
             await new Promise(resolve => setTimeout(resolve, 200));
         }
 
-        // =================================================================
-        // PASO 2 — Forward geocode: dirección de texto → postal code
-        // =================================================================
         const { rows: addressRows } = await pool.query<AdminRow>(`
             SELECT
                 id,
@@ -176,18 +163,12 @@ async function main() {
 
         const remainingRows = addressRows.filter(r => !coordProcessedIds.has(r.id));
 
-        console.log(`\n=== PASO 2: Forward geocode (dirección → postal code) ===`);
-        console.log(`Encontrados ${remainingRows.length} Administrators con dirección pero sin postal code (no cubiertos en paso 1)\n`);
-
         let addressUpdated = 0;
         let addressFailed = 0;
 
         for (let i = 0; i < remainingRows.length; i++) {
             const row = remainingRows[i];
-            const name = `${row.firstName} ${row.lastName}`.trim() || row.emailAddress;
             const address = row.customFieldsStorepickupaddress!;
-
-            console.log(`[${i + 1}/${remainingRows.length}] ${name} ("${address.substring(0, 60)}...")`);
 
             try {
                 const postalCode = await forwardGeocode(address);
@@ -197,67 +178,45 @@ async function main() {
                         `UPDATE administrator SET "customFieldsStorepickuppostalcode" = $1 WHERE id = $2`,
                         [postalCode, row.id],
                     );
-                    console.log(`  Postal code: ${postalCode}`);
                     addressUpdated++;
                 } else {
-                    console.log(`  No se encontró postal_code`);
                     addressFailed++;
                 }
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
-                console.error(`  Error: ${message}`);
+                console.error(`Error forward geocode (id=${row.id}): ${message}`);
                 addressFailed++;
             }
 
             await new Promise(resolve => setTimeout(resolve, 200));
         }
 
-        // =================================================================
-        // PASO 3 — Lista informativa: vendedores sin ningún dato de ubicación
-        // =================================================================
         const { rows: noLocationRows } = await pool.query<AdminRow>(`
             SELECT
                 id,
                 "firstName",
                 "lastName",
-                "emailAddress",
-                "customFieldsStorepickuplatitude",
-                "customFieldsStorepickuplongitude",
-                "customFieldsStorepickupaddress",
-                "customFieldsStorepickuppostalcode"
+                "emailAddress"
             FROM administrator
             WHERE ("customFieldsStorepickuplatitude" IS NULL OR "customFieldsStorepickuplatitude" = 0)
               AND ("customFieldsStorepickuplongitude" IS NULL OR "customFieldsStorepickuplongitude" = 0)
               AND ("customFieldsStorepickupaddress" IS NULL OR "customFieldsStorepickupaddress" = '')
         `);
 
-        console.log(`\n=== PASO 3: Vendedores sin ningún dato de ubicación — requieren completar su perfil manualmente ===`);
-        console.log(`Encontrados ${noLocationRows.length} Administrators sin coordenadas ni dirección\n`);
+        console.log(`\n--- Resumen ---`);
+        console.log(`Reverse geocode (lat/lng): ${coordRows.length} procesados, ${coordUpdated} actualizados, ${coordFailed} fallidos`);
+        console.log(`Forward geocode (dirección): ${remainingRows.length} procesados, ${addressUpdated} actualizados, ${addressFailed} fallidos`);
 
-        for (const row of noLocationRows) {
-            const name = `${row.firstName} ${row.lastName}`.trim() || '(sin nombre)';
-            console.log(`  - ${name} (${row.emailAddress || 'sin email'})`);
+        if (noLocationRows.length > 0) {
+            console.log(`\nVendedores sin ningún dato de ubicación (${noLocationRows.length}):`);
+            for (const row of noLocationRows) {
+                const name = `${row.firstName} ${row.lastName}`.trim() || '(sin nombre)';
+                console.log(`  - ${name} (${row.emailAddress || 'sin email'})`);
+            }
+        } else {
+            console.log(`\nTodos los vendedores tienen datos de ubicación.`);
         }
 
-        if (noLocationRows.length === 0) {
-            console.log('  (ninguno)\n');
-        }
-
-        // =================================================================
-        // RESUMEN FINAL
-        // =================================================================
-        console.log(`\n=== Resumen Final ===`);
-        console.log(`Reverse geocode (lat/lng):`);
-        console.log(`  Procesados:  ${coordRows.length}`);
-        console.log(`  Actualizados: ${coordUpdated}`);
-        console.log(`  Fallidos:     ${coordFailed}`);
-        console.log('');
-        console.log(`Forward geocode (dirección):`);
-        console.log(`  Procesados:  ${remainingRows.length}`);
-        console.log(`  Actualizados: ${addressUpdated}`);
-        console.log(`  Fallidos:     ${addressFailed}`);
-        console.log('');
-        console.log(`Sin datos de ubicación: ${noLocationRows.length}`);
         console.log('');
     } finally {
         await pool.end();
