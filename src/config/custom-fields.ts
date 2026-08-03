@@ -1,5 +1,5 @@
 import type { VendureConfig } from '@vendure/core';
-import { Asset, LanguageCode } from '@vendure/core';
+import { Asset, LanguageCode, Permission } from '@vendure/core';
 
 /**
  * Custom fields para ProductVariant (peso y dimensiones).
@@ -753,6 +753,7 @@ export const customFields: VendureConfig['customFields'] = {
       name: 'bankCertificationVerified',
       type: 'boolean',
       defaultValue: false,
+      requiresPermission: Permission.SuperAdmin,
       label: [
         { languageCode: LanguageCode.en, value: 'Bank certification verified' },
         { languageCode: LanguageCode.es, value: 'Certificacion bancaria verificada' },
@@ -760,11 +761,13 @@ export const customFields: VendureConfig['customFields'] = {
       description: [
         {
           languageCode: LanguageCode.en,
-          value: 'Whether the uploaded bank certification has been verified',
+          value:
+            'Only SuperAdmin can mark bank certification as verified. It resets automatically when bank details change.',
         },
         {
           languageCode: LanguageCode.es,
-          value: 'Indica si la certificacion bancaria cargada fue verificada',
+          value:
+            'Solo SuperAdmin puede marcar la certificacion bancaria como verificada. Se desactiva automaticamente si cambian los datos bancarios.',
         },
       ],
     },
