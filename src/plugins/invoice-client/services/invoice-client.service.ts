@@ -235,9 +235,17 @@ export class InvoiceClientService {
       );
 
       const trimmedCompanyId = config.matiasCompanyId?.trim();
-      const headers = trimmedCompanyId
-        ? { [MATIAS_COMPANY_ID_HEADER]: trimmedCompanyId }
-        : undefined;
+      if (!trimmedCompanyId) {
+        throw new Error(
+          'Falta Company ID Matias de la tienda. Configúralo en Ventas → Matias por tienda antes de emitir.',
+        );
+      }
+      if (!config.prefix?.trim() || !config.resolutionNumber?.trim()) {
+        throw new Error(
+          'Falta prefijo o número de resolución Matias de la tienda. Configúralo en Ventas → Matias por tienda.',
+        );
+      }
+      const headers = { [MATIAS_COMPANY_ID_HEADER]: trimmedCompanyId };
       const response = await this.microHttp.axios.post<InvoiceResponse>('/invoices', request, { headers });
       if (!response.data.success) {
         throw new Error(response.data.error || response.data.message || 'Failed to create invoice');
