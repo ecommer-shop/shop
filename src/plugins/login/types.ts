@@ -22,6 +22,7 @@ export interface RegisterSellerWithGoogleInput {
     pickupLatitude: number;
     pickupLongitude: number;
     pickupNeighborhood?: string | null;
+    pickupPostalCode?: string | null;
     pickupGooglePlaceId?: string | null;
 }
 
@@ -39,5 +40,6 @@ export interface SellerOnboardingInput {
     pickupLatitude: number;
     pickupLongitude: number;
     pickupNeighborhood?: string | null;
+    pickupPostalCode?: string | null;
     pickupGooglePlaceId?: string | null;
 }

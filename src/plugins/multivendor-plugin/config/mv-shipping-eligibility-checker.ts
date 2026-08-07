@@ -1,12 +1,15 @@
 import { LanguageCode } from '@vendure/common/lib/generated-types';
 import { DEFAULT_CHANNEL_CODE } from '@vendure/common/lib/shared-constants';
-import { idsAreEqual, Injector, ShippingEligibilityChecker, ShippingMethod, TransactionalConnection } from '@vendure/core';
+import { Injector, ShippingEligibilityChecker, ShippingMethod, TransactionalConnection } from '@vendure/core';
+
+import { normalizeCity } from './mv-shipping-helpers';
 
 let connection: TransactionalConnection;
 
 /**
  * @description
- * Shipping method is eligible if at least one OrderLine is associated with the Seller's Channel.
+ * Shipping method is eligible if at least one OrderLine is associated with the Seller's Channel
+ * AND the destination city is Popayán.
  */
 export const multivendorShippingEligibilityChecker = new ShippingEligibilityChecker({
     code: 'multivendor-shipping-eligibility-checker',
@@ -16,7 +19,6 @@ export const multivendorShippingEligibilityChecker = new ShippingEligibilityChec
         connection = injector.get(TransactionalConnection);
     },
     check: async (ctx, order, args, method) => {
-        // Query channels directly to avoid entityHydrator $Command redefine error
         const methodWithChannels = await connection
             .getRepository(ctx, ShippingMethod)
             .createQueryBuilder('sm')
@@ -31,11 +33,11 @@ export const multivendorShippingEligibilityChecker = new ShippingEligibilityChec
         }
         const sellerChannelIds = new Set(sellerChannels.map(c => String(c.id)));
 
-        // Ensure order lines have sellerChannelId loaded
         const lines = order.lines ?? [];
         for (const line of lines) {
             if (line.sellerChannelId && sellerChannelIds.has(String(line.sellerChannelId))) {
-                return true;
+                const city = normalizeCity(order.shippingAddress?.city ?? '');
+                return city === 'popayan';
             }
         }
         return false;

@@ -58,6 +58,11 @@ export const adminApiExtensions = gql`
         Google Place ID de la dirección de recogida.
         """
         pickupGooglePlaceId: String
+
+        """
+        Código postal de la dirección de recogida.
+        """
+        pickupPostalCode: String
     }
 
     """
