@@ -2,7 +2,8 @@ import { defineDashboardExtension } from '@vendure/dashboard';
 import { PayoutListPage } from './pages/payout-list';
 import { PayoutNewPage } from './pages/payout-new';
 import { PayoutDetailPage } from './pages/payout-detail';
-import { PayoutSettingsPage } from './pages/payout-settings';
+import { PayoutSellersPage } from './pages/payout-sellers';
+import { PayoutSellerDetailPage } from './pages/payout-seller-detail';
 
 export default defineDashboardExtension({
     routes: [
@@ -16,7 +17,7 @@ export default defineDashboardExtension({
                 url: '/payouts',
                 requiresPermission: ['SuperAdmin'],
             },
-            component: () => <PayoutListPage />,
+            component: (route: any) => <PayoutListPage route={route} />,
         },
         {
             path: '/payouts/new',
@@ -29,15 +30,21 @@ export default defineDashboardExtension({
             component: (route: any) => <PayoutDetailPage route={route} />,
         },
         {
-            path: '/payout-settings',
-            loader: () => ({ breadcrumb: 'Configurar pago' }),
+            path: '/payout-sellers',
+            loader: () => ({ breadcrumb: 'Pagos por vendedor' }),
             navMenuItem: {
-                id: 'payout-settings',
+                id: 'payout-sellers',
                 sectionId: 'settings',
-                title: 'Liquidaciones',
-                url: '/payout-settings',
+                title: 'Pagos por vendedor',
+                url: '/payout-sellers',
+                requiresPermission: ['SuperAdmin'],
             },
-            component: () => <PayoutSettingsPage />,
+            component: () => <PayoutSellersPage />,
+        },
+        {
+            path: '/payout-sellers/$sellerId',
+            loader: () => ({ breadcrumb: 'Detalle de vendedor' }),
+            component: (route: any) => <PayoutSellerDetailPage route={route} />,
         },
     ],
 });

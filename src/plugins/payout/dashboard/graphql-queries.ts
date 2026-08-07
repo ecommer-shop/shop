@@ -20,6 +20,17 @@ export const GET_PAYOUT_BATCH = `
     }
 `;
 
+export const GET_PAYOUT_FINANCIAL = `
+    query GetPayoutFinancial($id: ID!) {
+        payoutBatchFinancial(id: $id) {
+            sellerName docTypeCode docTypeLabel docNumber bankCode bankName
+            accountType accountTypeCode transactionType accountNumber phone email fecha
+            ventasBrutas comisionPlataforma comisionWompi comisionEcommer neto
+            orderCodes subOrderCodes wompiRefs pabRef oficina estado
+        }
+    }
+`;
+
 export const PENDING_PAYOUT_REPORT = `
     query PendingPayoutReport($periodStart: DateTime!, $periodEnd: DateTime!) {
         pendingPayoutReport(periodStart: $periodStart, periodEnd: $periodEnd) {
@@ -53,6 +64,14 @@ export const CREATE_PAYOUT_BATCH = `
     }
 `;
 
+export const PAYOUT_BATCH_COUNTS = `
+    query PayoutBatchCounts {
+        payoutBatchCounts {
+            total pending paid cancelled
+        }
+    }
+`;
+
 export const CONFIRM_PAYOUT_BATCH = `
     mutation ConfirmPayoutBatch($id: ID!) {
         confirmPayoutBatch(id: $id) { id status paidAt }
@@ -82,5 +101,35 @@ export const SAVE_MY_PAYOUT_INFO = `
         saveMyPayoutInfo(input: $input) {
             legalIdType legalId accountType accountNumber bankCode brebKey brebKeyType brebVerified
         }
+    }
+`;
+
+export const SELLER_PAYOUT_SUMMARIES = `
+    query SellerPayoutSummaries {
+        sellerPayoutSummaries {
+            sellerId sellerName channelToken totalPaid totalPending totalFee
+            batchCount transactionCount lastPaidAt bankCode bankName accountType accountNumber
+        }
+    }
+`;
+
+export const SELLER_PAYOUT_TRANSACTIONS = `
+    query SellerPayoutTransactions($sellerId: ID!) {
+        sellerPayoutTransactions(sellerId: $sellerId) {
+            id sellerName amount platformFee orderCodes status notes createdAt
+            batch { id reference periodStart periodEnd }
+        }
+    }
+`;
+
+export const DOWNLOAD_SELLER_PAYOUT_REPORT = `
+    mutation DownloadSellerPayoutReport($sellerId: ID) {
+        downloadSellerPayoutReport(sellerId: $sellerId)
+    }
+`;
+
+export const DOWNLOAD_PAYOUT_FINANCIAL = `
+    mutation DownloadPayoutFinancial($id: ID!, $format: String) {
+        downloadPayoutCsv(id: $id, format: $format)
     }
 `;

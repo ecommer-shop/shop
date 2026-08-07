@@ -25,6 +25,8 @@ import {
     CONFIRM_PAYOUT_BATCH,
     DOWNLOAD_PAYOUT_CSV,
     DOWNLOAD_PAYOUT_PAB,
+    DOWNLOAD_PAYOUT_FINANCIAL,
+    GET_PAYOUT_FINANCIAL,
 } from '../graphql-queries';
 
 const statusBadge = (status: string) => {
@@ -50,6 +52,12 @@ export function PayoutDetailPage({ route }: any) {
     const { data, isLoading, error } = useQuery({
         queryKey: ['payoutBatch', batchId],
         queryFn: () => api.query<{ payoutBatch: any }>(GET_PAYOUT_BATCH, { id: batchId }),
+        enabled: !!batchId,
+    });
+
+    const { data: financialData, isLoading: financialLoading } = useQuery({
+        queryKey: ['payoutFinancial', batchId],
+        queryFn: () => api.query<{ payoutBatchFinancial: any[] }>(GET_PAYOUT_FINANCIAL, { id: batchId }),
         enabled: !!batchId,
     });
 
@@ -84,6 +92,27 @@ export function PayoutDetailPage({ route }: any) {
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `${batch?.reference || `payout-${batchId}`}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        },
+    });
+
+    const financialMutation = useMutation({
+        mutationFn: () => api.mutate(DOWNLOAD_PAYOUT_FINANCIAL, { id: batchId, format: 'financial' }),
+        onSuccess: (result: any) => {
+            const base64 = result?.downloadPayoutCsv;
+            if (base64) {
+                const binary = atob(base64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${batch?.reference || `payout-${batchId}`}-reporte-financiero.xlsx`;
                 a.click();
                 URL.revokeObjectURL(url);
             }
@@ -155,6 +184,9 @@ export function PayoutDetailPage({ route }: any) {
                                         <Button variant="default" onClick={() => pabMutation.mutate()} disabled={pabMutation.isPending}>
                                             {pabMutation.isPending ? 'Generando...' : 'TXT PAB Bancolombia'}
                                         </Button>
+                                        <Button variant="outline" onClick={() => financialMutation.mutate()} disabled={financialMutation.isPending}>
+                                            {financialMutation.isPending ? 'Generando...' : 'Reporte financiero (XLSX)'}
+                                        </Button>
                                         <Button variant="default" onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}>
                                             {confirmMutation.isPending ? 'Confirmando...' : 'Confirmar pago'}
                                         </Button>
@@ -196,6 +228,52 @@ export function PayoutDetailPage({ route }: any) {
                                                     }
                                                 </TableCell>
                                                 <TableCell>{statusBadge(t.status)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Desglose financiero ({financialData?.payoutBatchFinancial?.length || 0})</CardTitle></CardHeader>
+                        <CardContent>
+                            {financialLoading ? (
+                                <p className="text-muted-foreground">Cargando desglose...</p>
+                            ) : !financialData?.payoutBatchFinancial?.length ? (
+                                <p className="text-muted-foreground">Sin datos financieros</p>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Vendedor</TableHead>
+                                            <TableHead>Ventas brutas</TableHead>
+                                            <TableHead>Comisión plataforma</TableHead>
+                                            <TableHead>Comisión Wompi</TableHead>
+                                            <TableHead>Comisión Ecommer</TableHead>
+                                            <TableHead>Neto</TableHead>
+                                            <TableHead>Órdenes</TableHead>
+                                            <TableHead>Sub-órdenes</TableHead>
+                                            <TableHead>Ref. Wompi</TableHead>
+                                            <TableHead>Celular</TableHead>
+                                            <TableHead>Estado</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {financialData.payoutBatchFinancial.map((r: any, i: number) => (
+                                            <TableRow key={i}>
+                                                <TableCell className="font-medium">{r.sellerName}</TableCell>
+                                                <TableCell>{fmt(r.ventasBrutas)}</TableCell>
+                                                <TableCell>{fmt(r.comisionPlataforma)}</TableCell>
+                                                <TableCell>{fmt(r.comisionWompi)}</TableCell>
+                                                <TableCell>{fmt(r.comisionEcommer)}</TableCell>
+                                                <TableCell className="font-medium">{fmt(r.neto)}</TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">{r.orderCodes}</TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">{r.subOrderCodes}</TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">{r.wompiRefs}</TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">{r.phone}</TableCell>
+                                                <TableCell>{statusBadge(r.estado)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

@@ -67,6 +67,7 @@ import { EnviaShippingPlugin } from '../plugins/envia-shipping';
 import { ChannelStockLocationPlugin } from '../plugins/channel-stock-location/channel-stock-location.plugin';
 import { SellerUxPlugin } from '../plugins/seller-ux/seller-ux.plugin';
 import { TranslationsPlugin } from '../plugins/translations/translations.plugin';
+import { PayoutPlugin } from '../plugins/payout/payout.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -115,7 +116,7 @@ export const plugins: VendureConfig['plugins'] = [
   AutoSkuPlugin,
   TranslationsPlugin,
   MultivendorPlugin.init({
-    platformFeePercent: 10,
+    platformFeePercent: 7.9,
     platformFeeSKU: "FEE"
   }),
 
@@ -216,6 +217,15 @@ export const plugins: VendureConfig['plugins'] = [
     currency: process.env.WOMPI_CURRENCY || 'COP',
     wompiPublicKey:
       process.env.WOMPI_PUBLIC_KEY || process.env.PAYMENT_PUBLIC_KEY || '',
+  }),
+
+  PayoutPlugin.init({
+    platformFeePercent: 7.9,
+    wompiFeePercent: 6.9,
+    ecommerFeePercent: 1.0,
+    companyNit: process.env.PAYOUT_COMPANY_NIT || '',
+    companyAccount: process.env.PAYOUT_COMPANY_ACCOUNT || '',
+    companyAccountType: (process.env.PAYOUT_COMPANY_ACCOUNT_TYPE || 'AHORROS') as 'AHORROS' | 'CORRIENTE',
   }),
 
   MetricsApiPlugin,

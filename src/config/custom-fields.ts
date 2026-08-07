@@ -460,14 +460,104 @@ export const customFields: VendureConfig['customFields'] = {
         { languageCode: LanguageCode.es, value: 'Redes sociales' },
       ],
       description: [
-        {
-          languageCode: LanguageCode.en,
-          value: 'Seller social media links (WhatsApp, Facebook, Instagram)',
-        },
-        {
-          languageCode: LanguageCode.es,
-          value: 'Redes sociales vinculadas del vendedor (WhatsApp, Facebook, Instagram)',
-        },
+        { languageCode: LanguageCode.en, value: 'Seller social media links (WhatsApp, Facebook, Instagram)' },
+        { languageCode: LanguageCode.es, value: 'Redes sociales vinculadas del vendedor (WhatsApp, Facebook, Instagram)' },
+      ],
+    },
+    {
+      name: 'payoutLegalIdType',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'ID Type (payout)' },
+        { languageCode: LanguageCode.es, value: 'Tipo de documento (pago)' },
+      ],
+      description: [
+        { languageCode: LanguageCode.es, value: 'Tipo de documento para recibir pagos: CC, NIT, CE' },
+      ],
+    },
+    {
+      name: 'payoutLegalId',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'ID Number (payout)' },
+        { languageCode: LanguageCode.es, value: 'Número de documento (pago)' },
+      ],
+      description: [
+        { languageCode: LanguageCode.es, value: 'Número de documento para recibir pagos' },
+      ],
+    },
+    {
+      name: 'payoutAccountType',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Account Type (payout)' },
+        { languageCode: LanguageCode.es, value: 'Tipo de cuenta (pago)' },
+      ],
+      description: [
+        { languageCode: LanguageCode.es, value: 'Tipo de cuenta: AHORROS o CORRIENTE' },
+      ],
+    },
+    {
+      name: 'payoutAccountNumber',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Account Number (payout)' },
+        { languageCode: LanguageCode.es, value: 'Número de cuenta (pago)' },
+      ],
+      description: [
+        { languageCode: LanguageCode.es, value: 'Número de cuenta bancaria para recibir pagos' },
+      ],
+    },
+    {
+      name: 'payoutBankCode',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Bank Code (payout)' },
+        { languageCode: LanguageCode.es, value: 'Código del banco (pago)' },
+      ],
+      description: [
+        { languageCode: LanguageCode.es, value: 'Código de la entidad financiera (001=Bancolombia, 051=Davivienda)' },
+      ],
+    },
+    {
+      name: 'payoutBrebKey',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'BRE-B Key' },
+        { languageCode: LanguageCode.es, value: 'Llave BRE-B' },
+      ],
+      description: [
+        { languageCode: LanguageCode.es, value: 'Llave BRE-B para recibir pagos (email, teléfono o @alias)' },
+      ],
+    },
+    {
+      name: 'payoutBrebKeyType',
+      type: 'string',
+      nullable: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'BRE-B Key Type' },
+        { languageCode: LanguageCode.es, value: 'Tipo de llave BRE-B' },
+      ],
+      description: [
+        { languageCode: LanguageCode.es, value: 'Tipo: MAIL, PHONE, ALPHANUMERIC' },
+      ],
+    },
+    {
+      name: 'payoutBrebVerified',
+      type: 'boolean',
+      defaultValue: false,
+      label: [
+        { languageCode: LanguageCode.en, value: 'BRE-B Verified' },
+        { languageCode: LanguageCode.es, value: 'BRE-B Verificado' },
+      ],
+      description: [
+        { languageCode: LanguageCode.es, value: 'Si la llave BRE-B ha sido verificada' },
       ],
     },
   ],

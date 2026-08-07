@@ -13,6 +13,7 @@ import { PayoutBatch, PayoutBatchStatus } from '../entities/payout-batch.entity'
 import { PayoutTransaction, PayoutTransactionStatus } from '../entities/payout-transaction.entity';
 import { loggerCtx } from '../constants';
 import { PayoutCsvService } from './payout-csv.service';
+import { PayoutConfigService } from './payout-config.service';
 
 interface SellerPayoutAccumulator {
     sellerId: number;
@@ -35,6 +36,7 @@ export class PayoutCalculationService {
     constructor(
         private connection: TransactionalConnection,
         private payoutCsvService: PayoutCsvService,
+        private payoutConfigService: PayoutConfigService,
     ) {}
 
     async getPendingPayoutReport(ctx: RequestContext, periodStart: Date, periodEnd: Date) {
@@ -182,6 +184,7 @@ export class PayoutCalculationService {
         }
 
         const sellerRepo = this.connection.rawConnection.getRepository(Seller);
+        const configBySeller = new Map<number, { legalIdType: string | null; legalId: string | null; accountType: string | null; accountNumber: string | null; bankCode: string | null; brebKey: string | null; brebKeyType: string | null } | null>();
 
         const sellerMap = new Map<number, SellerPayoutAccumulator>();
 
@@ -193,12 +196,9 @@ export class PayoutCalculationService {
                 if (!channel?.sellerId) continue;
 
                 const sellerId = Number(channel.sellerId);
-                const seller = await sellerRepo.findOne({ where: { id: sellerId as any } });
-                if (!seller) continue;
-
                 const existing = sellerMap.get(sellerId) || ({
                     sellerId,
-                    sellerName: seller.name,
+                    sellerName: `Seller ${sellerId}`,
                     channelToken: channel.token,
                     totalNeto: 0,
                     totalFee: 0,
@@ -212,15 +212,31 @@ export class PayoutCalculationService {
                     brebKeyType: null as string | null,
                 } as SellerPayoutAccumulator);
 
-                const cf = (seller.customFields || {}) as Record<string, any>;
-                if (!existing.accountNumber && cf.payoutAccountNumber) {
-                    existing.legalIdType = String(cf.payoutLegalIdType || '');
-                    existing.legalId = String(cf.payoutLegalId || '');
-                    existing.accountType = String(cf.payoutAccountType || '');
-                    existing.accountNumber = String(cf.payoutAccountNumber || '');
-                    existing.bankCode = String(cf.payoutBankCode || '');
-                    existing.brebKey = String(cf.payoutBrebKey || '');
-                    existing.brebKeyType = String(cf.payoutBrebKeyType || '');
+                if (existing.sellerName === `Seller ${sellerId}`) {
+                    const seller = await sellerRepo.findOne({ where: { id: sellerId as any }, select: ['id', 'name'] });
+                    if (seller?.name) {
+                        existing.sellerName = seller.name;
+                    }
+                }
+
+                if (!existing.accountNumber) {
+                    let cfg = configBySeller.get(sellerId);
+                    if (cfg === undefined) {
+                        const config = await this.payoutConfigService.getBySellerId(sellerId);
+                        cfg = config
+                            ? { legalIdType: config.legalIdType, legalId: config.legalId, accountType: config.accountType, accountNumber: config.accountNumber, bankCode: config.bankCode, brebKey: config.brebKey, brebKeyType: config.brebKeyType }
+                            : null;
+                        configBySeller.set(sellerId, cfg);
+                    }
+                    if (cfg && cfg.accountNumber) {
+                        existing.legalIdType = cfg.legalIdType ? String(cfg.legalIdType) : null;
+                        existing.legalId = cfg.legalId ? String(cfg.legalId) : null;
+                        existing.accountType = cfg.accountType ? String(cfg.accountType) : null;
+                        existing.accountNumber = String(cfg.accountNumber);
+                        existing.bankCode = cfg.bankCode ? String(cfg.bankCode) : null;
+                        existing.brebKey = cfg.brebKey ? String(cfg.brebKey) : null;
+                        existing.brebKeyType = cfg.brebKeyType ? String(cfg.brebKeyType) : null;
+                    }
                 }
 
                 existing.totalNeto += sellerOrder.totalWithTax;
