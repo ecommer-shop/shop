@@ -1,9 +1,7 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
-    Allow,
     Channel,
     Ctx,
-    Permission,
     RequestContext,
     TransactionalConnection,
 } from '@vendure/core';
@@ -13,7 +11,6 @@ export class SellerShippingSettingsResolver {
     constructor(private readonly connection: TransactionalConnection) {}
 
     @Query()
-    @Allow(Permission.ReadShippingMethod)
     async sellerShippingSettings(@Ctx() ctx: RequestContext) {
         const channel = await this.connection
             .getRepository(ctx, Channel)
@@ -26,7 +23,6 @@ export class SellerShippingSettingsResolver {
     }
 
     @Mutation()
-    @Allow(Permission.Public)
     async updateSellerShippingSettings(
         @Ctx() ctx: RequestContext,
         @Args() args: { ownDeliveryEnabled: boolean },
