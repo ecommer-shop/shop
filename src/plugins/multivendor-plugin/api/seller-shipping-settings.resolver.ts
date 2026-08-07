@@ -26,7 +26,7 @@ export class SellerShippingSettingsResolver {
     }
 
     @Mutation()
-    @Allow(Permission.UpdateShippingMethod)
+    @Allow(Permission.Public)
     async updateSellerShippingSettings(
         @Ctx() ctx: RequestContext,
         @Args() args: { ownDeliveryEnabled: boolean },
