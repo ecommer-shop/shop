@@ -112,7 +112,7 @@ function patchVendureDashboardChannelPermissions() {
                 if (!nextCode.includes("import { BillingCertificateDocField } from '@/plugins/invoice-client/dashboard/components/billing-certificate-doc-field';")) {
                     nextCode = nextCode.replace(
                         "import { ErrorPage } from '@/vdb/components/shared/error-page.js';",
-                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { BillingCertificateDocField } from '@/plugins/invoice-client/dashboard/components/billing-certificate-doc-field';",
+                        "import { ErrorPage } from '@/vdb/components/shared/error-page.js';\nimport { BillingCertificateDocField } from '@/plugins/invoice-client/dashboard/components/billing-certificate-doc-field';\nimport { PayoutSettingsSection } from '@/plugins/payout/dashboard/components/payout-settings-section';",
                     );
                 }
                 if (!nextCode.includes("import { PermissionGuard } from '@/vdb/components/shared/permission-guard.js';")) {
@@ -257,6 +257,9 @@ function patchVendureDashboardChannelPermissions() {
                             )}
                         />
                     </PermissionGuard>
+                </PageBlock>
+                <PageBlock column="main" blockId="payout-settings" title="Liquidaciones">
+                    <PayoutSettingsSection />
                 </PageBlock>`,
                 );
                 nextCode = nextCode.replace(

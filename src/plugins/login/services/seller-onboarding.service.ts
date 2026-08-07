@@ -462,7 +462,6 @@ export class SellerOnboardingService {
         const superAdminUser = await this.connection.getRepository(ctx, User).findOne({
             where: { identifier: superadminCredentials.identifier },
         });
-
         return this.requestContextService.create({
             apiType: 'admin',
             user: superAdminUser!,

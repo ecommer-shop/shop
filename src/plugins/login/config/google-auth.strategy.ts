@@ -146,6 +146,16 @@ export class GoogleAdminAuthenticationStrategy
             if (isSeller) {
                 try {
                     await this.sellerOnboardingService.syncAllSellerRolesForUser(ctx, user);
+                    const freshUser = await this.connection
+                        .getRepository(ctx, User)
+                        .createQueryBuilder('user')
+                        .leftJoinAndSelect('user.roles', 'role')
+                        .leftJoinAndSelect('role.channels', 'channel')
+                        .where('user.id = :id', { id: user.id })
+                        .getOne();
+                    if (freshUser) {
+                        (user as any).roles = freshUser.roles;
+                    }
                 } catch (syncError) {
                     Logger.error(
                         `Failed to sync seller roles for ${email}: ${syncError instanceof Error ? syncError.message : syncError}`,
