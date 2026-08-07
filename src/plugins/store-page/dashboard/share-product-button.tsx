@@ -9,6 +9,8 @@ function getStoreFrontendUrl(): string {
     return origin.replace(/^https?:\/\/admin[-.]/, 'https://');
 }
 
+const STOREFRONT_URL = typeof window !== 'undefined' ? getStoreFrontendUrl() : 'https://ecommer.shop';
+
 export function ShareProductButton({ context }: { context: PageContextValue }) {
     const { activeChannel } = useChannel();
     const [copiedProduct, setCopiedProduct] = useState(false);
@@ -16,12 +18,11 @@ export function ShareProductButton({ context }: { context: PageContextValue }) {
 
     const slug = (context?.entity as any)?.slug;
     const storeCode = activeChannel?.code;
-    const storeFrontendUrl = getStoreFrontendUrl();
 
     const handleCopyProduct = async () => {
         try {
             const productLink = slug
-                ? `${storeFrontendUrl}/es/product/${slug}`
+                ? `${STOREFRONT_URL}/es/product/${slug}`
                 : window.location.href;
             await navigator.clipboard.writeText(productLink);
             toast.success("Enlace del producto copiado");
@@ -43,7 +44,7 @@ export function ShareProductButton({ context }: { context: PageContextValue }) {
     const handleCopyStore = async () => {
         try {
             const storeLink = storeCode
-                ? `${storeFrontendUrl}/es/store/${storeCode}`
+                ? `${STOREFRONT_URL}/es/store/${storeCode}`
                 : null;
             if (!storeLink) {
                 toast.error('No se pudo generar el enlace de la tienda');
@@ -72,7 +73,7 @@ export function ShareProductButton({ context }: { context: PageContextValue }) {
             ?? (context?.entity as any)?.assets?.[0]?.preview 
             ?? null;
         
-        const base = `${storeFrontendUrl}/api/product-qr`;
+        const base = `${STOREFRONT_URL}/api/product-qr`;
         const params = new URLSearchParams({ slug: slugFromEntity });
         if (imageUrl) params.set("image", imageUrl);
 
