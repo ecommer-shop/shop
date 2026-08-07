@@ -1209,6 +1209,14 @@ export default defineConfig({
       body.hide-native-login form [data-slot="input-group"] {
           display: none !important;
       }
+
+      /* Ocultar el campo Slug en el detalle de producto (input override en
+         store-page/dashboard/hidden-slug-input.tsx no puede quitar el
+         <FieldLabel> del núcleo de Vendure, así que se oculta el wrapper
+         completo por CSS mientras ese componente está montado). */
+      body.hide-product-slug-field [data-slot="field"]:has(label[for="field-slug"]) {
+          display: none !important;
+      }
     </style>`
                 );
 
