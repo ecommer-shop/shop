@@ -7,7 +7,7 @@ export default defineDashboardExtension({
             path: '/shipping-methods',
             loader: () => ({ breadcrumb: 'Métodos de envío' }),
             navMenuItem: {
-                id: 'shipping-methods',
+                id: 'seller-shipping-methods',
                 sectionId: 'settings',
                 title: 'Métodos de envío',
                 url: '/shipping-methods',
