@@ -241,6 +241,7 @@ export function SellerRegistrationForm({
                             pickupLatitude: pickupSelection.latitude,
                             pickupLongitude: pickupSelection.longitude,
                             pickupNeighborhood: pickupSelection.neighborhood,
+                            pickupPostalCode: pickupSelection.postalCode,
                             pickupGooglePlaceId: pickupSelection.googlePlaceId,
                         },
                     },

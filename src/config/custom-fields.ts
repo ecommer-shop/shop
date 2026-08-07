@@ -312,6 +312,26 @@ export const customFields: VendureConfig['customFields'] = {
         },
       ],
     },
+    {
+      name: 'storePickupPostalCode',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup postal code' },
+        { languageCode: LanguageCode.es, value: 'Código postal de recogida' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Store pickup postal code used as delivery origin',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Código postal de la tienda usado como origen del domicilio',
+        },
+      ],
+    },
   ],
   Customer: [
     {

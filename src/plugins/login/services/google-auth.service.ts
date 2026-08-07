@@ -31,6 +31,7 @@ export class GoogleAuthService {
             pickupLatitude: input.pickupLatitude,
             pickupLongitude: input.pickupLongitude,
             pickupNeighborhood: input.pickupNeighborhood ?? null,
+            pickupPostalCode: input.pickupPostalCode ?? null,
             pickupGooglePlaceId: input.pickupGooglePlaceId ?? null,
         });
     }

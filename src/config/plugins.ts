@@ -161,7 +161,20 @@ export const plugins: VendureConfig['plugins'] = [
 
   SafeShippingPlugin,
 
-  EnviaShippingPlugin.init({}),
+  EnviaShippingPlugin.init({
+    originAddress: {
+      name: 'Tienda Ecommer',
+      company: 'Ecommer',
+      phone: '+57 3001234567',
+      email: 'test@ecommer.shop',
+      street: 'Calle 5',
+      number: '10-20',
+      city: '19001000',
+      state: 'CAU',
+      country: 'CO',
+      postalCode: '19001000',
+    },
+  }),
 
   PaymentPlugin.init({
     secretKey: process.env.WOMPI_INTEGRITY_SECRET || process.env.PAYMENT_SECRET_KEY,

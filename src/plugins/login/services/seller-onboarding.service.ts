@@ -46,6 +46,7 @@ type StorePickupCustomFields = {
     storePickupLatitude: number;
     storePickupLongitude: number;
     storePickupNeighborhood?: string | null;
+    storePickupPostalCode?: string | null;
     storePickupGooglePlaceId?: string | null;
 };
 
@@ -70,6 +71,7 @@ export class SellerOnboardingService {
             storePickupLatitude: input.pickupLatitude,
             storePickupLongitude: input.pickupLongitude,
             storePickupNeighborhood: input.pickupNeighborhood?.trim() || null,
+            storePickupPostalCode: input.pickupPostalCode?.trim() || null,
             storePickupGooglePlaceId: input.pickupGooglePlaceId?.trim() || null,
         };
     }
