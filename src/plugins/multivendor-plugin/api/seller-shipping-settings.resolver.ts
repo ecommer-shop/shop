@@ -13,7 +13,7 @@ export class SellerShippingSettingsResolver {
     constructor(private readonly connection: TransactionalConnection) {}
 
     @Query()
-    @Allow(Permission.Authenticated)
+    @Allow(Permission.ReadShippingMethod)
     async sellerShippingSettings(@Ctx() ctx: RequestContext) {
         const channel = await this.connection
             .getRepository(ctx, Channel)
@@ -26,7 +26,7 @@ export class SellerShippingSettingsResolver {
     }
 
     @Mutation()
-    @Allow(Permission.Authenticated)
+    @Allow(Permission.UpdateShippingMethod)
     async updateSellerShippingSettings(
         @Ctx() ctx: RequestContext,
         @Args() args: { ownDeliveryEnabled: boolean },
