@@ -132,11 +132,12 @@ export class InvoiceClientService {
       const items = order.lines.map((line) => {
         const productVariant = line.productVariant;
         const taxRate = line.taxRate ?? 19;
-        const discountedLinePrice =
+        // Vendure stores prices in cents (integer). Divide by 100 to get real monetary value.
+        const discountedLinePriceCents =
           typeof line.discountedLinePrice === 'number'
             ? line.discountedLinePrice
             : line.unitPrice * line.quantity;
-        const unitPrice = line.quantity > 0 ? discountedLinePrice / line.quantity : 0;
+        const unitPricePesos = line.quantity > 0 ? discountedLinePriceCents / line.quantity / 100 : 0;
         const description =
           productVariant?.name ||
           line.productVariant?.product?.name ||
@@ -147,7 +148,7 @@ export class InvoiceClientService {
           description,
           code: sku,
           quantity: line.quantity,
-          unitPrice: Number(unitPrice.toFixed(2)),
+          unitPrice: Number(unitPricePesos.toFixed(2)),
           taxPercent: taxRate,
           quantityUnitsId: '1093',
           typeItemIdentificationsId: '4',
@@ -157,20 +158,22 @@ export class InvoiceClientService {
 
       const shippingLines = (order.shippingLines ?? [])
         .map((line, index) => {
-          const price =
+          // Vendure shipping prices are also in cents. Divide by 100.
+          const priceCents =
             typeof line.discountedPrice === 'number'
               ? line.discountedPrice
               : typeof line.price === 'number'
                 ? line.price
                 : 0;
-          if (price <= 0) {
+          const pricePesos = priceCents / 100;
+          if (pricePesos <= 0) {
             return null;
           }
           return {
             description: line.shippingMethod?.name || 'Domicilio',
             code: line.shippingMethod?.code || `SHIPPING-${index + 1}`,
             quantity: 1,
-            unitPrice: Number(price.toFixed(2)),
+            unitPrice: Number(pricePesos.toFixed(2)),
             taxPercent: 0,
             quantityUnitsId: '1093',
             typeItemIdentificationsId: '4',
