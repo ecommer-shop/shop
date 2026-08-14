@@ -495,6 +495,26 @@ export const customFields: VendureConfig['customFields'] = {
     { name: 'invoiceBillingActive', type: 'boolean', defaultValue: false },
     { name: 'invoiceLimitRemaining', type: 'int', nullable: true },
     {
+      name: 'ownDeliveryEnabled',
+      type: 'boolean',
+      defaultValue: false,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.es, value: 'Domicilio con el vendedor' },
+        { languageCode: LanguageCode.en, value: 'Seller delivery' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'El vendedor coordina la entrega y cobra el domicilio en el lugar de destino.',
+        },
+        {
+          languageCode: LanguageCode.en,
+          value: 'The seller coordinates delivery and charges at the destination.',
+        },
+      ],
+    },
+    {
       name: 'matiasCompanyId',
       type: 'string',
       nullable: true,
