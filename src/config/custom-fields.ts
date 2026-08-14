@@ -333,6 +333,108 @@ export const customFields: VendureConfig['customFields'] = {
       ],
     },
   ],
+  Fulfillment: [
+    {
+      name: 'enviaPickupNumber',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup number' },
+        { languageCode: LanguageCode.es, value: 'Número de recolección' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Envia pickup confirmation number',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Número de confirmación de recolección de Envia',
+        },
+      ],
+    },
+    {
+      name: 'enviaPickupDate',
+      type: 'string',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup date' },
+        { languageCode: LanguageCode.es, value: 'Fecha de recolección' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Envia scheduled pickup date (YYYY-MM-DD)',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Fecha agendada de recolección de Envia (YYYY-MM-DD)',
+        },
+      ],
+    },
+    {
+      name: 'enviaPickupTimeFrom',
+      type: 'int',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup window start' },
+        { languageCode: LanguageCode.es, value: 'Inicio de ventana de recolección' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Envia pickup time window start hour',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Hora de inicio de la ventana de recolección de Envia',
+        },
+      ],
+    },
+    {
+      name: 'enviaPickupTimeTo',
+      type: 'int',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup window end' },
+        { languageCode: LanguageCode.es, value: 'Fin de ventana de recolección' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Envia pickup time window end hour',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Hora de fin de la ventana de recolección de Envia',
+        },
+      ],
+    },
+    {
+      name: 'enviaPickupFee',
+      type: 'float',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup fee' },
+        { languageCode: LanguageCode.es, value: 'Costo de recolección' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Envia pickup fee cost',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Costo de la recolección de Envia',
+        },
+      ],
+    },
+  ],
   Customer: [
     {
       name: 'acceptedTermsAndPrivacy',
