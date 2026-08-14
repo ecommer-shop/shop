@@ -132,7 +132,8 @@ function patchVendureDashboardChannelPermissions() {
                         '    const { t } = useLingui();',
                         `    const { t } = useLingui();
     const { hasPermissions } = usePermissions();
-    const canConfigurePaymentProcessor = hasPermissions(['CreateSettings']);`,
+    const canConfigurePaymentProcessor = hasPermissions(['CreateSettings']);
+    const canManageBankVerification = hasPermissions(['SuperAdmin']);`,
                     );
                 }
 
@@ -145,8 +146,15 @@ function patchVendureDashboardChannelPermissions() {
             };
         },`,
                     `        transformCreateInput: input => {
+            const customFields = { ...(input.customFields ?? {}) };
+            if (!canManageBankVerification) {
+                delete customFields.bankCertificationVerified;
+            } else if (customFields.bankCertificationVerified == null) {
+                customFields.bankCertificationVerified = false;
+            }
             return {
                 ...input,
+                customFields,
                 code:
                     input.code?.trim() ||
                     (input.name ?? '')
@@ -162,6 +170,20 @@ function patchVendureDashboardChannelPermissions() {
                           arguments: [{ name: 'automaticSettle', value: 'false' }],
                       },
             };
+        },
+        transformUpdateInput: input => {
+            const customFields = { ...(input.customFields ?? {}) };
+            const prev = entity?.customFields ?? {};
+            const bankChanged =
+                String(customFields.accountNumber ?? '').trim() !== String(prev.accountNumber ?? '').trim() ||
+                String(customFields.bankName ?? '').trim() !== String(prev.bankName ?? '').trim() ||
+                String(customFields.bankCertificationPdf ?? '') !== String(prev.bankCertificationPdf ?? '');
+            if (!canManageBankVerification) {
+                delete customFields.bankCertificationVerified;
+            } else if (bankChanged) {
+                customFields.bankCertificationVerified = false;
+            }
+            return { ...input, customFields };
         },`,
                 );
                 nextCode = nextCode.replace(
@@ -221,12 +243,15 @@ function patchVendureDashboardChannelPermissions() {
                 >
                     <BillingCertificateDocField
                         label="Certificación bancaria"
-                        hint="PDF o imagen de la certificación bancaria. Al guardar el método de pago, el archivo queda asociado y se muestra al volver a abrir."
+                        hint="PDF o imagen de la certificación bancaria. Si reemplazas el archivo, la verificación se desactiva hasta que SuperAdmin la revise."
                         assetId={String(form.watch('customFields.bankCertificationPdf') ?? '')}
                         onAssetIdChange={id => {
                             form.setValue('customFields.bankCertificationPdf', id || undefined, {
                                 shouldDirty: true,
                                 shouldValidate: true,
+                            });
+                            form.setValue('customFields.bankCertificationVerified', false, {
+                                shouldDirty: true,
                             });
                         }}
                         accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf"
@@ -238,13 +263,33 @@ function patchVendureDashboardChannelPermissions() {
                             control={form.control}
                             name="customFields.accountNumber"
                             label="Número de cuenta"
-                            render={({ field }) => <Input {...field} />}
+                            render={({ field }) => (
+                                <Input
+                                    {...field}
+                                    onChange={e => {
+                                        field.onChange(e);
+                                        form.setValue('customFields.bankCertificationVerified', false, {
+                                            shouldDirty: true,
+                                        });
+                                    }}
+                                />
+                            )}
                         />
                         <FormFieldWrapper
                             control={form.control}
                             name="customFields.bankName"
                             label="Banco"
-                            render={({ field }) => <Input {...field} />}
+                            render={({ field }) => (
+                                <Input
+                                    {...field}
+                                    onChange={e => {
+                                        field.onChange(e);
+                                        form.setValue('customFields.bankCertificationVerified', false, {
+                                            shouldDirty: true,
+                                        });
+                                    }}
+                                />
+                            )}
                         />
                     </DetailFormGrid>
                     <PermissionGuard requires={['SuperAdmin']}>
@@ -257,6 +302,11 @@ function patchVendureDashboardChannelPermissions() {
                             )}
                         />
                     </PermissionGuard>
+                    {!canManageBankVerification ? (
+                        <p className="text-xs text-muted-foreground mt-2">
+                            Si cambias cuenta, banco o el PDF, la certificación deja de estar verificada hasta que SuperAdmin la revise.
+                        </p>
+                    ) : null}
                 </PageBlock>`,
                 );
                 nextCode = nextCode.replace(
@@ -1207,6 +1257,14 @@ export default defineConfig({
       body.hide-native-login form h1,
       body.hide-native-login form > div:not([class*="max-w-sm"]) p.text-muted-foreground,
       body.hide-native-login form [data-slot="input-group"] {
+          display: none !important;
+      }
+
+      /* Ocultar el campo Slug en el detalle de producto (input override en
+         store-page/dashboard/hidden-slug-input.tsx no puede quitar el
+         <FieldLabel> del núcleo de Vendure, así que se oculta el wrapper
+         completo por CSS mientras ese componente está montado). */
+      body.hide-product-slug-field [data-slot="field"]:has(label[for="field-slug"]) {
           display: none !important;
       }
     </style>`
