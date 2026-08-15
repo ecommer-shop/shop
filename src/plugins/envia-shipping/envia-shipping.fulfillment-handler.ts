@@ -2,24 +2,22 @@ import { FulfillmentHandler, LanguageCode, Logger } from '@vendure/core';
 import type { Order, RequestContext } from '@vendure/core';
 import type { OrderLineInput } from '@vendure/common/lib/generated-types';
 
+import type { EnviaEmailService } from './services/envia-email.service';
 import type { EnviaShippingService } from './services/envia-shipping.service';
-import type { EnviaAddressInput, EnviaCreateLabelInput, EnviaPackageInput } from './types';
+import type { EnviaAddressInput, EnviaCreateLabelInput, EnviaCreateLabelResult, EnviaPackageInput } from './types';
+import { DEFAULT_DECLARED_VALUE, DEFAULT_PACKAGE } from './defaults';
 
 let _service: EnviaShippingService | null = null;
+let _emailService: EnviaEmailService | null = null;
 
 const loggerCtx = 'EnviaFulfillmentHandler';
 
-const DEFAULT_PACKAGE: Omit<EnviaPackageInput, 'declaredValue' | 'content'> = {
-    type: 'box',
-    amount: 1,
-    weight: 1,
-    weightUnit: 'KG',
-    lengthUnit: 'CM',
-    dimensions: { length: 30, width: 20, height: 10 },
-};
-
 export function setEnviaFulfillmentService(service: EnviaShippingService): void {
     _service = service;
+}
+
+export function setEnviaEmailService(emailService: EnviaEmailService): void {
+    _emailService = emailService;
 }
 
 export const enviaFulfillmentHandler = new FulfillmentHandler({
@@ -69,7 +67,17 @@ export const enviaFulfillmentHandler = new FulfillmentHandler({
             throw new Error('No order found for fulfillment');
         }
 
-        const origin = await service.resolveSellerOriginAddress(_ctx, order as any);
+        let origin;
+        try {
+            origin = await service.resolveSellerOriginAddress(_ctx, order as any);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            Logger.error(
+                `Origin resolution failed for order=${order.code}: ${message}`,
+                loggerCtx,
+            );
+            throw err;
+        }
 
         if (!origin) {
             throw new Error(
@@ -85,13 +93,15 @@ export const enviaFulfillmentHandler = new FulfillmentHandler({
         const postalCode = shippingAddress.postalCode || '';
         const countryCode = shippingAddress.countryCode || 'CO';
 
-        const daneCode = await service.getDaneCode(countryCode, postalCode);
+        const zipCodeInfo = await service.getZipCodeInfo(countryCode, postalCode);
 
-        if (!daneCode) {
+        if (!zipCodeInfo) {
             throw new Error(
-                `No DANE code found for country=${countryCode} zip=${postalCode}. Cannot create label.`,
+                `No location info found for country=${countryCode} zip=${postalCode}. Cannot create label.`,
             );
         }
+
+        const { daneCode, stateCode } = zipCodeInfo;
 
         const destination: EnviaAddressInput = {
             name: shippingAddress.fullName || 'Cliente',
@@ -99,14 +109,14 @@ export const enviaFulfillmentHandler = new FulfillmentHandler({
             street: shippingAddress.streetLine1 || '',
             number: shippingAddress.streetLine2 || '',
             city: daneCode,
-            state: shippingAddress.province || '',
+            state: stateCode || shippingAddress.province || '',
             country: countryCode,
             postalCode: daneCode,
         };
 
         const orderTotal = order.totalWithTax / 100;
         const declaredValue =
-            Number.isFinite(orderTotal) && orderTotal > 0 ? orderTotal : 50000;
+            Number.isFinite(orderTotal) && orderTotal > 0 ? orderTotal : DEFAULT_DECLARED_VALUE;
 
         const packages: EnviaPackageInput[] = [
             {
@@ -139,7 +149,17 @@ export const enviaFulfillmentHandler = new FulfillmentHandler({
             loggerCtx,
         );
 
-        const result = await service.createLabel(input);
+        let result: EnviaCreateLabelResult;
+        try {
+            result = await service.createLabel(input);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            Logger.error(
+                `Label creation failed for order=${order.code}: ${message}`,
+                loggerCtx,
+            );
+            throw err;
+        }
 
         const label = result.data?.[0];
         if (!label) {
@@ -151,9 +171,85 @@ export const enviaFulfillmentHandler = new FulfillmentHandler({
             loggerCtx,
         );
 
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const pickupDate = tomorrow.toISOString().split('T')[0];
+
+        const totalPackages = packages.length;
+        const totalWeight = packages.reduce((sum, p) => sum + p.weight, 0);
+
+        const fulfillmentCustomFields: Record<string, any> = {
+            enviaLabelUrl: label.label,
+            enviaTrackUrl: label.trackUrl,
+        };
+
+        const pickupWindow = await service.resolveSellerPickupWindow(_ctx, order as any);
+        const pickupTimeFrom = pickupWindow?.timeFrom ?? 9;
+        const pickupTimeTo = pickupWindow?.timeTo ?? 18;
+
+        try {
+            const pickupResult = await service.schedulePickup({
+                origin,
+                shipment: {
+                    carrier,
+                    pickup: {
+                        date: pickupDate,
+                        timeFrom: pickupTimeFrom,
+                        timeTo: pickupTimeTo,
+                        totalPackages,
+                        totalWeight,
+                    },
+                },
+                trackingNumbers: [label.trackingNumber],
+            });
+
+            const pickup = pickupResult.data?.[0];
+            if (pickup) {
+                Object.assign(fulfillmentCustomFields, {
+                    enviaPickupNumber: pickup.pickupNumber,
+                    enviaPickupDate: pickup.pickupDate,
+                    enviaPickupTimeFrom: pickup.pickupTimeFrom,
+                    enviaPickupTimeTo: pickup.pickupTimeTo,
+                    enviaPickupFee: pickup.pickupFee,
+                });
+
+                Logger.info(
+                    `Pickup scheduled for order=${order.code} pickupNumber=${pickup.pickupNumber} pickupDate=${pickup.pickupDate} pickupFee=${pickup.pickupFee}`,
+                    loggerCtx,
+                );
+
+                if (_emailService && origin.email) {
+                    try {
+                        await _emailService.sendPickupScheduled(origin.email, {
+                            trackingCode: label.trackingNumber,
+                            pickupDate: pickup.pickupDate,
+                            pickupTimeFrom: pickup.pickupTimeFrom,
+                            pickupTimeTo: pickup.pickupTimeTo,
+                        });
+                    } catch (emailErr) {
+                        const emailMsg =
+                            emailErr instanceof Error ? emailErr.message : String(emailErr);
+                        Logger.error(
+                            `Failed to send pickup email for order=${order.code}: ${emailMsg}`,
+                            loggerCtx,
+                        );
+                    }
+                }
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            Logger.error(
+                `Pickup scheduling failed for order=${order.code} tracking=${label.trackingNumber}: ${message}`,
+                loggerCtx,
+            );
+        }
+
         return {
             method: `Envia - ${carrier} - ${serviceName}`,
             trackingCode: label.trackingNumber,
+            ...(Object.keys(fulfillmentCustomFields).length > 0 && {
+                customFields: fulfillmentCustomFields,
+            }),
         };
     },
 });

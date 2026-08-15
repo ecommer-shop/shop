@@ -332,6 +332,46 @@ export const customFields: VendureConfig['customFields'] = {
         },
       ],
     },
+    {
+      name: 'pickupTimeFrom',
+      type: 'int',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup window start hour' },
+        { languageCode: LanguageCode.es, value: 'Hora de inicio de la ventana de recolección' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Preferred pickup window start hour (0-23)',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Hora de inicio preferida de la ventana de recolección (0-23)',
+        },
+      ],
+    },
+    {
+      name: 'pickupTimeTo',
+      type: 'int',
+      nullable: true,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.en, value: 'Pickup window end hour' },
+        { languageCode: LanguageCode.es, value: 'Hora de fin de la ventana de recolección' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Preferred pickup window end hour (0-23)',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'Hora de fin preferida de la ventana de recolección (0-23)',
+        },
+      ],
+    },
   ],
   Fulfillment: [
     {
@@ -431,6 +471,48 @@ export const customFields: VendureConfig['customFields'] = {
         {
           languageCode: LanguageCode.es,
           value: 'Costo de la recolección de Envia',
+        },
+      ],
+    },
+    {
+      name: 'enviaLabelUrl',
+      type: 'string',
+      nullable: true,
+      public: true,
+      ui: { component: 'ecommer-envia-label-url' },
+      label: [
+        { languageCode: LanguageCode.en, value: 'Label URL' },
+        { languageCode: LanguageCode.es, value: 'URL de la guía' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Envia shipping label PDF URL',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'URL del PDF de la guía de envío de Envia',
+        },
+      ],
+    },
+    {
+      name: 'enviaTrackUrl',
+      type: 'string',
+      nullable: true,
+      public: true,
+      ui: { component: 'ecommer-envia-track-url' },
+      label: [
+        { languageCode: LanguageCode.en, value: 'Tracking URL' },
+        { languageCode: LanguageCode.es, value: 'URL de rastreo' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.en,
+          value: 'Envia shipment tracking URL',
+        },
+        {
+          languageCode: LanguageCode.es,
+          value: 'URL de rastreo del envío de Envia',
         },
       ],
     },

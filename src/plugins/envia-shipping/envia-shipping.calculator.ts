@@ -3,19 +3,11 @@ import type { Order, RequestContext, ShippingCalculationResult, ShippingMethod }
 
 import type { EnviaShippingService } from './services/envia-shipping.service';
 import type { EnviaAddressInput, EnviaGetRatesInput, EnviaPackageInput } from './types';
+import { DEFAULT_DECLARED_VALUE, DEFAULT_PACKAGE } from './defaults';
 
 let _service: EnviaShippingService | null = null;
 
 const loggerCtx = 'EnviaShippingCalculator';
-
-const DEFAULT_PACKAGE: Omit<EnviaPackageInput, 'declaredValue' | 'content'> = {
-    type: 'box',
-    amount: 1,
-    weight: 1,
-    weightUnit: 'KG',
-    lengthUnit: 'CM',
-    dimensions: { length: 30, width: 20, height: 10 },
-};
 
 export function setEnviaShippingService(service: EnviaShippingService): void {
     _service = service;
@@ -108,7 +100,7 @@ export const enviaShippingCalculator = new ShippingCalculator({
 
             const orderTotal = order.totalWithTax / 100;
             const declaredValue =
-                Number.isFinite(orderTotal) && orderTotal > 0 ? orderTotal : 50000;
+                Number.isFinite(orderTotal) && orderTotal > 0 ? orderTotal : DEFAULT_DECLARED_VALUE;
 
             const packages: EnviaPackageInput[] = [
                 {
