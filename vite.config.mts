@@ -839,16 +839,16 @@ function patchVendureDashboardChannelPermissions() {
                 if (!nextCode.includes('ECOMMER_RECOMMENDED_WIDGET_LAYOUT')) {
                     nextCode = nextCode.replace(
                         `const findNextPosition = (`,
-                        `const ECOMMER_LAYOUT_VERSION = 2;
+                        `const ECOMMER_LAYOUT_VERSION = 3;
 const ECOMMER_LAYOUT_VERSION_KEY = 'ecommer.widgetLayoutVersion';
 const ECOMMER_RECOMMENDED_WIDGET_LAYOUT: Record<string, { x: number; y: number; w: number; h: number }> = {
-    'latest-orders-widget': { x: 0, y: 0, w: 6, h: 7 },
-    'orders-summary-widget': { x: 6, y: 0, w: 6, h: 3 },
-    'ai-chat-widget': { x: 6, y: 3, w: 6, h: 4 },
-    'advanced-metrics': { x: 6, y: 7, w: 6, h: 4 },
-    'invoice-quota': { x: 0, y: 7, w: 6, h: 2 },
-    'ecommer-share-links': { x: 0, y: 9, w: 6, h: 4 },
-    'metrics-widget': { x: 0, y: 13, w: 12, h: 5 },
+    'ai-chat-widget': { x: 0, y: 0, w: 12, h: 8 },
+    'orders-summary-widget': { x: 0, y: 8, w: 6, h: 3 },
+    'advanced-metrics': { x: 6, y: 8, w: 6, h: 4 },
+    'latest-orders-widget': { x: 0, y: 11, w: 6, h: 7 },
+    'invoice-quota': { x: 6, y: 12, w: 6, h: 2 },
+    'ecommer-share-links': { x: 6, y: 14, w: 6, h: 4 },
+    'metrics-widget': { x: 0, y: 18, w: 12, h: 5 },
 };
 function ecommerLayoutsOverlap(
     a: { x: number; y: number; w: number; h: number },

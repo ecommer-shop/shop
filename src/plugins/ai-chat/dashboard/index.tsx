@@ -24,7 +24,7 @@ export default defineDashboardExtension({
             component: AiChatWindow,
             defaultSize: { w: 6, h: 4, x: 6, y: 3 },
             minSize: { w: 4, h: 3 },
-            maxSize: { w: 6, h: 6 },
+            maxSize: { w: 12, h: 10 },
         },
     ],
     toolbarItems: [
