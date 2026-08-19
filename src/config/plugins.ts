@@ -10,9 +10,11 @@ import {
 
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import {
-  defaultEmailHandlers,
+  emailAddressChangeHandler,
+  emailVerificationHandler,
   EmailPlugin,
   FileBasedTemplateLoader,
+  passwordResetHandler,
 } from '@vendure/email-plugin';
 import {
   AssetServerPlugin,
@@ -30,6 +32,7 @@ import { ServientregaPlugin } from '../plugins/servientrega/servientrega.plugin'
 import { SalesReportPlugin } from '../plugins/sales-report/sales-report.plugin';
 import { InvoiceClientPlugin } from '../plugins/invoice-client/invoice-client.plugin';
 import { ResendEmailSender } from './mail/resend-email-sender';
+import { orderConfirmationHandler } from './mail/order-confirmation.handler';
 import {
   IS_DEV,
   staticDir,
@@ -101,7 +104,12 @@ const emailPlugin = EmailPlugin.init({
   emailSender: new ResendEmailSender(process.env.RESEND_API_KEY),
 
   route: ROUTE.Mailbox,
-  handlers: [...defaultEmailHandlers],
+  handlers: [
+    orderConfirmationHandler,
+    emailVerificationHandler,
+    passwordResetHandler,
+    emailAddressChangeHandler,
+  ],
   templateLoader: new FileBasedTemplateLoader(emailTemplatePath),
   globalTemplateVars: {
     fromAddress: '"EcommerShop" <ceo@ecommer.shop>',

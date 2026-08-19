@@ -1,5 +1,5 @@
 import type { VendureConfig } from '@vendure/core';
-import { Asset, LanguageCode } from '@vendure/core';
+import { Asset, LanguageCode, Permission } from '@vendure/core';
 
 /**
  * Custom fields para ProductVariant (peso y dimensiones).
@@ -585,6 +585,26 @@ export const customFields: VendureConfig['customFields'] = {
     { name: 'invoiceBillingActive', type: 'boolean', defaultValue: false },
     { name: 'invoiceLimitRemaining', type: 'int', nullable: true },
     {
+      name: 'ownDeliveryEnabled',
+      type: 'boolean',
+      defaultValue: false,
+      public: true,
+      label: [
+        { languageCode: LanguageCode.es, value: 'Domicilio con el vendedor' },
+        { languageCode: LanguageCode.en, value: 'Seller delivery' },
+      ],
+      description: [
+        {
+          languageCode: LanguageCode.es,
+          value: 'El vendedor coordina la entrega y cobra el domicilio en el lugar de destino.',
+        },
+        {
+          languageCode: LanguageCode.en,
+          value: 'The seller coordinates delivery and charges at the destination.',
+        },
+      ],
+    },
+    {
       name: 'matiasCompanyId',
       type: 'string',
       nullable: true,
@@ -863,6 +883,7 @@ export const customFields: VendureConfig['customFields'] = {
       name: 'bankCertificationVerified',
       type: 'boolean',
       defaultValue: false,
+      requiresPermission: Permission.SuperAdmin,
       label: [
         { languageCode: LanguageCode.en, value: 'Bank certification verified' },
         { languageCode: LanguageCode.es, value: 'Certificacion bancaria verificada' },
@@ -870,11 +891,13 @@ export const customFields: VendureConfig['customFields'] = {
       description: [
         {
           languageCode: LanguageCode.en,
-          value: 'Whether the uploaded bank certification has been verified',
+          value:
+            'Only SuperAdmin can mark bank certification as verified. It resets automatically when bank details change.',
         },
         {
           languageCode: LanguageCode.es,
-          value: 'Indica si la certificacion bancaria cargada fue verificada',
+          value:
+            'Solo SuperAdmin puede marcar la certificacion bancaria como verificada. Se desactiva automaticamente si cambian los datos bancarios.',
         },
       ],
     },
