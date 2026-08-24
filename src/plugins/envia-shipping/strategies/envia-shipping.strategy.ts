@@ -1,4 +1,4 @@
-import type { EnviaCreateLabelInput, EnviaCreateLabelResult, EnviaGetRatesInput, EnviaGetRatesResult, EnviaShippingOptions, EnviaShippingStrategy, EnviaZipCodeInfo } from '../types';
+import type { EnviaCreateLabelInput, EnviaCreateLabelResult, EnviaGetRatesInput, EnviaGetRatesResult, EnviaSchedulePickupInput, EnviaSchedulePickupResult, EnviaShippingOptions, EnviaShippingStrategy, EnviaZipCodeInfo } from '../types';
 
 const DEFAULT_BASE_URLS: Record<string, string> = {
     sandbox: 'https://api-test.envia.com',
@@ -20,7 +20,10 @@ export class EnviaDefaultStrategy implements EnviaShippingStrategy {
         }
         this.token = token;
 
-        const env = options.env || process.env.ENVIA_ENV || 'sandbox';
+        const env = options.env || process.env.ENVIA_ENV;
+        if (!env) {
+            throw new Error('ENVIA_ENV environment variable is required');
+        }
         if (env !== 'sandbox' && env !== 'production') {
             throw new Error(`ENVIA_ENV must be "sandbox" or "production", got "${env}"`);
         }
@@ -83,6 +86,27 @@ export class EnviaDefaultStrategy implements EnviaShippingStrategy {
         }
 
         const data = await response.json() as EnviaCreateLabelResult;
+        return data;
+    }
+
+    async schedulePickup(input: EnviaSchedulePickupInput): Promise<EnviaSchedulePickupResult> {
+        const response = await this.fetchWithTimeout('/ship/pickup/', {
+            method: 'POST',
+            body: JSON.stringify(input),
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => undefined) as
+                | { error?: { message?: string }; message?: string }
+                | undefined;
+            throw new Error(
+                errorBody?.error?.message ||
+                errorBody?.message ||
+                `Envia schedule pickup API responded with status ${response.status}`,
+            );
+        }
+
+        const data = await response.json() as EnviaSchedulePickupResult;
         return data;
     }
 

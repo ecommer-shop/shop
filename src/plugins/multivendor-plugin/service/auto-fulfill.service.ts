@@ -20,6 +20,8 @@ export class AutoFulfillService implements OnModuleInit {
         private connection: TransactionalConnection,
     ) { }
 
+    private readonly inFlightOrderIds = new Set<string>();
+
     onModuleInit() {
         this.eventBus.ofType(PaymentStateTransitionEvent).subscribe(async event => {
     if(event.toState !== 'Settled') {
@@ -77,6 +79,14 @@ try {
     }
 
     private async fulfillOrder(ctx: any, order: Order): Promise < void> {
+    const orderIdStr = String(order.id);
+    if (this.inFlightOrderIds.has(orderIdStr)) {
+        Logger.info(`AutoFulfill: Order ${order.code} ya está siendo procesada, omitiendo fulfillment duplicado`, loggerCtx);
+        return;
+    }
+    this.inFlightOrderIds.add(orderIdStr);
+
+    try {
     // Cargar la orden con líneas y sus fulfillments actuales
     const orderWithLines = await this.connection
         .getRepository(ctx, Order)
@@ -112,7 +122,28 @@ Logger.info(
     loggerCtx,
 );
 
-const shippingMethod = (orderWithLines as any).shippingLines?.[0]?.shippingMethod;
+let shippingMethod = (orderWithLines as any).shippingLines?.[0]?.shippingMethod;
+
+if (!shippingMethod) {
+    try {
+        const aggregateOrder = await this.orderService.getAggregateOrder(ctx, order);
+        if (aggregateOrder) {
+            const aggregateWithShipping = await this.connection
+                .getRepository(ctx, Order)
+                .findOne({
+                    where: { id: aggregateOrder.id as any },
+                    relations: ['shippingLines', 'shippingLines.shippingMethod'],
+                });
+            shippingMethod = (aggregateWithShipping as any)?.shippingLines?.[0]?.shippingMethod;
+        }
+    } catch (err) {
+        Logger.warn(
+            `AutoFulfill: Could not resolve aggregate order shipping method for seller order ${order.code}, fallback a manual`,
+            loggerCtx,
+        );
+    }
+}
+
 const fulfillmentHandlerCode = shippingMethod?.fulfillmentHandlerCode;
 
 let handler: { code: string; arguments: { name: string; value: string }[] };
@@ -172,6 +203,9 @@ Logger.info(
     `AutoFulfill: Fulfillment ${result.id} creado para Order ${order.code} — el vendedor lo transicionará a Shipped manualmente`,
     loggerCtx,
 );
+    } finally {
+        this.inFlightOrderIds.delete(orderIdStr);
+    }
     }
 }
 

@@ -2,14 +2,14 @@ import { LanguageCode } from '@vendure/common/lib/generated-types';
 import { DEFAULT_CHANNEL_CODE } from '@vendure/common/lib/shared-constants';
 import { Injector, ShippingEligibilityChecker, ShippingMethod, TransactionalConnection } from '@vendure/core';
 
-import { normalizeCity } from './mv-shipping-helpers';
+import { normalizeCity, resolveSellerOriginIsPopayan } from './mv-shipping-helpers';
 
 let connection: TransactionalConnection;
 
 /**
  * @description
  * Shipping method is eligible if at least one OrderLine is associated with the Seller's Channel
- * AND the destination city is Popayán.
+ * AND both the seller's origin AND the destination city are Popayán.
  */
 export const multivendorShippingEligibilityChecker = new ShippingEligibilityChecker({
     code: 'multivendor-shipping-eligibility-checker',
@@ -33,11 +33,20 @@ export const multivendorShippingEligibilityChecker = new ShippingEligibilityChec
         }
         const sellerChannelIds = new Set(sellerChannels.map(c => String(c.id)));
 
+        const destinationCity = normalizeCity(order.shippingAddress?.city ?? '');
+        if (destinationCity !== 'popayan') {
+            return false;
+        }
+
         const lines = order.lines ?? [];
         for (const line of lines) {
             if (line.sellerChannelId && sellerChannelIds.has(String(line.sellerChannelId))) {
-                const city = normalizeCity(order.shippingAddress?.city ?? '');
-                return city === 'popayan';
+                const originIsPopayan = await resolveSellerOriginIsPopayan(
+                    connection,
+                    ctx,
+                    line.sellerChannelId,
+                );
+                return originIsPopayan;
             }
         }
         return false;
