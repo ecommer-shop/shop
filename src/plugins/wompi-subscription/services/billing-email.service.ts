@@ -38,7 +38,7 @@ export class BillingEmailService {
     }
 
     private compileTemplates() {
-        const names = ['renewal-success', 'renewal-failed', 'manual-reminder', 'payment-expired', 'suspended'];
+        const names = ['renewal-success', 'renewal-failed', 'manual-reminder', 'payment-expired', 'suspended', 'grace-period'];
         for (const name of names) {
             try {
                 const source = readFileSync(path.join(this.templatesDir, `${name}.hbs`), 'utf8');
@@ -82,6 +82,11 @@ export class BillingEmailService {
     async sendSuspended(to: string, planName: string) {
         const html = this.render('suspended', { planName });
         await this.send(to, 'Plan suspendido - Ecommer.shop', html);
+    }
+
+    async sendGracePeriodNotice(to: string, planName: string) {
+        const html = this.render('grace-period', { planName });
+        await this.send(to, 'Período de gracia - Ecommer.shop', html);
     }
 
     private async send(to: string, subject: string, html: string) {

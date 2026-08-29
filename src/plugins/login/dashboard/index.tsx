@@ -3,6 +3,7 @@ import { LoginMarketingPage } from './marketing/LoginMarketingPage';
 import { LoginLogo } from './components/LoginLogo';
 import { DeleteAccountSection } from './components/DeleteAccountSection';
 import { SocialLinksSection } from '../../store-page/dashboard/social-links-section';
+import { SubscriptionAlertSection } from '../../wompi-subscription/dashboard/subscription-alert';
 
 defineDashboardExtension({
     routes: [{
@@ -37,6 +38,15 @@ defineDashboardExtension({
     },
 
     pageBlocks: [
+        {
+            id: 'subscription-alert-section',
+            location: {
+                pageId: 'profile',
+                column: 'main',
+                position: { blockId: 'custom-fields', order: 'before' },
+            },
+            component: SubscriptionAlertSection,
+        },
         {
             id: 'social-links-section',
             location: {

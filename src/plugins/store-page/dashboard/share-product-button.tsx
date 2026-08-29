@@ -1,4 +1,4 @@
-import { useChannel, Button } from '@vendure/dashboard';
+import { useChannel, Button, Tooltip, TooltipContent, TooltipTrigger } from '@vendure/dashboard';
 import { CheckCheck, Share2, Store, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState } from 'react';
@@ -15,6 +15,10 @@ export function ShareProductButton({ context }: { context: PageContextValue }) {
     const { activeChannel } = useChannel();
     const [copiedProduct, setCopiedProduct] = useState(false);
     const [copiedStore, setCopiedStore] = useState(false);
+
+    if (!context?.entity) {
+        return null;
+    }
 
     const slug = (context?.entity as any)?.slug;
     const storeCode = activeChannel?.code;
@@ -89,24 +93,45 @@ export function ShareProductButton({ context }: { context: PageContextValue }) {
 
     return (
         <>
-            <Button type="button" variant="outline" onClick={handleCopyProduct}>
-                {copiedProduct
-                    ? <CheckCheck className="mr-2 h-4 w-4" />
-                    : <Share2 className="mr-2 h-4 w-4" />
-                }
-                Compartir Producto
-            </Button>
-            <Button type="button" variant="outline" onClick={handleCopyStore}>
-                {copiedStore
-                    ? <CheckCheck className="mr-2 h-4 w-4" />
-                    : <Store className="mr-2 h-4 w-4" />
-                }
-                Compartir Tienda
-            </Button>
-            <Button type="button" variant="outline" onClick={handleDownloadQR}>
-                <Download className="mr-2 h-4 w-4" />
-                Descargar QR
-            </Button>
+            <Tooltip>
+                <TooltipTrigger render={
+                    <Button type="button" variant="outline" onClick={handleCopyProduct}>
+                        {copiedProduct
+                            ? <CheckCheck className="mr-2 h-4 w-4" />
+                            : <Share2 className="mr-2 h-4 w-4" />
+                        }
+                        Compartir Producto
+                    </Button>
+                } />
+                <TooltipContent>
+                    <p>Comparte el enlace público de este producto</p>
+                </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+                <TooltipTrigger render={
+                    <Button type="button" variant="outline" onClick={handleCopyStore}>
+                        {copiedStore
+                            ? <CheckCheck className="mr-2 h-4 w-4" />
+                            : <Store className="mr-2 h-4 w-4" />
+                        }
+                        Compartir Tienda
+                    </Button>
+                } />
+                <TooltipContent>
+                    <p>Comparte el enlace público de tu tienda</p>
+                </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+                <TooltipTrigger render={
+                    <Button type="button" variant="outline" onClick={handleDownloadQR}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Descargar QR
+                    </Button>
+                } />
+                <TooltipContent>
+                    <p>Descarga el código QR de este producto</p>
+                </TooltipContent>
+            </Tooltip>
         </>
     );
 }

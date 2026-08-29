@@ -320,7 +320,9 @@ Full subscription/billing system:
 - **Features:** Product limits, variation limits, AI access, electronic billing
 - **Guards:** `FeatureGuard`, `ProductLimitGuard`, `ProductVariationLimitGuard`, `PlanGuard`, `DefaultChannelGuard`
 - **Webhooks:** Wompi webhook controller for payment status updates
-- **Enforcement:** Auto-hides/restores excess products/variants via custom fields
+- **Create-time limits (no auto-hide):** `ProductLimitResolver` wraps `createProduct`/`createProductVariants` with `@UseGuards(ProductLimitGuard)`/`ProductVariationLimitGuard` — the limit is enforced when the seller tries to CREATE, not by hiding existing products. No auto-hide/restore logic exists anymore (`ProductLimitEnforcementService` was removed).
+- **Impago notice:** `SubscriptionAlertSection` pageBlock on the profile page shows a warning banner (with link to `/dashboard/billing`) when status is `PENDING_PAYMENT` or `GRACE_PERIOD`
+- **Emails:** `renewal-success`, `renewal-failed`, `manual-reminder`, `payment-expired`, `suspended`, `grace-period`
 
 ### Subscription Payment Flow (Admin Dashboard)
 
@@ -357,6 +359,7 @@ Full subscription/billing system:
 | `SavedPaymentMethodsSection` | `dashboard/components/saved-payment-methods-section.tsx` | Lists saved payment methods for the admin |
 | `AddPaymentMethodModal` | `dashboard/components/add-payment-method-modal.tsx` | Modal to manually add CARD/NEQUI/DAVIPLATA |
 | `SavedPaymentCard` | `dashboard/components/saved-payment-card.tsx` | Single saved method card with brand logo + actions |
+| `SubscriptionAlertSection` | `dashboard/subscription-alert.tsx` | Profile pageBlock: impago warning (PENDING_PAYMENT/GRACE_PERIOD) → link a `/billing` |
 
 ### Resolvers
 
@@ -365,6 +368,7 @@ Full subscription/billing system:
 | `SubscriptionResolver` | `api/subscription.resolver.ts` | `createSubscriptionWithPayment`, `createPendingSubscription` |
 | `AdminSavedPaymentResolver` | `api/admin-saved-payment.resolver.ts` | `mySavedPaymentMethods`, `savePaymentMethodForSubscription`, `useSavedPaymentMethodForSubscription` |
 | `WompiResolver` | `api/wompi.resolver.ts` | `GetWompiIntegritySignature`, `getAdminWompiTransactionStatus` |
+| `ProductLimitResolver` | `api/product-limit.resolver.ts` | `createProduct` (guard ProductLimit) + `createProductVariants` (guard ProductVariationLimit) — enforces limits at CREATE time |
 
 ---
 
@@ -909,3 +913,8 @@ Expone solo: `platform`, `username`, `dmLink`, `profileUrl`, `displayName`, `inP
 | 2026-07-22 | AGENTS.md: comprehensive Wompi payment documentation added | — |
 | 2026-07-28 | PayoutPlugin: scaffold entities, services, resolvers, dashboard pages (list/new/detail/settings), platformFeePercent 10→7.9, admin-payout resolver with channel token header resolution for custom auth, nav titles: Dispersiones (SA) / Liquidaciones (seller), fix resolveSeller via ctx.req.headers['vendure-token'], add @Allow(Permission.Authenticated) | — |
 | 2026-07-28 | AGENTS.md: PayoutPlugin deep dive, Gotcha #19 (channel token header), Seller custom fields update | — |
+| 2026-08-18 | Product detail patch: viewMode (read-only view), product-images block (maxAssets 3), slug/description tooltips, Editar button, hasRequiredCreateValues validation, hide-description-images CSS (vite.config.mts) | — |
+| 2026-08-18 | Login plugin: server-side shop name blacklist (blacklist.ts FORBIDDEN_WORDS + assertValidShopName), Spanish error | — |
+| 2026-08-18 | Wompi subscription: create-time limits via ProductLimitResolver wrapper (createProduct/createProductVariants + guards), counts without hidden filter, guards in Spanish, REMOVE all auto-hide logic (ProductLimitEnforcementService deleted, 4 call-sites cleaned), impago notice pageBlock on profile, GRACE_PERIOD email (grace-period.hbs + sendGracePeriodNotice in updateSubscriptionStatus), fix stale email texts | — |
+| 2026-08-18 | Dashboard Manage Variants: productDetailWithVariantsDocument extended with featuredAsset+stockLevels, variants table gets Imagen/SKU/Stock columns (VendureImage preset tiny + StockLevelLabel) via vite.config.mts | — |
+| 2026-08-18 | AGENTS.md: WompiSubscriptionPlugin deep dive update (no auto-hide, ProductLimitResolver, SubscriptionAlertSection, grace-period email), session log | — |

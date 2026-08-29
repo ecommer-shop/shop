@@ -50,6 +50,7 @@ import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
 import { StorePagePlugin } from '../plugins/store-page/store-page.plugin';
 import { AutoSkuPlugin } from '../plugins/auto-sku/auto-sku.plugin';
 import { ProductVariantEnforcementPlugin } from '../plugins/product-variant-enforcement/product-variant-enforcement.plugin';
+import { ProductContentValidationPlugin } from '../plugins/product-content-validation/product-content-validation.plugin';
 import {
   DeliveryCostPlugin,
   MessengerDomisDeliveryCostStrategy,
@@ -217,6 +218,7 @@ export const plugins: VendureConfig['plugins'] = [
   }),
 
   ProductVariantEnforcementPlugin,
+  ProductContentValidationPlugin,
   SuperadminvisibilityPlugin,
 
   StoresManagementPlugin.init({}),

@@ -11,18 +11,9 @@ import { StorePickupAddressInput } from './store-pickup-address-input';
 import { ShareProductButton } from './share-product-button';
 import { SlugShareDisplay } from './slug-share-display';
 import { ShareLinksWidget } from './share-links-widget';
-import { HiddenSlugInput } from './hidden-slug-input';
 
 defineDashboardExtension({
     routes: [],
-    detailForms: [
-        {
-            pageId: 'product-detail',
-            inputs: [
-                { blockId: 'main-form', field: 'slug', component: HiddenSlugInput },
-            ],
-        },
-    ],
     customFormComponents: {
         customFields: [
             { id: 'ecommer-store-featured-star', component: StoreFeaturedStarInput },
@@ -86,6 +77,10 @@ import type { PageContextValue } from '@vendure/dashboard';
 
 function ShareProductDropdownItem({ context }: { context: PageContextValue }) {
     const { activeChannel } = useChannel();
+
+    if (!context?.entity) {
+        return null;
+    }
 
     const handleCopy = async () => {
         try {

@@ -839,16 +839,16 @@ function patchVendureDashboardChannelPermissions() {
                 if (!nextCode.includes('ECOMMER_RECOMMENDED_WIDGET_LAYOUT')) {
                     nextCode = nextCode.replace(
                         `const findNextPosition = (`,
-                        `const ECOMMER_LAYOUT_VERSION = 3;
+                        `const ECOMMER_LAYOUT_VERSION = 4;
 const ECOMMER_LAYOUT_VERSION_KEY = 'ecommer.widgetLayoutVersion';
 const ECOMMER_RECOMMENDED_WIDGET_LAYOUT: Record<string, { x: number; y: number; w: number; h: number }> = {
-    'ai-chat-widget': { x: 0, y: 0, w: 12, h: 8 },
-    'orders-summary-widget': { x: 0, y: 8, w: 6, h: 3 },
-    'advanced-metrics': { x: 6, y: 8, w: 6, h: 4 },
-    'latest-orders-widget': { x: 0, y: 11, w: 6, h: 7 },
-    'invoice-quota': { x: 6, y: 12, w: 6, h: 2 },
-    'ecommer-share-links': { x: 6, y: 14, w: 6, h: 4 },
-    'metrics-widget': { x: 0, y: 18, w: 12, h: 5 },
+    'ecommer-home-hero': { x: 0, y: 0, w: 12, h: 8 },
+    'latest-orders-widget': { x: 0, y: 8, w: 6, h: 7 },
+    'orders-summary-widget': { x: 6, y: 8, w: 6, h: 3 },
+    'advanced-metrics': { x: 6, y: 11, w: 6, h: 4 },
+    'invoice-quota': { x: 0, y: 15, w: 6, h: 2 },
+    'ecommer-share-links': { x: 0, y: 17, w: 6, h: 4 },
+    'metrics-widget': { x: 0, y: 21, w: 12, h: 5 },
 };
 function ecommerLayoutsOverlap(
     a: { x: number; y: number; w: number; h: number },
@@ -945,6 +945,981 @@ const findNextPosition = (`,
         }
     }, [settings.widgetLayout, hasPermissions, setWidgetLayout]);`,
                 );
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_products/products_.$id.tsx',
+                )
+            ) {
+                nextCode = nextCode.replace(
+                    "import { Layers, Package, PlusIcon } from 'lucide-react';",
+                    "import { Layers, Package, Pencil, PlusIcon, Info } from 'lucide-react';",
+                );
+                if (!nextCode.includes("import { Tooltip, TooltipContent, TooltipTrigger }")) {
+                    nextCode = nextCode.replace(
+                        "import { Button } from '@/vdb/components/ui/button.js';",
+                        `import { Button } from '@/vdb/components/ui/button.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/vdb/components/ui/tooltip.js';`,
+                    );
+                }
+                if (!nextCode.includes("import { useEffect, useRef, useState } from 'react';")) {
+                    nextCode = nextCode.replace(
+                        "import { useRef, useState } from 'react';",
+                        "import { useEffect, useRef, useState } from 'react';",
+                    );
+                }
+
+                if (!nextCode.includes('const [viewMode, setViewMode] = useState(false);')) {
+                    nextCode = nextCode.replace(
+                        `    const creatingNewEntity = params.id === NEW_ENTITY_PATH;
+    const { t } = useLingui();`,
+                        `    const creatingNewEntity = params.id === NEW_ENTITY_PATH;
+    const [viewMode, setViewMode] = useState(false);
+    const { t } = useLingui();`,
+                    );
+                }
+
+                if (!nextCode.includes('const hasRequiredCreateValues =')) {
+                    nextCode = nextCode.replace(
+                        `    const { removeOptionGroupAsync } = useRemoveOptionGroup(entity?.id ?? '');`,
+                        `    const { removeOptionGroupAsync } = useRemoveOptionGroup(entity?.id ?? '');
+
+    const watchedTranslations = form.watch('translations');
+    const watchedFeaturedAssetId = form.watch('featuredAssetId');
+    const hasRequiredCreateValues =
+        !!watchedTranslations?.[0]?.name?.trim() &&
+        !!watchedTranslations?.[0]?.description?.trim() &&
+        !!watchedFeaturedAssetId;
+
+    useEffect(() => {
+        if (entity && !creatingNewEntity) {
+            setViewMode(true);
+        }
+    }, [entity, creatingNewEntity]);
+
+    useEffect(() => {
+        document.body.classList.add('hide-description-images');
+        return () => document.body.classList.remove('hide-description-images');
+    }, []);`,
+                    );
+                }
+
+                if (nextCode.includes('blockId="enabled-toggle"')) {
+                    nextCode = nextCode.replace(
+                        `                <PageBlock column="side" blockId="enabled-toggle">
+                    <FormFieldWrapper
+                        control={form.control}
+                        name="enabled"
+                        label={<Trans>Enabled</Trans>}
+                        description={<Trans>When enabled, a product is available in the shop</Trans>}
+                        render={({ field }) => (
+                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        )}
+                    />
+                </PageBlock>
+`,
+                        ``,
+                    );
+                }
+
+                if (!nextCode.includes('Imagen del producto')) {
+                    nextCode = nextCode.replace(
+                        `                <PageBlock column="side" blockId="assets" title={<Trans>Assets</Trans>}>
+                    <Field>
+                        <EntityAssets
+                            assets={entity?.assets}
+                            featuredAsset={entity?.featuredAsset}
+                            compact={true}
+                            value={form.getValues()}
+                            onChange={value => {
+                                form.setValue('featuredAssetId', value.featuredAssetId ?? undefined, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                });
+                                form.setValue('assetIds', value.assetIds ?? [], {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                });
+                            }}
+                        />
+                    </Field>
+                </PageBlock>`,
+                        ``,
+                    );
+                }
+
+                if (!nextCode.includes('blockId="product-images"')) {
+                    nextCode = nextCode.replace(
+                        `                </PageBlock>
+                <CustomFieldsPageBlock column="main" entityType="Product" control={form.control} />`,
+                        `                </PageBlock>
+                <PageBlock column="main" blockId="product-images" title="Imagen del producto">
+                    <Field>
+                        <EntityAssets
+                            assets={entity?.assets}
+                            featuredAsset={entity?.featuredAsset}
+                            compact={true}
+                            maxAssets={3}
+                            value={form.getValues()}
+                            onChange={value => {
+                                form.setValue('featuredAssetId', value.featuredAssetId ?? undefined, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                });
+                                form.setValue('assetIds', value.assetIds ?? [], {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                });
+                            }}
+                        />
+                    </Field>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        Las imágenes de tus productos son la primera impresión que ven tus clientes. Puedes añadir hasta 3 imágenes; la primera será la imagen principal.
+                    </p>
+                    <Button
+                        type="button"
+                        variant={form.watch('enabled') ? 'default' : 'outline'}
+                        disabled={creatingNewEntity}
+                        className="mt-3"
+                        onClick={() =>
+                            form.setValue('enabled', !(form.getValues('enabled') ?? false), {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                            })
+                        }
+                    >
+                        {form.watch('enabled') ? 'Habilitado' : 'Deshabilitado'}
+                    </Button>
+                    <span className="ml-2 mt-3 text-xs text-muted-foreground">
+                        {form.watch('enabled')
+                            ? 'Tu producto está activo en la tienda'
+                            : 'Tu producto no aparece en la tienda'}
+                    </span>
+                </PageBlock>
+                <CustomFieldsPageBlock column="main" entityType="Product" control={form.control} />`,
+                    );
+                }
+
+                if (!nextCode.includes('product-view')) {
+                    nextCode = nextCode.replace(
+                        `            <PageLayout>
+                <PageBlock column="main" blockId="main-form">`,
+                        `            <PageLayout>
+                {viewMode && entity ? (
+                    <PageBlock column="main" blockId="product-view">
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-2xl font-semibold">{entity.name}</h2>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => setViewMode(false)} aria-label="Editar nombre">
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <span className="inline-flex items-center gap-1">
+                                    <Trans>Slug</Trans>
+                                    <Tooltip>
+                                        <TooltipTrigger render={<Info className="h-3.5 w-3.5 cursor-help" />} />
+                                        <TooltipContent>
+                                            Identificador de URL: parte final y legible de una dirección de tu producto
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </span>
+                                <code className="rounded bg-muted px-2 py-0.5">{entity.translations?.[0]?.slug}</code>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => setViewMode(false)} aria-label="Editar slug">
+                                    <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                            </div>
+                            {entity.translations?.[0]?.description && (
+                                <div>
+                                    <h3 className="mb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                                        <Trans>Description</Trans>
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => setViewMode(false)} aria-label="Editar descripción">
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </h3>
+                                    <div
+                                        className="border rounded-md p-3"
+                                        dangerouslySetInnerHTML={{ __html: entity.translations[0].description }}
+                                    />
+                                </div>
+                            )}
+                            {entity.variantList?.totalItems > 0 && (
+                                <div>
+                                    <h3 className="mb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                                        <Trans>Product variants</Trans>
+                                        <Button render={<Link to="./variants" />} variant="ghost" size="icon" aria-label="Editar variantes">
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </h3>
+                                    <ProductVariantsTable
+                                        productId={params.id}
+                                        registerRefresher={refresher => {
+                                            refreshRef.current = refresher;
+                                        }}
+                                        fromProductDetailPage={true}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </PageBlock>
+                ) : (
+                    <>
+                <PageBlock column="main" blockId="main-form">`,
+                    );
+                }
+
+                if (!nextCode.includes('viewMode && entity ? (')) {
+                    nextCode = nextCode.replace(
+                        `                    </Button>
+                </ActionBarItem>
+            </PageActionBar>`,
+                        `                    </Button>
+                </ActionBarItem>
+            </PageActionBar>`,
+                    );
+                }
+
+                if (
+                    nextCode.includes('disabled={!form.formState.isDirty || !form.formState.isValid || isPending}') &&
+                    !nextCode.includes('onClick={() => setViewMode(false)}>\n                            <Pencil className="mr-2 h-4 w-4" />')
+                ) {
+                    nextCode = nextCode.replace(
+                        `                    <Button
+                        type="submit"
+                        disabled={!form.formState.isDirty || !form.formState.isValid || isPending}
+                    >
+                        {creatingNewEntity ? <Trans>Create</Trans> : <Trans>Update</Trans>}
+                    </Button>`,
+                        `                    {viewMode && entity ? (
+                        <Button type="button" onClick={() => setViewMode(false)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            <Trans>Edit</Trans>
+                        </Button>
+                    ) : (
+                        <Button
+                            type="submit"
+                            disabled={!form.formState.isDirty || !form.formState.isValid || isPending || (creatingNewEntity && !hasRequiredCreateValues)}
+                        >
+                            {creatingNewEntity ? <Trans>Create</Trans> : <Trans>Update</Trans>}
+                        </Button>
+                    )}`,
+                    );
+                }
+
+                if (!nextCode.includes('</>\n                )}\n            </PageLayout>')) {
+                    nextCode = nextCode.replace(
+                        `            </PageLayout>
+        </Page>
+    );
+}`,
+                        `                    </>
+                )}
+            </PageLayout>
+        </Page>
+    );
+}`,
+                    );
+                }
+
+                if (!nextCode.includes('Completa el nombre, la descripción y añade una imagen')) {
+                    nextCode = nextCode.replace(
+                        `                    </DetailFormGrid>`,
+                        `                    </DetailFormGrid>
+                    {creatingNewEntity && !hasRequiredCreateValues && (
+                        <p className="mb-4 text-xs text-muted-foreground">
+                            Completa el nombre, la descripción y añade una imagen del producto para poder crearlo.
+                        </p>
+                    )}`,
+                    );
+                }
+
+                if (!nextCode.includes("label={\n                                <span className=\"inline-flex items-center gap-1\">")) {
+                    nextCode = nextCode.replace(
+                        `                            name="slug"
+                            label={<Trans>Slug</Trans>}`,
+                        `                            name="slug"
+                            label={
+                                <span className="inline-flex items-center gap-1">
+                                    <Trans>Slug</Trans>
+                                    <Tooltip>
+                                        <TooltipTrigger render={<Info className="h-3.5 w-3.5 cursor-help" />} />
+                                        <TooltipContent>
+                                            Identificador de URL: parte final y legible de una dirección de tu producto
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </span>
+                            }`,
+                    );
+                }
+
+                if (!nextCode.includes('Guarda el producto primero para poder asignar facetas')) {
+                    nextCode = nextCode.replace(
+                        `                <PageBlock column="side" blockId="facet-values" title={<Trans>Facet Values</Trans>}>
+                    <FormFieldWrapper
+                        control={form.control}
+                        name="facetValueIds"
+                        render={({ field }) => (
+                            <AssignedFacetValues facetValues={entity?.facetValues ?? []} {...field} />
+                        )}
+                    />
+                </PageBlock>`,
+                        `                <PageBlock column="side" blockId="facet-values" title={<Trans>Facet Values</Trans>}>
+                    <div className="relative">
+                        {creatingNewEntity && !entity?.id && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/80 backdrop-blur-sm">
+                                <p className="px-4 text-center text-sm text-muted-foreground">
+                                    Guarda el producto primero para poder asignar facetas
+                                </p>
+                            </div>
+                        )}
+                        <div className={creatingNewEntity && !entity?.id ? 'pointer-events-none blur-sm' : ''}>
+                            <FormFieldWrapper
+                                control={form.control}
+                                name="facetValueIds"
+                                render={({ field }) => (
+                                    <AssignedFacetValues facetValues={entity?.facetValues ?? []} {...field} />
+                                )}
+                            />
+                        </div>
+                    </div>
+                </PageBlock>`,
+                    );
+                }
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_products/products.graphql.ts',
+                )
+            ) {
+                if (!nextCode.includes('price\n                    priceWithTax\n                    stockLevels {\n                        stockLocation')) {
+                    nextCode = nextCode.replace(
+                        `query ProductVariantList($options: ProductVariantListOptions, $productId: ID) {
+            productVariants(options: $options, productId: $productId) {
+                items {
+                    id
+                    createdAt
+                    updatedAt
+                    featuredAsset {
+                        ...Asset
+                    }
+                    name
+                    sku
+                    enabled
+                    currencyCode
+                    price
+                    priceWithTax
+                    stockLevels {
+                        stockOnHand
+                        stockAllocated
+                    }
+                }
+                totalItems
+            }
+        }`,
+                        `query ProductVariantList($options: ProductVariantListOptions, $productId: ID) {
+            productVariants(options: $options, productId: $productId) {
+                items {
+                    id
+                    createdAt
+                    updatedAt
+                    featuredAsset {
+                        ...Asset
+                    }
+                    name
+                    sku
+                    enabled
+                    currencyCode
+                    price
+                    priceWithTax
+                    stockLevels {
+                        stockLocation {
+                            id
+                        }
+                        stockOnHand
+                        stockAllocated
+                    }
+                }
+                totalItems
+            }
+        }`,
+                    );
+                }
+
+                if (!nextCode.includes('featuredAsset {\n                        id\n                        preview\n                    }')) {
+                    nextCode = nextCode.replace(
+                        `            variants {
+                id
+                name
+                sku
+                price
+                currencyCode
+                priceWithTax
+                createdAt
+                updatedAt
+                options {`,
+                        `            variants {
+                id
+                name
+                sku
+                price
+                currencyCode
+                priceWithTax
+                createdAt
+                updatedAt
+                featuredAsset {
+                    id
+                    preview
+                }
+                stockLevels {
+                    stockLocation {
+                        id
+                    }
+                    stockOnHand
+                    stockAllocated
+                }
+                options {`,
+                    );
+                }
+
+                if (!nextCode.includes('featuredAsset {\n                        id\n                        preview\n                    }\n                stockLevels')) {
+                    nextCode = nextCode.replace(
+                        `mutation UpdateProductVariant($input: UpdateProductVariantInput!) {
+        updateProductVariant(input: $input) {
+            id
+            name
+            options {
+                id
+                code
+                name
+                groupId
+            }
+        }
+    }`,
+                        `mutation UpdateProductVariant($input: UpdateProductVariantInput!) {
+        updateProductVariant(input: $input) {
+            id
+            name
+            featuredAsset {
+                id
+                preview
+            }
+            stockLevels {
+                stockOnHand
+                stockAllocated
+            }
+            options {
+                id
+                code
+                name
+                groupId
+            }
+        }
+    }`,
+                    );
+                }
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_products/products_.$id_.variants.tsx',
+                )
+            ) {
+                if (!nextCode.includes("import { StockLevelLabel } from '@/vdb/components/shared/stock-level-label.js';")) {
+                    nextCode = nextCode.replace(
+                        `import { ConfirmationDialog } from '@/vdb/components/shared/confirmation-dialog.js';`,
+                        `import { ConfirmationDialog } from '@/vdb/components/shared/confirmation-dialog.js';
+import { StockLevelLabel } from '@/vdb/components/shared/stock-level-label.js';
+import { VendureImage } from '@/vdb/components/shared/vendure-image.js';`,
+                    );
+                }
+
+                if (!nextCode.includes('handleImageUpload')) {
+                    nextCode = nextCode.replace(
+                        `    const [optionsToAddToVariant, setOptionsToAddToVariant] = useState<
+        Record<string, Record<string, string>>
+    >({});
+
+    const { data: productData, refetch, isFetching } = useQuery({`,
+                        `    const [optionsToAddToVariant, setOptionsToAddToVariant] = useState<
+        Record<string, Record<string, string>>
+    >({});
+    const [editingStockId, setEditingStockId] = useState<string | null>(null);
+    const [editingStockValue, setEditingStockValue] = useState<string>('');
+    const [uploadingImageId, setUploadingImageId] = useState<string | null>(null);
+
+    const CREATE_ASSET_DOC = \`
+        mutation CreateAssets($input: [CreateAssetInput!]!) {
+            createAssets(input: $input) {
+                ... on Asset { id name preview source mimeType type }
+                ... on ErrorResult { message }
+            }
+        }
+    \`;
+
+    const UPDATE_VARIANT_DOC = \`
+        mutation UpdateProductVariant($input: UpdateProductVariantInput!) {
+            updateProductVariant(input: $input) {
+                id
+                featuredAsset { id preview }
+                stockLevels { stockOnHand stockAllocated }
+            }
+        }
+    \`;
+
+    const handleImageUpload = async (variantId: string, file: File) => {
+        setUploadingImageId(variantId);
+        try {
+            const res = await api.mutate<{ createAssets: Array<{ id: string; preview: string } | { message: string }> }>(
+                CREATE_ASSET_DOC,
+                { input: [{ file }] },
+            );
+            const asset = res.createAssets?.[0];
+            if (!asset || !('id' in asset)) {
+                const msg = asset && 'message' in asset ? asset.message : 'Error al subir imagen';
+                toast.error(msg);
+                return;
+            }
+            await api.mutate(UPDATE_VARIANT_DOC, {
+                input: { id: variantId, featuredAssetId: asset.id },
+            });
+            toast.success('Imagen actualizada');
+            refetch();
+        } catch {
+            toast.error('Error al subir imagen');
+        } finally {
+            setUploadingImageId(null);
+        }
+    };
+
+    const handleStockSave = async (variantId: string, stockOnHand: number, stockLocationId?: string) => {
+        try {
+            await api.mutate(UPDATE_VARIANT_DOC, {
+                input: {
+                    id: variantId,
+                    stockLevels: stockLocationId
+                        ? [{ stockLocationId, stockOnHand }]
+                        : undefined,
+                    ...(stockLocationId ? {} : { stockOnHand }),
+                },
+            });
+            toast.success('Stock actualizado');
+            setEditingStockId(null);
+            refetch();
+        } catch {
+            toast.error('Error al actualizar stock');
+        }
+    };
+
+    const { data: productData, refetch, isFetching } = useQuery({`,
+                    );
+                }
+
+                if (!nextCode.includes('<Trans>Imagen</Trans>')) {
+                    nextCode = nextCode.replace(
+                        `                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>
+                                        <Trans>Name</Trans>
+                                    </TableHead>
+                                    <TableHead>
+                                        <Trans>SKU</Trans>
+                                    </TableHead>`,
+                        `                            <TableHeader>
+                                <TableRow>
+<TableHead>
+                            <Trans>Image</Trans>
+                        </TableHead>
+                                    <TableHead>
+                                        <Trans>Name</Trans>
+                                    </TableHead>
+                                    <TableHead>
+                                        <Trans>SKU</Trans>
+                                    </TableHead>
+                                    <TableHead>
+                                        <Trans>Stock</Trans>
+                                    </TableHead>`,
+                    );
+                }
+
+                if (!nextCode.includes('editingStockId === variant.id')) {
+                    nextCode = nextCode.replace(
+                        `                                {productData.product.variants.map(variant => (
+                                    <TableRow key={variant.id}>
+                                        <TableCell>
+                                            {variant.featuredAsset ? (
+                                                <VendureImage asset={variant.featuredAsset} preset="tiny" />
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>{variant.name}</TableCell>
+                                        <TableCell>{variant.sku}</TableCell>
+                                        <TableCell>
+                                            <StockLevelLabel stockLevels={variant.stockLevels} />
+                                        </TableCell>`,
+                        `                                {productData.product.variants.map(variant => (
+                                    <TableRow key={variant.id}>
+                                        <TableCell>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                id={'img-' + variant.id}
+                                                onChange={e => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) handleImageUpload(variant.id, file);
+                                                }}
+                                            />
+                                            <label
+                                                htmlFor={'img-' + variant.id}
+                                                className="cursor-pointer block"
+                                            >
+                                                {uploadingImageId === variant.id ? (
+                                                    <span className="text-xs text-muted-foreground">Subiendo...</span>
+                                                ) : variant.featuredAsset ? (
+                                                    <VendureImage asset={variant.featuredAsset} preset="tiny" />
+                                                ) : (
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded border border-dashed text-muted-foreground text-xs hover:border-primary">
+                                                        +
+                                                    </div>
+                                                )}
+                                            </label>
+                                        </TableCell>
+                                        <TableCell>{variant.name}</TableCell>
+                                        <TableCell>{variant.sku}</TableCell>
+                                        <TableCell>
+                                            {editingStockId === variant.id ? (
+                                                <input
+                                                    type="number"
+                                                    className="h-7 w-16 rounded border bg-background px-1 text-sm"
+                                                    value={editingStockValue}
+                                                    autoFocus
+                                                    onChange={e => setEditingStockValue(e.target.value)}
+                                                    onBlur={() => {
+                                                        const val = parseInt(editingStockValue, 10);
+                                                        if (!isNaN(val)) handleStockSave(variant.id, val, variant.stockLevels?.[0]?.stockLocation?.id);
+                                                        else setEditingStockId(null);
+                                                    }}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') {
+                                                            const val = parseInt(editingStockValue, 10);
+                                                            if (!isNaN(val)) handleStockSave(variant.id, val, variant.stockLevels?.[0]?.stockLocation?.id);
+                                                            else setEditingStockId(null);
+                                                        }
+                                                        if (e.key === 'Escape') setEditingStockId(null);
+                                                    }}
+                                                />
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    className="cursor-pointer rounded bg-muted/50 px-1.5 py-0.5 text-sm hover:bg-muted"
+                                                    onClick={() => {
+                                                        setEditingStockId(variant.id);
+                                                        setEditingStockValue(String(variant.stockLevels?.[0]?.stockOnHand ?? 0));
+                                                    }}
+                                                >
+                                                    {variant.stockLevels?.[0]?.stockOnHand ?? 0}
+                                                    <span className="ml-0.5 text-muted-foreground">/ {variant.stockLevels?.[0]?.stockAllocated ?? 0}</span>
+                                                </button>
+                                            )}
+                                        </TableCell>`,
+                    );
+                }
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/lib/components/shared/entity-assets.tsx',
+                )
+            ) {
+                if (!nextCode.includes('maxAssets?: number')) {
+                    nextCode = nextCode.replace(
+                        `    updatePermissions?: boolean;
+    multiSelect?: boolean;
+    value?: EntityAssetValue;`,
+                        `    updatePermissions?: boolean;
+    multiSelect?: boolean;
+    maxAssets?: number;
+    value?: EntityAssetValue;`,
+                    );
+                }
+                if (!nextCode.includes('maxAssets,')) {
+                    nextCode = nextCode.replace(
+                        `    compact = false,
+    updatePermissions = true,
+    multiSelect = true,
+    onChange,`,
+                        `    compact = false,
+    updatePermissions = true,
+    multiSelect = true,
+    maxAssets,
+    onChange,`,
+                    );
+                }
+                if (!nextCode.includes('cappedAssets')) {
+                    nextCode = nextCode.replace(
+                        `                const uniqueAssets = multiSelect
+                    ? [...new Map([...assets, ...selectedAssets].map(item => [item.id, item])).values()]
+                    : selectedAssets;
+
+                const newFeaturedAsset = !featuredAsset || !multiSelect ? selectedAssets[0] : featuredAsset;
+
+                setAssets(uniqueAssets);
+                setFeaturedAsset(newFeaturedAsset);
+                emitChange(uniqueAssets, newFeaturedAsset);`,
+                        `                const uniqueAssets = multiSelect
+                    ? [...new Map([...assets, ...selectedAssets].map(item => [item.id, item])).values()]
+                    : selectedAssets;
+
+                const cappedAssets = maxAssets ? uniqueAssets.slice(0, maxAssets) : uniqueAssets;
+
+                const newFeaturedAsset = !featuredAsset || !multiSelect ? cappedAssets[0] : featuredAsset;
+
+                setAssets(cappedAssets);
+                setFeaturedAsset(newFeaturedAsset);
+                emitChange(cappedAssets, newFeaturedAsset);`,
+                    );
+                }
+                if (!nextCode.includes('assets.length < maxAssets')) {
+                    nextCode = nextCode.replace(
+                        `    const AddAssetButton = () =>
+        updatePermissions && (`,
+                        `    const AddAssetButton = () =>
+        updatePermissions && (!maxAssets || assets.length < maxAssets) && (`,
+                    );
+                }
+                if (!nextCode.includes('[assets, featuredAsset, multiSelect, maxAssets, emitChange]')) {
+                    nextCode = nextCode.replace(
+                        `        [assets, featuredAsset, multiSelect, emitChange],`,
+                        `        [assets, featuredAsset, multiSelect, maxAssets, emitChange],`,
+                    );
+                }
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/app/routes/_authenticated/_products/components/product-variants-table.tsx',
+                )
+            ) {
+                if (!nextCode.includes("import { VendureImage } from '@/vdb/components/shared/vendure-image.js'")) {
+                    nextCode = nextCode.replace(
+                        `import { Money } from '@/vdb/components/data-display/money.js';`,
+                        `import { Money } from '@/vdb/components/data-display/money.js';
+import { VendureImage } from '@/vdb/components/shared/vendure-image.js';
+import { AssetPickerDialog } from '@/vdb/components/shared/asset/asset-picker-dialog.js';
+import { ImagePlus } from 'lucide-react';
+import { api } from '@/vdb/graphql/api.js';
+import { toast } from 'sonner';`,
+                    );
+                }
+
+                if (!nextCode.includes('import { useState, useRef }')) {
+                    nextCode = nextCode.replace(
+                        `import { useState } from 'react';`,
+                        `import { useState, useRef, useCallback } from 'react';`,
+                    );
+                }
+
+                if (!nextCode.includes('pickerOpenVariantId')) {
+                    nextCode = nextCode.replace(
+                        `    const [page, setPage] = useState(1);`,
+                        `    const refetchListRef = useRef<(() => void) | null>(null);
+    const [editingStockId, setEditingStockId] = useState<string | null>(null);
+    const [editingStockValue, setEditingStockValue] = useState<string>('');
+    const [uploadingImageId, setUploadingImageId] = useState<string | null>(null);
+    const [pickerOpenVariantId, setPickerOpenVariantId] = useState<string | null>(null);
+
+    const UPDATE_VARIANT_DOC = \`
+        mutation UpdateProductVariant($input: UpdateProductVariantInput!) {
+            updateProductVariant(input: $input) {
+                id
+                featuredAsset { id preview }
+                stockLevels { stockOnHand stockAllocated }
+            }
+        }
+    \`;
+
+    const handleAssetSelect = async (variantId: string, assetId: string) => {
+        setUploadingImageId(variantId);
+        try {
+            await api.mutate(UPDATE_VARIANT_DOC, {
+                input: { id: variantId, featuredAssetId: assetId },
+            });
+            toast.success('Imagen actualizada');
+            refetchListRef.current?.();
+        } catch {
+            toast.error('Error al actualizar imagen');
+        } finally {
+            setUploadingImageId(null);
+            setPickerOpenVariantId(null);
+        }
+    };
+
+    const handleStockSave = async (variantId: string, stockOnHand: number, stockLocationId?: string) => {
+        try {
+            await api.mutate(UPDATE_VARIANT_DOC, {
+                input: {
+                    id: variantId,
+                    stockLevels: stockLocationId
+                        ? [{ stockLocationId, stockOnHand }]
+                        : undefined,
+                    ...(stockLocationId ? {} : { stockOnHand }),
+                },
+            });
+            toast.success('Stock actualizado');
+            setEditingStockId(null);
+            refetchListRef.current?.();
+        } catch {
+            toast.error('Error al actualizar stock');
+        }
+    };
+
+    const [page, setPage] = useState(1);`,
+                    );
+                }
+
+                if (!nextCode.includes('refetchListRef.current = refresher')) {
+                    nextCode = nextCode.replace(
+                        `registerRefresher={registerRefresher}`,
+                        `registerRefresher={refresher => {
+                refetchListRef.current = refresher;
+                registerRefresher?.(refresher);
+            }}`,
+                    );
+                }
+
+                if (!nextCode.includes("onClick={() => { setEditingStockId(String(original.id))")) {
+                    nextCode = nextCode.replace(
+                        `                stockLevels: {
+                    cell: ({ row: { original } }) => <StockLevelLabel stockLevels={original.stockLevels} />,
+                },`,
+                        `                featuredAsset: {
+                    cell: ({ row: { original } }) => (
+                        <div className="flex items-center">
+                            <button
+                                type="button"
+                                className="cursor-pointer rounded border border-border p-0.5 hover:border-primary hover:bg-accent"
+                                onClick={() => setPickerOpenVariantId(String(original.id))}
+                                title="Cambiar imagen"
+                            >
+                                {uploadingImageId === String(original.id) ? (
+                                    <span className="flex h-10 w-10 items-center justify-center text-xs text-muted-foreground">
+                                        ...
+                                    </span>
+                                ) : original.featuredAsset ? (
+                                    <VendureImage asset={original.featuredAsset} preset="tiny" />
+                                ) : (
+                                    <span className="flex h-10 w-10 items-center justify-center text-muted-foreground">
+                                        <ImagePlus className="h-4 w-4" />
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+                    ),
+                },
+                stockLevels: {
+                    cell: ({ row: { original } }) => (
+                        editingStockId === String(original.id) ? (
+                            <input
+                                type="number"
+                                className="h-7 w-16 rounded border bg-background px-1 text-sm"
+                                value={editingStockValue}
+                                autoFocus
+                                onChange={e => setEditingStockValue(e.target.value)}
+                                onBlur={() => {
+                                    const val = parseInt(editingStockValue, 10);
+                                    if (!isNaN(val)) handleStockSave(String(original.id), val, String(original.stockLevels?.[0]?.stockLocation?.id));
+                                    else setEditingStockId(null);
+                                }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const val = parseInt(editingStockValue, 10);
+                                        if (!isNaN(val)) handleStockSave(String(original.id), val, String(original.stockLevels?.[0]?.stockLocation?.id));
+                                        else setEditingStockId(null);
+                                    }
+                                    if (e.key === 'Escape') setEditingStockId(null);
+                                }}
+                            />
+                        ) : (
+                            <button
+                                type="button"
+                                className="cursor-pointer rounded border border-border bg-background px-1.5 py-0.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                                onClick={() => {
+                                    setEditingStockId(String(original.id));
+                                    setEditingStockValue(String(original.stockLevels?.[0]?.stockOnHand ?? 0));
+                                }}
+                            >
+                                {original.stockLevels?.[0]?.stockOnHand ?? 0}
+                                <span className="ml-0.5 text-muted-foreground">/ {original.stockLevels?.[0]?.stockAllocated ?? 0}</span>
+                            </button>
+                        )
+                    ),
+                },`,
+                    );
+                }
+
+                if (!nextCode.includes('AssetPickerDialog open={!!pickerOpenVariantId}')) {
+                    nextCode = nextCode.replace(
+                        `    return (
+        <PaginatedListDataTable`,
+                        `    return (
+        <>
+        <PaginatedListDataTable`,
+                    );
+                    nextCode = nextCode.replace(
+                        `        />
+    );
+}`,
+                        `        />
+        <AssetPickerDialog
+            open={!!pickerOpenVariantId}
+            onClose={() => setPickerOpenVariantId(null)}
+            onSelect={assets => {
+                if (pickerOpenVariantId && assets[0]) {
+                    handleAssetSelect(pickerOpenVariantId, assets[0].id);
+                }
+            }}
+            multiSelect={false}
+        />
+        </>
+    );
+}`,
+                    );
+                }
+            }
+
+            if (
+                normalizedId.includes(
+                    '/@vendure/dashboard/src/lib/components/shared/rich-text-editor/responsive-toolbar.tsx',
+                )
+            ) {
+                if (!nextCode.includes('const hideImages =')) {
+                    nextCode = nextCode.replace(
+                        `    const toolbarItems: ToolbarItem[] = useMemo(() => {
+        if (!editor) return [];
+
+        return [`,
+                        `    const toolbarItems: ToolbarItem[] = useMemo(() => {
+        if (!editor) return [];
+
+        const hideImages =
+            typeof document !== 'undefined' && document.body.classList.contains('hide-description-images');
+
+        return [`,
+                    );
+                }
+                if (!nextCode.includes("item => !(hideImages && item.id === 'image')")) {
+                    nextCode = nextCode.replace(
+                        `        ];
+    }, [editor, disabled, linkDialogOpen, imageDialogOpen, canUndo, canRedo, canInsertTable]);`,
+                        `        ].filter(item => !(hideImages && item.id === 'image'));
+    }, [editor, disabled, linkDialogOpen, imageDialogOpen, canUndo, canRedo, canInsertTable]);`,
+                    );
+                }
             }
 
             return nextCode === code ? null : nextCode;
@@ -1260,14 +2235,6 @@ export default defineConfig({
       body.hide-native-login form h1,
       body.hide-native-login form > div:not([class*="max-w-sm"]) p.text-muted-foreground,
       body.hide-native-login form [data-slot="input-group"] {
-          display: none !important;
-      }
-
-      /* Ocultar el campo Slug en el detalle de producto (input override en
-         store-page/dashboard/hidden-slug-input.tsx no puede quitar el
-         <FieldLabel> del núcleo de Vendure, así que se oculta el wrapper
-         completo por CSS mientras ese componente está montado). */
-      body.hide-product-slug-field [data-slot="field"]:has(label[for="field-slug"]) {
           display: none !important;
       }
     </style>`

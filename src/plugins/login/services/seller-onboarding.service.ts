@@ -15,11 +15,13 @@ import {
     InternalServerError,
     isGraphQlErrorResult,
     Logger,
+    UserInputError,
     Permission,
     RequestContext,
     RequestContextService,
     Role,
     RoleService,
+    Seller,
     SellerService,
     StockLocation,
     StockLocationService,
@@ -28,6 +30,7 @@ import {
 } from '@vendure/core';
 import crypto from 'crypto';
 
+import { assertValidShopName } from '../blacklist';
 import { loggerCtx, SELLER_ADMIN_PERMISSIONS } from '../constants';
 import { GoogleSellerRegistrationResult, SellerOnboardingInput } from '../types';
 import {
@@ -91,6 +94,7 @@ export class SellerOnboardingService {
         input: SellerOnboardingInput,
     ): Promise<GoogleSellerRegistrationResult> {
         this.assertValidPickupAddress(input);
+        assertValidShopName(input.shopName);
 
         const existingUser = await this.connection
             .getRepository(ctx, User)
@@ -112,6 +116,14 @@ export class SellerOnboardingService {
         }
 
         const superAdminCtx = await this.getSuperAdminContext(ctx);
+
+        const sellerRepo = this.connection.getRepository(superAdminCtx, Seller);
+        const existingSellerByName = await sellerRepo.findOne({ where: { name: input.shopName } });
+        if (existingSellerByName) {
+            throw new UserInputError(
+                `Ya existe una tienda con el nombre "${input.shopName}". Elige otro nombre.`,
+            );
+        }
 
         // Idempotency: check if Channel already exists from a previous partial registration
         const shopCode = normalizeString(input.shopName, '-');
