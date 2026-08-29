@@ -69,6 +69,33 @@ export interface EnviaZipCodeInfo {
     stateCode: string;
 }
 
+export interface EnviaSchedulePickupInput {
+    origin: Pick<EnviaAddressInput, 'name' | 'phone' | 'street' | 'number' | 'city' | 'state' | 'country' | 'postalCode'>;
+    shipment: {
+        carrier: string;
+        pickup: {
+            date: string;
+            timeFrom: number;
+            timeTo: number;
+            totalPackages: number;
+            totalWeight: number;
+        };
+    };
+    trackingNumbers: string[];
+}
+
+export interface EnviaPickupResult {
+    pickupNumber: string;
+    pickupDate: string;
+    pickupTimeFrom: number;
+    pickupTimeTo: number;
+    pickupFee: number;
+}
+
+export interface EnviaSchedulePickupResult {
+    data: EnviaPickupResult[];
+}
+
 export interface EnviaShippingStrategy {
     getBaseUrl(): string;
     getAuthHeaders(): { Authorization: string; 'Content-Type': string };
@@ -76,6 +103,7 @@ export interface EnviaShippingStrategy {
     getDaneCode(countryCode: string, zipCode: string): Promise<string | null>;
     getZipCodeInfo(countryCode: string, zipCode: string): Promise<EnviaZipCodeInfo | null>;
     createLabel(input: EnviaCreateLabelInput): Promise<EnviaCreateLabelResult>;
+    schedulePickup(input: EnviaSchedulePickupInput): Promise<EnviaSchedulePickupResult>;
 }
 
 export interface EnviaShippingOptions {
