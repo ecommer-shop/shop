@@ -96,6 +96,23 @@ export function humanizeInvoiceEmissionError(raw: string): string {
       : 'Faltan datos obligatorios para emitir la factura (cliente, resolución, prefijo, etc.).';
   }
 
+  if (/property ["']?image["']? on null|InvoiceReports\.php/i.test(text)) {
+    return (
+      'Matias no pudo generar el PDF de la factura: falta el logo (image) de la empresa en Matias. ' +
+      'En el panel sandbox de Matias, abre esa compañía (Company ID / client_uuid) y sube el logo de la empresa; ' +
+      'luego vuelve a emitir. Si ya tiene logo, contacta soporte Matias (error en InvoiceReports.php).'
+    );
+  }
+
+  if (/ya se encuentra validado/i.test(text)) {
+    return (
+      'Matias indica que ese consecutivo de factura ya fue validado (p. ej. FEV1). ' +
+      'Suele pasar si un intento anterior llegó a DIAN pero falló el PDF/logo. ' +
+      'El sistema reintenta con el siguiente número automáticamente; si persiste, en Matias ' +
+      'avanza el «siguiente consecutivo» de la resolución FEV o contacta soporte Matias.'
+    );
+  }
+
   let cleaned = text
     .replace(/^Failed to create invoice in Matias:\s*/i, 'Matias rechazó la factura: ')
     .replace(/^Failed to create invoice:\s*/i, 'No se pudo crear la factura: ')
