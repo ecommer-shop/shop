@@ -1922,6 +1922,66 @@ import { toast } from 'sonner';`,
                 }
             }
 
+            if (normalizedId.includes('/@vendure/dashboard/src/app/routes/_authenticated/_sellers/sellers.tsx')) {
+                if (!nextCode.includes("import { useState } from 'react';")) {
+                    nextCode = nextCode.replace(
+                        "import { Trans } from '@lingui/react/macro';",
+                        "import { useState } from 'react';\nimport { Trans } from '@lingui/react/macro';",
+                    );
+                }
+
+                if (!nextCode.includes('const [showDeleted, setShowDeleted] = useState(false);')) {
+                    nextCode = nextCode.replace(
+                        `function SellerListPage() {
+    return (
+        <ListPage`,
+                        `function SellerListPage() {
+    const [showDeleted, setShowDeleted] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
+    return (
+        <ListPage
+            key={refreshKey}`,
+                    );
+                }
+
+                if (!nextCode.includes('transformVariables={')) {
+                    nextCode = nextCode.replace(
+                        `            onSearchTermChange={searchTerm => {
+                return {
+                    name: { contains: searchTerm },
+                };
+            }}`,
+                        `            onSearchTermChange={searchTerm => {
+                return {
+                    name: { contains: searchTerm },
+                };
+            }}
+            transformVariables={variables => ({
+                ...variables,
+                options: {
+                    ...variables.options,
+                    filter: {
+                        ...variables.options?.filter,
+                        deletedAt: showDeleted ? { isNull: false } : { isNull: true },
+                    },
+                },
+            })}`,
+                    );
+                }
+
+                if (!nextCode.includes('seller-toggle-button')) {
+                    nextCode = nextCode.replace(
+                        `            <ActionBarItem itemId="create-button" requiresPermission={['CreateSeller']}>`,
+                        `            <ActionBarItem itemId="seller-toggle-button">
+                <Button onClick={() => { setShowDeleted(v => !v); setRefreshKey(k => k + 1); }}>
+                    {showDeleted ? 'Mostrar eliminados' : 'Ocultar eliminados'}
+                </Button>
+            </ActionBarItem>
+            <ActionBarItem itemId="create-button" requiresPermission={['CreateSeller']}>`,
+                    );
+                }
+            }
+
             return nextCode === code ? null : nextCode;
         },
     };

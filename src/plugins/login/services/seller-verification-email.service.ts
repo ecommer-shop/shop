@@ -7,23 +7,23 @@ import { readFileSync } from 'node:fs';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mjml: (input: string, options?: Record<string, any>) => Promise<{ html: string; errors: any[] }> = require('mjml');
 
+// Envío directo vía Resend (sin worker ni JobQueue) del correo de verificación
+// de la tienda del vendedor.
 @Injectable()
-export class EnviaEmailService {
-    private readonly logger = new Logger(EnviaEmailService.name);
+export class SellerVerificationEmailService {
+    private readonly logger = new Logger(SellerVerificationEmailService.name);
     private resend: Resend;
     private templatesDir: string;
     private partialsDir: string;
     private compiled: Record<string, HandlebarsTemplateDelegate> = {};
-    private initialized = false;
 
     constructor() {
         this.resend = new Resend(process.env.RESEND_API_KEY);
         const baseDir = path.join(__dirname, '../../../../static/email/templates');
-        this.templatesDir = path.join(baseDir, 'envia-shipping');
+        this.templatesDir = path.join(baseDir, 'verify-seller-email');
         this.partialsDir = path.join(baseDir, 'partials');
         this.registerPartials();
         this.compileTemplates();
-        this.initialized = true;
     }
 
     private registerPartials() {
@@ -38,14 +38,11 @@ export class EnviaEmailService {
     }
 
     private compileTemplates() {
-        const names = ['pickup-scheduled'];
-        for (const name of names) {
-            try {
-                const source = readFileSync(path.join(this.templatesDir, `${name}.hbs`), 'utf8');
-                this.compiled[name] = Handlebars.compile(source);
-            } catch (e: any) {
-                this.logger.warn(`Could not compile template ${name}: ${e.message}`);
-            }
+        try {
+            const source = readFileSync(path.join(this.templatesDir, 'verify-seller-email.hbs'), 'utf8');
+            this.compiled['verify-seller-email'] = Handlebars.compile(source);
+        } catch (e: any) {
+            this.logger.warn(`Could not compile template verify-seller-email: ${e.message}`);
         }
     }
 
@@ -65,30 +62,28 @@ export class EnviaEmailService {
         return html;
     }
 
-    async sendPickupScheduled(
-        to: string,
-        data: {
-            trackingCode: string;
-            pickupDate: string;
-            pickupTimeFrom: number;
-            pickupTimeTo: number;
-        },
-    ) {
-        const html = await this.render('pickup-scheduled', data);
-        await this.send(to, 'Recolección agendada - Ecommer.shop', html);
-    }
-
-    private async send(to: string, subject: string, html: string) {
+    async sendVerification(to: string, verifyUrl: string, code: string): Promise<boolean> {
         try {
-            await this.resend.emails.send({
+            const html = await this.render('verify-seller-email', { verifyUrl, code });
+            const { data, error } = await this.resend.emails.send({
                 to,
                 from: '"EcommerShop" <ceo@ecommer.shop>',
-                subject,
+                subject: 'Verifica tu correo para activar tu tienda - Ecommer.shop',
                 html,
             });
-            this.logger.log(`Email sent to ${to}: ${subject}`);
+
+            if (error) {
+                this.logger.error(
+                    `Resend rechazó el email de verificación a ${to}: ${JSON.stringify(error)}`,
+                );
+                return false;
+            }
+
+            this.logger.log(`Email de verificación enviado a ${to} (Resend ID: ${data?.id ?? 'n/a'})`);
+            return true;
         } catch (e: any) {
-            this.logger.error(`Failed to send email to ${to}: ${e.message}`);
+            this.logger.error(`No se pudo enviar el email de verificación a ${to}: ${e.message}`);
+            return false;
         }
     }
 }

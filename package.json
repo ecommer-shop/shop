@@ -16,6 +16,7 @@
         "seed:prod": "node ./dist/populate/seed.js",
         "seed:dev": "ts-node ./src/populate/seed.ts",
         "migrate": "ts-node ./src/migrate.ts",
+        "delete:seller": "ts-node --transpile-only ./scripts/delete-unverified-seller.ts",
         "repair:invoice-schema": "ts-node --transpile-only ./scripts/repair-invoice-schema.ts",
         "repair:store-schema": "node ./scripts/repair-store-schema.mjs",
         "predev": "node ./scripts/repair-store-schema.mjs"
