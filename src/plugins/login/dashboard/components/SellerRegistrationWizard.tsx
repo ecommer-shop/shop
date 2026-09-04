@@ -16,8 +16,6 @@ interface SellerRegistrationWizardProps {
 
 type WizardMethod = 'google' | 'email';
 
-const STEP_TOTAL = 3;
-
 const INPUT_CLASS =
     'w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-50 disabled:cursor-not-allowed';
 const PRIMARY_BUTTON_CLASS =
@@ -69,8 +67,16 @@ export function SellerRegistrationWizard({
         Number.isFinite(pickupSelection.latitude) &&
         Number.isFinite(pickupSelection.longitude);
 
-    const canContinueStore =
-        shopName.trim().length > 0 && hasPickupCoordinates && !loading;
+    const stepTotal = method === 'google' ? 2 : 3;
+
+    const canContinueAccount =
+        firstName.trim().length > 0 &&
+        lastName.trim().length > 0 &&
+        emailTrimmed.length > 0 &&
+        emailValid &&
+        password.length >= 8 &&
+        confirmPassword === password &&
+        !loading;
 
     const canSubmitFinal =
         shopName.trim().length > 0 &&
@@ -311,7 +317,7 @@ export function SellerRegistrationWizard({
 
             <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-1.5">
-                    {[1, 2, 3].map(n => (
+                    {Array.from({ length: stepTotal }, (_, i) => i + 1).map(n => (
                         <span
                             key={n}
                             className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -321,7 +327,7 @@ export function SellerRegistrationWizard({
                     ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    Paso {step} de {STEP_TOTAL}
+                    Paso {step} de {stepTotal}
                 </p>
             </div>
 
@@ -379,14 +385,193 @@ export function SellerRegistrationWizard({
                 </div>
             )}
 
-            {step === 2 && (
+            {step === 2 && method === 'email' && (
+                <div className="flex flex-col gap-3">
+                    <div>
+                        <h3 className="text-base font-semibold tracking-tight text-foreground">
+                            Crea tu acceso
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                            Tu tienda está casi lista. Solo falta la información con la que vas a acceder a ecommer.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                            <label
+                                htmlFor="firstName"
+                                className="text-sm font-medium text-foreground"
+                            >
+                                Nombre *
+                            </label>
+                            <input
+                                id="firstName"
+                                type="text"
+                                autoComplete="given-name"
+                                value={firstName}
+                                onChange={e => setFirstName(e.target.value)}
+                                placeholder="Juan"
+                                disabled={loading}
+                                className={INPUT_CLASS}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label
+                                htmlFor="lastName"
+                                className="text-sm font-medium text-foreground"
+                            >
+                                Apellido *
+                            </label>
+                            <input
+                                id="lastName"
+                                type="text"
+                                autoComplete="family-name"
+                                value={lastName}
+                                onChange={e => setLastName(e.target.value)}
+                                placeholder="Pérez"
+                                disabled={loading}
+                                className={INPUT_CLASS}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="email"
+                            className="text-sm font-medium text-foreground"
+                        >
+                            Correo electrónico *
+                        </label>
+                        <input
+                            id="email"
+                            type="email"
+                            autoComplete="email"
+                            value={email}
+                            onChange={e => handleEmailChange(e.target.value)}
+                            placeholder="tucorreo@ejemplo.com"
+                            disabled={loading}
+                            className={INPUT_CLASS}
+                        />
+                        {emailTrimmed.length > 0 && !emailValid && (
+                            <p className={ERROR_BOX_CLASS}>
+                                Ingresa un correo electrónico válido.
+                            </p>
+                        )}
+                        {emailSuggestion && !emailSuggestionDismissed && (
+                            <div className="flex items-center justify-between gap-2 rounded-md bg-blue-50 border border-blue-200 px-3 py-2">
+                                <p className="text-sm text-blue-700">
+                                    ¿Quisiste decir{' '}
+                                    <span className="font-semibold">{emailSuggestion.suggestion}</span>?
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={applyEmailSuggestion}
+                                    disabled={loading}
+                                    className="shrink-0 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    Usar
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="password"
+                            className="text-sm font-medium text-foreground"
+                        >
+                            Contraseña *
+                        </label>
+                        <div className="relative w-full">
+                            <input
+                                id="password"
+                                type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder="Mínimo 8 caracteres"
+                                disabled={loading}
+                                className={`${INPUT_CLASS} pr-11`}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(v => !v)}
+                                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                            >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
+                        {password.length > 0 && password.length < 8 && (
+                            <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
+                                La contraseña debe tener al menos 8 caracteres.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="confirmPassword"
+                            className="text-sm font-medium text-foreground"
+                        >
+                            Confirmar contraseña *
+                        </label>
+                        <div className="relative w-full">
+                            <input
+                                id="confirmPassword"
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                value={confirmPassword}
+                                onChange={e => setConfirmPassword(e.target.value)}
+                                placeholder="Repite tu contraseña"
+                                disabled={loading}
+                                className={`${INPUT_CLASS} pr-11`}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(v => !v)}
+                                aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                            >
+                                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
+                        {confirmPassword && confirmPassword !== password && (
+                            <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
+                                Las contraseñas no coinciden.
+                            </p>
+                        )}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => goToStep(3)}
+                        disabled={!canContinueAccount}
+                        className={PRIMARY_BUTTON_CLASS}
+                    >
+                        Continuar
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => goToStep(1)}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer self-start"
+                    >
+                        ← Atrás
+                    </button>
+                </div>
+            )}
+
+            {(step === 3 || (step === 2 && method === 'google')) && (
                 <div className="flex flex-col gap-3">
                     <div>
                         <h3 className="text-base font-semibold tracking-tight text-foreground">
                             Cuéntanos de tu tienda
                         </h3>
                         <p className="text-sm text-muted-foreground mt-0.5">
-                            Nombre y dirección donde recogerán lo que vendas.
+                            {method === 'google'
+                                ? 'Crearemos tu tienda con tu cuenta de Google.'
+                                : 'Nombre y dirección donde recogerán lo que vendas.'}
                         </p>
                     </div>
 
@@ -416,191 +601,6 @@ export function SellerRegistrationWizard({
                         onSelect={handlePickupSelect}
                         disabled={loading}
                     />
-
-                    <button
-                        type="button"
-                        onClick={() => goToStep(3)}
-                        disabled={!canContinueStore}
-                        className={PRIMARY_BUTTON_CLASS}
-                    >
-                        Continuar
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => goToStep(1)}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer self-start"
-                    >
-                        ← Atrás
-                    </button>
-                </div>
-            )}
-
-            {step === 3 && (
-                <div className="flex flex-col gap-3">
-                    <div>
-                        <h3 className="text-base font-semibold tracking-tight text-foreground">
-                            {method === 'google'
-                                ? 'Último paso'
-                                : 'Crea tu acceso'}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                            {method === 'google'
-                                ? 'Crearemos tu tienda con tu cuenta de Google.'
-                                : 'Tu tienda está casi lista. Solo falta la información con la que vas a acceder a ecommer.'}
-                        </p>
-                    </div>
-
-                    {method === 'email' && (
-                        <>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="flex flex-col gap-1">
-                                    <label
-                                        htmlFor="firstName"
-                                        className="text-sm font-medium text-foreground"
-                                    >
-                                        Nombre *
-                                    </label>
-                                    <input
-                                        id="firstName"
-                                        type="text"
-                                        autoComplete="given-name"
-                                        value={firstName}
-                                        onChange={e => setFirstName(e.target.value)}
-                                        placeholder="Juan"
-                                        disabled={loading}
-                                        className={INPUT_CLASS}
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <label
-                                        htmlFor="lastName"
-                                        className="text-sm font-medium text-foreground"
-                                    >
-                                        Apellido *
-                                    </label>
-                                    <input
-                                        id="lastName"
-                                        type="text"
-                                        autoComplete="family-name"
-                                        value={lastName}
-                                        onChange={e => setLastName(e.target.value)}
-                                        placeholder="Pérez"
-                                        disabled={loading}
-                                        className={INPUT_CLASS}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                                <label
-                                    htmlFor="email"
-                                    className="text-sm font-medium text-foreground"
-                                >
-                                    Correo electrónico *
-                                </label>
-                                <input
-                                    id="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    value={email}
-                                    onChange={e => handleEmailChange(e.target.value)}
-                                    placeholder="tucorreo@ejemplo.com"
-                                    disabled={loading}
-                                    className={INPUT_CLASS}
-                                />
-                                {emailTrimmed.length > 0 && !emailValid && (
-                                    <p className={ERROR_BOX_CLASS}>
-                                        Ingresa un correo electrónico válido.
-                                    </p>
-                                )}
-                                {emailSuggestion && !emailSuggestionDismissed && (
-                                    <div className="flex items-center justify-between gap-2 rounded-md bg-blue-50 border border-blue-200 px-3 py-2">
-                                        <p className="text-sm text-blue-700">
-                                            ¿Quisiste decir{' '}
-                                            <span className="font-semibold">{emailSuggestion.suggestion}</span>?
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={applyEmailSuggestion}
-                                            disabled={loading}
-                                            className="shrink-0 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                                        >
-                                            Usar
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                                <label
-                                    htmlFor="password"
-                                    className="text-sm font-medium text-foreground"
-                                >
-                                    Contraseña *
-                                </label>
-                                <div className="relative w-full">
-                                    <input
-                                        id="password"
-                                        type={showPassword ? 'text' : 'password'}
-                                        autoComplete="new-password"
-                                        value={password}
-                                        onChange={e => setPassword(e.target.value)}
-                                        placeholder="Mínimo 8 caracteres"
-                                        disabled={loading}
-                                        className={`${INPUT_CLASS} pr-11`}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(v => !v)}
-                                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                                    >
-                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                    </button>
-                                </div>
-                                {password.length > 0 && password.length < 8 && (
-                                    <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
-                                        La contraseña debe tener al menos 8 caracteres.
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                                <label
-                                    htmlFor="confirmPassword"
-                                    className="text-sm font-medium text-foreground"
-                                >
-                                    Confirmar contraseña *
-                                </label>
-                                <div className="relative w-full">
-                                    <input
-                                        id="confirmPassword"
-                                        type={showConfirmPassword ? 'text' : 'password'}
-                                        autoComplete="new-password"
-                                        value={confirmPassword}
-                                        onChange={e => setConfirmPassword(e.target.value)}
-                                        placeholder="Repite tu contraseña"
-                                        disabled={loading}
-                                        className={`${INPUT_CLASS} pr-11`}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowConfirmPassword(v => !v)}
-                                        aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                                    >
-                                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                    </button>
-                                </div>
-                                {confirmPassword && confirmPassword !== password && (
-                                    <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
-                                        Las contraseñas no coinciden.
-                                    </p>
-                                )}
-                            </div>
-                        </>
-                    )}
 
                     <div className="flex items-start gap-2">
                         <input
@@ -665,7 +665,7 @@ export function SellerRegistrationWizard({
 
                     <button
                         type="button"
-                        onClick={() => goToStep(2)}
+                        onClick={() => goToStep(method === 'google' ? 1 : 2)}
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer self-start"
                     >
                         ← Atrás
