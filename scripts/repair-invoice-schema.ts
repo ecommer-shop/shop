@@ -58,9 +58,6 @@ async function main() {
   await client.query(
     `ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "customFieldsInvoicelasterror" text`,
   );
-  await client.query(
-    `ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "customFieldsInvoicelastfailedat" TIMESTAMP`,
-  );
   const check = await client.query(
     `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'channel' AND column_name = 'customFieldsInvoicebillingactive'`,
   );

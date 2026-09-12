@@ -66,18 +66,16 @@ export class SubscriptionQueryService {
     }
 
     async getGracePeriodSubscriptions(): Promise<CustomerSubscription[]> {
-        const now = new Date();
-        const graceCutoff = new Date(now.getTime() - GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - GRACE_PERIOD_DAYS);
 
-        return this.subscriptionRepository
-            .createQueryBuilder('sub')
-            .leftJoinAndSelect('sub.plan', 'plan')
-            .where('sub.status = :status', { status: SubscriptionStatus.GRACE_PERIOD })
-            // Operable hasta max(endsAt, gracePeriodStart + GRACE_PERIOD_DAYS); degradar cuando ambos ya pasaron.
-            .andWhere('(sub."endsAt" IS NULL OR sub."endsAt" <= :now)', { now })
-            .andWhere('sub."gracePeriodStart" IS NOT NULL')
-            .andWhere('sub."gracePeriodStart" <= :graceCutoff', { graceCutoff })
-            .getMany();
+        return this.subscriptionRepository.find({
+            where: {
+                status: SubscriptionStatus.GRACE_PERIOD,
+                gracePeriodStart: LessThanOrEqual(cutoffDate),
+            },
+            relations: ['plan'],
+        });
     }
 
     async getSuspendedSubscriptionsForPurge(): Promise<CustomerSubscription[]> {

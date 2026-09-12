@@ -14,7 +14,7 @@ export const DEFAULT_PLAN_NAMES = {
     OMNICHANNEL: 'Omnichannel',
 } as const;
 
-export const GRACE_PERIOD_DAYS = 7;
+export const GRACE_PERIOD_DAYS = 15;
 export const SUSPENSION_DAYS = 30;
 export const MANUAL_RENEWAL_REMINDER_DAYS = 5;
 export const FALLBACK_PRODUCT_LIMIT = 15;

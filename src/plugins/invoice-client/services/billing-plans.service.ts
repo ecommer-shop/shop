@@ -115,12 +115,12 @@ export class BillingPlansService {
     }
     if (state.certificateStatus === 'EXPIRED') {
       throw new Error(
-        `El certificado de facturación de la tienda «${channel.code}» está vencido. Renueva el certificado en Facturación electrónica.`,
+        `El certificado de facturación de la tienda «${channel.code}» está vencido. Renueva el certificado en Planes de facturación.`,
       );
     }
     if (state.certificateStatus === 'REJECTED') {
       throw new Error(
-        `El certificado de la tienda «${channel.code}» fue rechazado. Corrige los documentos en Facturación electrónica y vuelve a enviarlos.`,
+        `El certificado de la tienda «${channel.code}» fue rechazado. Corrige los documentos en Planes de facturación y vuelve a enviarlos.`,
       );
     }
     if (state.certificateStatus === 'UNDER_REVIEW') {
@@ -129,7 +129,7 @@ export class BillingPlansService {
       );
     }
     throw new Error(
-      `La tienda «${channel.code}» no tiene certificado de facturación activo. Complétalo en Facturación electrónica.`,
+      `La tienda «${channel.code}» no tiene certificado de facturación activo. Complétalo en Planes de facturación.`,
     );
   }
 

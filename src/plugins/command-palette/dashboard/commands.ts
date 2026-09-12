@@ -254,7 +254,7 @@ export const ALL_COMMANDS: Command[] = [
     {
         id: 'billing',
         icon: Wallet,
-        label: 'Plan',
+        label: 'Facturación y Plan',
         keywords: ['factura', 'plan', 'suscripcion', 'pago', 'billing', 'cobro'],
         path: '/billing',
         section: 'Configuración',
@@ -348,12 +348,6 @@ export const RESTRICTED_COMMAND_IDS = [
     'store-management',
     'store-analytics',
     'shipping-methods',
-    'tax-categories',
-    'tax-rates',
-    'job-queue',
-    'scheduled-tasks',
-    'settings-store',
-    'api-keys',
 ];
 
 export function getCommandsBySection(): Record<string, Command[]> {

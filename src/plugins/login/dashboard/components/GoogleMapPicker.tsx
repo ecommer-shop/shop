@@ -5,7 +5,6 @@ export type MapPickerSelection = {
     latitude: number;
     longitude: number;
     neighborhood: string | null;
-    postalCode: string | null;
     googlePlaceId: string | null;
 };
 
@@ -136,7 +135,6 @@ export function GoogleMapPicker({
                 latitude: selectedLocation.lat,
                 longitude: selectedLocation.lng,
                 neighborhood: null,
-                postalCode: null,
                 googlePlaceId: null,
             });
             return;
@@ -161,9 +159,6 @@ export function GoogleMapPicker({
                             'sublocality',
                             'locality',
                         ]),
-                        postalCode: getGeocodeAddressComponent(place.address_components, [
-                            'postal_code',
-                        ]),
                         googlePlaceId: place.place_id || null,
                     });
                 } else {
@@ -172,7 +167,6 @@ export function GoogleMapPicker({
                         latitude: selectedLocation.lat,
                         longitude: selectedLocation.lng,
                         neighborhood: null,
-                        postalCode: null,
                         googlePlaceId: null,
                     });
                 }

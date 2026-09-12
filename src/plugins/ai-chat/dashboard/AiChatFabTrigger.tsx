@@ -1,40 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Drawer, DrawerContent } from '@vendure/dashboard';
+import { Drawer, DrawerContent, useNavigate } from '@vendure/dashboard';
 import { MessageSquare } from 'lucide-react';
-import { AiChatWindow } from './AiChatWindow';
-import { AiChatDock } from './AiChatDock';
-
-const DESKTOP_MQ = '(min-width: 768px)';
-
-function getDockHost(): HTMLElement {
-    return document.querySelector('main[data-slot="sidebar-inset"]') ?? document.body;
-}
+import { AiChatDrawerContent } from './AiChatDrawerContent';
 
 export function AiChatFabTrigger() {
     const [open, setOpen] = useState(false);
-    const [isDesktop, setIsDesktop] = useState(
-        () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_MQ).matches,
-    );
+    const navigate = useNavigate();
 
     const handleToggle = useCallback(() => setOpen(prev => !prev), []);
 
-    useEffect(() => {
-        const mql = window.matchMedia(DESKTOP_MQ);
-        const onChange = () => setIsDesktop(mql.matches);
-        mql.addEventListener('change', onChange);
-        return () => mql.removeEventListener('change', onChange);
-    }, []);
-
-    useEffect(() => {
-        const main = document.querySelector('main[data-slot="sidebar-inset"]');
-        if (main && open && isDesktop) {
-            main.classList.add('ecommer-chat-open');
-        } else if (main) {
-            main.classList.remove('ecommer-chat-open');
-        }
-        return () => main?.classList.remove('ecommer-chat-open');
-    }, [open, isDesktop]);
+    const handleNavigateToFullChat = useCallback(() => {
+        setOpen(false);
+        navigate({ to: '/ai-chat' });
+    }, [navigate]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -80,19 +59,14 @@ export function AiChatFabTrigger() {
                 <MessageSquare style={{ width: 18, height: 18 }} />
             </button>
 
-            {open &&
-                (isDesktop ? (
-                    createPortal(<AiChatDock onClose={handleToggle} />, getDockHost())
-                ) : (
-                    createPortal(
-                        <Drawer open={open} onOpenChange={setOpen} direction="right">
-                            <DrawerContent className="ecommer-chat-sheet flex flex-col w-full max-w-full sm:max-w-full p-0">
-                                <AiChatWindow onClose={handleToggle} />
-                            </DrawerContent>
-                        </Drawer>,
-                        document.body,
-                    )
-                ))}
+            {createPortal(
+                <Drawer open={open} onOpenChange={setOpen} direction="right">
+                    <DrawerContent className="flex flex-col sm:max-w-[400px]">
+                        <AiChatDrawerContent onNavigateToFullChat={handleNavigateToFullChat} />
+                    </DrawerContent>
+                </Drawer>,
+                document.body,
+            )}
         </>
     );
 }

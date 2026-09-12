@@ -161,7 +161,6 @@ export class StoreService {
                 isNew: row.isNew,
                 isDeleted: row.sellerDeletedAt !== null,
                 deletedAt: row.sellerDeletedAt,
-                adminId: adminInfoMap[row.channelId]?.adminId ?? null,
                 adminName: adminInfoMap[row.channelId]
                     ? `${adminInfoMap[row.channelId].firstName} ${adminInfoMap[row.channelId].lastName}`
                     : null,
@@ -246,7 +245,6 @@ export class StoreService {
             isNew: row.isNew,
             isDeleted: row.sellerDeletedAt !== null,
             deletedAt: row.sellerDeletedAt,
-            adminId: adminInfo?.adminId ?? null,
             adminName: adminInfo ? `${adminInfo.firstName} ${adminInfo.lastName}` : null,
             adminEmail: adminInfo?.emailAddress ?? null,
             adminLastLogin: adminInfo?.lastLogin ?? null,
@@ -428,7 +426,6 @@ export class StoreService {
             isNew: row.isNew,
             isDeleted: row.sellerDeletedAt !== null,
             deletedAt: row.sellerDeletedAt,
-            adminId: adminInfoMap[row.channelId]?.adminId ?? null,
             adminName: adminInfoMap[row.channelId]
                 ? `${adminInfoMap[row.channelId].firstName} ${adminInfoMap[row.channelId].lastName}`
                 : null,

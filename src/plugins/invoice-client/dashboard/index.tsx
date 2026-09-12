@@ -32,11 +32,11 @@ const matiasStoresRoute: DashboardRouteDefinition = {
 
 const billingPlansRoute: DashboardRouteDefinition = {
     path: '/planes-facturacion',
-    loader: () => ({ breadcrumb: 'Facturación electrónica' }),
+    loader: () => ({ breadcrumb: 'Planes de facturación' }),
     navMenuItem: {
         id: 'billing-plans',
         sectionId: 'settings',
-        title: 'Facturación electrónica',
+        title: 'Planes de facturación',
         url: '/planes-facturacion',
     },
     component: () => <BillingPlansPage />,
