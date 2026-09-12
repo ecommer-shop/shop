@@ -206,7 +206,7 @@ export function BillingPage() {
             <PageTitle>
                 <span className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5" />
-                    Facturación y Plan
+                    Plan
                 </span>
             </PageTitle>
 

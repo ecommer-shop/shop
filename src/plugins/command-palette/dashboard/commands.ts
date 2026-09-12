@@ -254,7 +254,7 @@ export const ALL_COMMANDS: Command[] = [
     {
         id: 'billing',
         icon: Wallet,
-        label: 'Facturación y Plan',
+        label: 'Plan',
         keywords: ['factura', 'plan', 'suscripcion', 'pago', 'billing', 'cobro'],
         path: '/billing',
         section: 'Configuración',
