@@ -6,6 +6,7 @@ import { WompiService } from './wompi.service';
 import { BillingEmailService } from './billing-email.service';
 import { SubscriptionStatus } from '../entities/customer-subscription.entity';
 import { JobQueue, JobQueueService, ProcessContext } from '@vendure/core';
+import { BifrostService } from '../../bifrost/services/bifrost.service';
 
 @Injectable()
 export class BillingJobService implements OnModuleInit {
@@ -20,6 +21,7 @@ export class BillingJobService implements OnModuleInit {
         private billingEmailService: BillingEmailService,
         private jobQueueService: JobQueueService,
         private processContext: ProcessContext,
+        private bifrostService: BifrostService,
     ) { }
 
     async onModuleInit() {
@@ -148,6 +150,10 @@ export class BillingJobService implements OnModuleInit {
                 if (transaction.status === 'APPROVED') {
                     await this.lifecycleService.extendSubscription(subscription.id);
                     this.logger.log(`Successfully renewed subscription ${subscription.id}`);
+
+                    void this.bifrostService.updateSellerVK(subscription.administratorId, plan.name).catch((e: any) => {
+                        this.logger.error(`Failed to refresh bifrost key for administrator ${subscription.administratorId}: ${e?.message}`);
+                    });
 
                     if (subscription.billingCustomerEmail) {
                         await this.billingEmailService.sendRenewalSuccess(

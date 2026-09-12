@@ -59,6 +59,7 @@ Root `GET /` redirects to `/dashboard`.
 | **Invoice** | `INVOICE_SERVICE_URL`, `INVOICE_SERVICE_API_KEY`, `MATIAS_PREFIX`, `MATIAS_RESOLUTION_NUMBER` |
 | **Delivery** | `SERVIENTREGA_API_KEY`, `DELIVERY_COST_API_KEY`, `DELIVERY_COST_API_URL`, `DELIVERY_ORDER_API_KEY`, `DELIVERY_ORDER_API_URL`, `DELIVERY_ORDER_WEBHOOK_SECRET` |
 | **Meta OAuth** | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `FACEBOOK_GRAPH_VERSION` |
+| **Bifrost** | `BIFROST_BASE_URL`, `BIFROST_ADMIN_USER`, `BIFROST_ADMIN_PASSWORD` |
 | **Dashboard** | `DASHBOARD_DEFAULT_LANGUAGE`, `DASHBOARD_DEFAULT_LOCALE` |
 
 ---
@@ -99,6 +100,7 @@ Root `GET /` redirects to `/dashboard`.
 | 30 | SellerSettingsVisibilityPlugin | — | Restrict settings sidebar items |
 | 31 | WompiSubscriptionPlugin | Full Wompi config | Subscription plans & billing |
 | 32 | PayoutPlugin | `platformFeePercent: 7.9` | Manual CSV-based seller dispersions via Bancolombia |
+| 33 | BifrostPlugin | `BIFROST_*` config | LLM gateway virtual keys (VK) per seller/superadmin |
 
 ---
 
@@ -692,6 +694,11 @@ Manual CSV-based seller dispersions via Bancolombia LibreFormato. No API cost �
 |---|---|---|
 | `PayoutBatch` | `payout_batch` | `reference`, `periodStart`, `periodEnd`, `totalAmount`, `totalPlatformFee`, `transactionCount`, `successCount`, `skippedCount`, `status` (pending/csv_downloaded/paid/cancelled), `csvContent`, `csvFileName`, `paidAt` |
 | `PayoutTransaction` | `payout_transaction` | `sellerId`, `sellerName`, `channelToken`, `amount`, `platformFee`, `orderCodes`, `legalIdType`, `legalId`, `accountType`, `accountNumber`, `bankCode`, `brebKey`, `brebKeyType`, `status` (pending/paid/skipped) |
+| `SellerPayoutConfig` | `seller_payout_config` | `sellerId` (UNIQUE), `legalIdType`, `legalId`, `accountType`, `accountNumber`, `bankCode`, `brebKey`, `brebKeyType`, `brebVerified` |
+
+### Seller Payout Config (única fuente de verdad)
+
+`SellerPayoutConfig` (`seller_payout_config`) es la **única fuente de verdad** de los datos bancarios del vendedor. Los custom fields `payout*` en `Seller` quedan definidos pero **inertes** (no existen como columnas en BD). `PayoutConfigService` expone `getBySellerId`, `upsert`, `resolveSellerIdByChannelToken` (vía `Channel.sellerId`). Migración idempotente `1785100000000-create-seller-payout-config.ts` (`transaction = false`, `CREATE TABLE IF NOT EXISTS` + backfill defensivo).
 
 ### Seller Custom Fields (on `Seller` table)
 
@@ -701,7 +708,7 @@ Manual CSV-based seller dispersions via Bancolombia LibreFormato. No API cost �
 
 | Resolver | Role | Queries/Mutations |
 |---|---|---|
-| `PayoutResolver` | SuperAdmin | `payoutBatches`, `payoutBatch`, `pendingPayoutReport`, `createPayoutBatch`, `confirmPayoutBatch`, `cancelPayoutBatch`, `downloadPayoutCsv` |
+| `PayoutResolver` | SuperAdmin | `payoutBatches`, `payoutBatchesList` (paginated), `payoutBatchCounts`, `payoutBatch`, `payoutBatchFinancial`, `pendingPayoutReport`, `createPayoutBatch`, `confirmPayoutBatch`, `cancelPayoutBatch`, `downloadPayoutCsv` |
 | `AdminPayoutResolver` | Seller (Authenticated) | `myPayoutInfo`, `saveMyPayoutInfo`, `myPayoutBatches` |
 
 ### Seller Resolution Strategy
@@ -741,8 +748,8 @@ type Mutation {
 ### Dashboard Routes
 
 | Route | Page | Nav | Permission |
-|---|---|---|---|
-| `/payouts` | `PayoutListPage` | Settings → **Dispersiones** | SuperAdmin |
+|---|---|---|
+| `/payouts` | `PayoutListPage` (ListPage nativo + filtros estado + franja totales) | Settings → **Dispersiones** | SuperAdmin |
 | `/payouts/new` | `PayoutNewPage` | — | SuperAdmin |
 | `/payouts/$id` | `PayoutDetailPage` | — | SuperAdmin |
 | `/payout-settings` | `PayoutSettingsPage` | Settings → **Liquidaciones** | Authenticated (seller) |
@@ -761,6 +768,61 @@ type Mutation {
 - Orders tomadas en estado `PaymentSettled`
 - Cada 15 días, sin monto mínimo
 - Gratis a Bancolombia/Nequi, ~$1,200 COP a otros bancos
+
+## 14. BifrostPlugin (`src/plugins/bifrost/`)
+
+**Class:** `BifrostPlugin.init({ bifrostBaseUrl, bifrostAdminUser, bifrostAdminPassword })`
+**Dashboard:** None
+
+LLM gateway integration (Maxim BiFrost) that provisions a **virtual key** (`sk-bf-*`) per user via the governance API (`/api/governance/virtual-keys`, Basic auth).
+
+### What it does
+
+- **Seller VKs** are tied to the `WompiSubscriptionPlugin` subscription lifecycle (by `administratorId`): provisioned on registration (Free), upgraded on plan purchase, refreshed on monthly renewal, downgraded on cancel.
+- **SuperAdmin VK** (`kind=superadmin`, plan `ecommer`) is a single global key reused across all superadmins.
+- Each VK carries `budgets[].reset_duration: "1M"` (monthly spend), rate limits, and provider model routing (azure/Phi-4).
+
+### Bifrost plans (`plans.ts`, provider azure)
+
+| Plan | Models | Budget | Rate limit |
+|---|---|---|---|
+| `free` | `Phi-4-mini-instruct` | $0.50/1M | 5k tok/1h, 10 req/1m |
+| `tienda` | `Phi-4-mini-instruct` | $3.00/1M | 20k tok/1h, 60 req/1m |
+| `omnichannel` | `Phi-4`, `Phi-4-mini-instruct` | $7.00/1M | 100k tok/1h, 120 req/1m |
+| `ecommer` (superadmin) | `Phi-4`, `Phi-4-mini-instruct` | $10.00/1M | 100k tok/1h, 120 req/1m |
+
+### Key services
+
+- **`BifrostClient`** — HTTP to governance + inference (`/v1/chat/completions`, `x-bf-vk`).
+- **`BifrostService`** — `provisionSellerVK`, `updateSellerVK`, `revokeVK`, `getSellerVK`, `getSuperAdminVK`, `infer`.
+- **Entity `BifrostKey`** (`bifrost_key`) — `id` (uuid / bifrost vk_id), `value` (`sk-bf-*`), `administratorId`, `kind`, `planName`, `isActive`, `expiresAt`.
+
+### GraphQL (Admin + Shop API)
+
+```graphql
+extend type Query {
+    myBifrostKey: BifrostKey          # seller or superadmin VK
+    bifrostKeys: [BifrostKey!]!        # superadmin only
+}
+extend type Mutation {
+    provisionBifrostKey(administratorId: ID!): BifrostKey
+}
+```
+
+### Integration hooks
+
+| Hook (file) | Bifrost action |
+|---|---|
+| `PlanManagementService.assignFreePlanToAdministrator` | `provisionSellerVK(free)` |
+| `SellerOnboardingService.assignFreePlanToSeller` | `provisionSellerVK(free)` |
+| `SubscriptionWriteService.createRecurrentSubscription` | `updateSellerVK(plan)` |
+| `SubscriptionWriteService.activateSubscriptionAfterPayment` | `updateSellerVK(plan)` |
+| `SubscriptionLifecycleService.cancelSubscription` / `downgradeToFree` | `updateSellerVK(free)` |
+| `BillingJobService.processMonthlyCollection` | `updateSellerVK(plan)` on renewal |
+
+### AI chat consumption
+
+`AiChat` (`ai-chat/services/ai-chat.ts`) now routes inference through `BifrostService.infer`, resolving the user's VK by `RequestContext` (superadmin → `ecommer` VK; seller → their plan VK). `AI_CHAT_URL` was removed.
 
 ---
 
@@ -1011,3 +1073,5 @@ Expone solo: `platform`, `username`, `dmLink`, `profileUrl`, `displayName`, `inP
 | 2026-09-05 | Registro diferido (Double Opt-In): entidad `seller_email_verification` (staged), registerSellerWithEmail → createPending, verifyByToken/verifyByCode crean cuenta + auto-login (SessionService + setSessionToken + channelToken), SellerNativeAdminAuthenticationStrategy bloquea login sin verificar, recycle de cuentas legacy (guardas superadmin/PENDING), script delete-unverified-seller.ts (TypeORM, --list), fix mjml v5 (await) en 3 servicios de email, re-registro tras eliminar cuenta, purga diaria de pendientes | `a542728`, `e4a284a` |
 | 2026-09-05 | Wizard de registro 3 pasos reordenado (método → datos de acceso → tienda+confirmar), progreso dinámico (Google 2 pasos), VerifySellerEmailPage sin pedir correo para el código, email-validation en tiempo real, copy suave en paso 3 | `e4a284a` |
 | 2026-09-05 | AGENTS.md: LoginPlugin deep dive (registro tradicional staged, servicios de verificación, wizard, entidad seller_email_verification), gotchas #20-23 (mjml Promise, DELETE alias, snake_case columns, auto-login), session log | — |
+| 2026-09-12 | Add BifrostPlugin: LLM gateway virtual keys per seller (Free/Tienda/Omnichannel) + superadmin `ecommer` VK, tied to subscription lifecycle; migrate AiChat to bifrost inference | — |
+| 2026-09-12 | Payout list page → ListPage nativo + filtros por estado + franja de totales; seller_payout_config table (single source of truth), migration, PayoutConfigService; fix `e.map`/`Button` runtime errors; AGENTS.md merge Payout+Bifrost | — |

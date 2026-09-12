@@ -9,6 +9,7 @@ import { PlanManagementService } from './plan-management.service';
 import { SubscriptionQueryService } from './subscription-query.service';
 import { BillingEmailService } from './billing-email.service';
 import { calculateEndDate } from './utils/date-utils';
+import { BifrostService } from '../../bifrost/services/bifrost.service';
 
 @Injectable()
 export class SubscriptionLifecycleService {
@@ -19,6 +20,7 @@ export class SubscriptionLifecycleService {
         private planManagementService: PlanManagementService,
         private subscriptionQueryService: SubscriptionQueryService,
         private billingEmailService: BillingEmailService,
+        private bifrostService: BifrostService,
     ) { }
 
     async updateSubscriptionStatus(subscriptionId: number, status: SubscriptionStatus): Promise<CustomerSubscription> {
@@ -119,6 +121,10 @@ export class SubscriptionLifecycleService {
 
         const saved = await this.subscriptionRepository.save(subscription);
 
+        void this.bifrostService.updateSellerVK(administratorId, freePlan.name).catch((e: any) => {
+            Logger.error(`Failed to downgrade bifrost key for administrator ${administratorId}: ${e?.message}`, 'SubscriptionLifecycleService');
+        });
+
         Logger.info(`Subscription ${subscriptionId} reverted to Free plan for administrator ${administratorId}`, 'SubscriptionLifecycleService');
         return saved;
     }
@@ -152,26 +158,12 @@ export class SubscriptionLifecycleService {
         subscription.planId = freePlan.id;
         subscription.status = SubscriptionStatus.ACTIVE;
 
-        return this.subscriptionRepository.save(subscription);
-    }
+        const saved = await this.subscriptionRepository.save(subscription);
 
-    private async getFeatureValue(administratorId: number, featureCode: string): Promise<string | null> {
-        const subscription = await this.subscriptionRepository
-            .createQueryBuilder('sub')
-            .leftJoinAndSelect('sub.plan', 'plan')
-            .leftJoinAndSelect('plan.planFeatures', 'planFeatures')
-            .leftJoinAndSelect('planFeatures.feature', 'feature')
-            .where('sub.administratorId = :adminId', { adminId: administratorId })
-            .getOne();
+        void this.bifrostService.updateSellerVK(subscription.administratorId, freePlan.name).catch((e: any) => {
+            Logger.error(`Failed to downgrade bifrost key for administrator ${subscription.administratorId}: ${e?.message}`, 'SubscriptionLifecycleService');
+        });
 
-        if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
-            return null;
-        }
-
-        const planFeature = subscription.plan?.planFeatures?.find(
-            pf => pf.feature?.code === featureCode
-        );
-
-        return planFeature?.value || null;
+        return saved;
     }
 }

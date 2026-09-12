@@ -45,6 +45,7 @@ import {
     SubscriptionStatus,
 } from '../../wompi-subscription/entities';
 import { FEATURE_CODES, DEFAULT_PLAN_NAMES } from '../../wompi-subscription/constants';
+import { BifrostService } from '../../bifrost/services/bifrost.service';
 
 type StorePickupCustomFields = {
     storePickupAddress: string;
@@ -69,6 +70,7 @@ export class SellerOnboardingService {
         private requestContextService: RequestContextService,
         private connection: TransactionalConnection,
         private passwordCipher: PasswordCipher,
+        private bifrostService: BifrostService,
     ) { }
 
     private buildStorePickupCustomFields(input: SellerOnboardingInput): StorePickupCustomFields {
@@ -453,6 +455,10 @@ export class SellerOnboardingService {
             autoRenew: false,
         });
         await subRepository.save(subscription);
+
+        void this.bifrostService.provisionSellerVK(numericAdminId, DEFAULT_PLAN_NAMES.FREE).catch((e: any) => {
+            Logger.error(`Failed to provision bifrost key for seller ${input.emailAddress}: ${e?.message}`, loggerCtx);
+        });
 
         Logger.info(`Assigned Free plan to seller ${input.emailAddress} (administrator ${admin.id})`, loggerCtx);
     }
