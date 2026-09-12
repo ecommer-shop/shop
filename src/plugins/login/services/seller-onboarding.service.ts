@@ -15,24 +15,19 @@ import {
     InternalServerError,
     isGraphQlErrorResult,
     Logger,
-    NativeAuthenticationMethod,
-    PasswordCipher,
     Permission,
     RequestContext,
     RequestContextService,
     Role,
     RoleService,
-    Seller,
     SellerService,
     StockLocation,
     StockLocationService,
     TransactionalConnection,
     User,
-    UserInputError,
 } from '@vendure/core';
 import crypto from 'crypto';
 
-import { assertValidShopName } from '../blacklist';
 import { loggerCtx, SELLER_ADMIN_PERMISSIONS } from '../constants';
 import { GoogleSellerRegistrationResult, SellerOnboardingInput } from '../types';
 import {
@@ -45,14 +40,12 @@ import {
     SubscriptionStatus,
 } from '../../wompi-subscription/entities';
 import { FEATURE_CODES, DEFAULT_PLAN_NAMES } from '../../wompi-subscription/constants';
-import { BifrostService } from '../../bifrost/services/bifrost.service';
 
 type StorePickupCustomFields = {
     storePickupAddress: string;
     storePickupLatitude: number;
     storePickupLongitude: number;
     storePickupNeighborhood?: string | null;
-    storePickupPostalCode?: string | null;
     storePickupGooglePlaceId?: string | null;
 };
 
@@ -69,8 +62,6 @@ export class SellerOnboardingService {
         private collectionService: CollectionService,
         private requestContextService: RequestContextService,
         private connection: TransactionalConnection,
-        private passwordCipher: PasswordCipher,
-        private bifrostService: BifrostService,
     ) { }
 
     private buildStorePickupCustomFields(input: SellerOnboardingInput): StorePickupCustomFields {
@@ -79,7 +70,6 @@ export class SellerOnboardingService {
             storePickupLatitude: input.pickupLatitude,
             storePickupLongitude: input.pickupLongitude,
             storePickupNeighborhood: input.pickupNeighborhood?.trim() || null,
-            storePickupPostalCode: input.pickupPostalCode?.trim() || null,
             storePickupGooglePlaceId: input.pickupGooglePlaceId?.trim() || null,
         };
     }
@@ -97,10 +87,8 @@ export class SellerOnboardingService {
     async registerSeller(
         ctx: RequestContext,
         input: SellerOnboardingInput,
-        options?: { password?: string; preHashedPassword?: string },
     ): Promise<GoogleSellerRegistrationResult> {
         this.assertValidPickupAddress(input);
-        assertValidShopName(input.shopName);
 
         const existingUser = await this.connection
             .getRepository(ctx, User)
@@ -122,14 +110,6 @@ export class SellerOnboardingService {
         }
 
         const superAdminCtx = await this.getSuperAdminContext(ctx);
-
-        const sellerRepo = this.connection.getRepository(superAdminCtx, Seller);
-        const existingSellerByName = await sellerRepo.findOne({ where: { name: input.shopName } });
-        if (existingSellerByName) {
-            throw new UserInputError(
-                `Ya existe una tienda con el nombre "${input.shopName}". Elige otro nombre.`,
-            );
-        }
 
         // Idempotency: check if Channel already exists from a previous partial registration
         const shopCode = normalizeString(input.shopName, '-');
@@ -166,8 +146,7 @@ export class SellerOnboardingService {
                     firstName: input.firstName,
                     lastName: input.lastName,
                     emailAddress: input.emailAddress,
-                    password: options?.password ?? this.generateSecurePassword(),
-                    preHashedPassword: options?.preHashedPassword,
+                    password: this.generateSecurePassword(),
                 },
             }, existingUser ?? undefined);
 
@@ -175,7 +154,7 @@ export class SellerOnboardingService {
             await this.assignFreePlanToSeller(txCtx, input);
 
             Logger.info(
-                `New seller registered: ${input.emailAddress} (shop: ${input.shopName})`,
+                `New seller registered via Google: ${input.emailAddress} (shop: ${input.shopName})`,
                 loggerCtx,
             );
 
@@ -186,11 +165,7 @@ export class SellerOnboardingService {
         await this.assignFacetsToSellerChannel(superAdminCtx, channel);
         await this.assignCollectionsToSellerChannel(superAdminCtx, channel);
 
-        return {
-            success: true,
-            email: input.emailAddress,
-            requiresEmailVerification: false,
-        };
+        return { success: true, email: input.emailAddress };
     }
 
     private async createSellerChannelRoleAdmin(
@@ -203,7 +178,6 @@ export class SellerOnboardingService {
                 lastName: string;
                 emailAddress: string;
                 password: string;
-                preHashedPassword?: string;
             };
         },
         existingUser?: User,
@@ -262,13 +236,6 @@ export class SellerOnboardingService {
                 roleIds: [role.id],
                 customFields: input.pickupCustomFields,
             });
-            if (input.seller.preHashedPassword) {
-                await this.overwriteNativePassword(
-                    ctx,
-                    input.seller.emailAddress,
-                    input.seller.preHashedPassword,
-                );
-            }
         }
 
         return channel;
@@ -282,8 +249,6 @@ export class SellerOnboardingService {
             firstName: string;
             lastName: string;
             emailAddress: string;
-            password?: string;
-            preHashedPassword?: string;
         },
         pickupCustomFields: StorePickupCustomFields,
     ) {
@@ -300,13 +265,6 @@ export class SellerOnboardingService {
                 ...pickupCustomFields,
             };
             await administratorRepository.save(existingAdministrator);
-            await this.ensureNativePassword(
-                ctx,
-                existingUser.id,
-                seller.emailAddress,
-                seller.password,
-                seller.preHashedPassword,
-            );
             return;
         }
 
@@ -318,7 +276,7 @@ export class SellerOnboardingService {
         const userRepository = this.connection.getRepository(ctx, User);
         const reloadedUser = await userRepository.findOne({
             where: { id: existingUser.id },
-            relations: { roles: true, authenticationMethods: true },
+            relations: { roles: true },
         });
 
         if (!reloadedUser) {
@@ -330,14 +288,6 @@ export class SellerOnboardingService {
             await userRepository.save(reloadedUser);
         }
 
-        await this.ensureNativePassword(
-            ctx,
-            existingUser.id,
-            seller.emailAddress,
-            seller.password,
-            seller.preHashedPassword,
-        );
-
         const administrator = administratorRepository.create({
             firstName: seller.firstName,
             lastName: seller.lastName,
@@ -346,67 +296,6 @@ export class SellerOnboardingService {
             customFields: pickupCustomFields,
         });
         await administratorRepository.save(administrator);
-    }
-
-    /**
-     * Asegura que el usuario existente tenga un método de autenticación nativo
-     * (correo/contraseña) para poder iniciar sesión en la Admin API. Si el usuario
-     * ya tiene uno, se ignora el password recibido.
-     */
-    private async ensureNativePassword(
-        ctx: RequestContext,
-        userId: number | string,
-        emailAddress: string,
-        password?: string,
-        preHashedPassword?: string,
-    ): Promise<void> {
-        if (!password && !preHashedPassword) {
-            return;
-        }
-        const userRepository = this.connection.getRepository(ctx, User);
-        const user = await userRepository.findOne({
-            where: { id: userId },
-            relations: { authenticationMethods: true },
-        });
-        if (!user) {
-            return;
-        }
-        if (user.getNativeAuthenticationMethod(false)) {
-            return;
-        }
-
-        const nativeMethodRepo = this.connection.getRepository(ctx, NativeAuthenticationMethod);
-        const method = nativeMethodRepo.create({
-            user,
-            identifier: emailAddress,
-            passwordHash: preHashedPassword ?? (await this.passwordCipher.hash(password!)),
-        });
-        await nativeMethodRepo.save(method);
-        Logger.info(`Native auth method created for promoted user ${emailAddress}`, loggerCtx);
-    }
-
-    /**
-     * Sobrescribe el hash del método de autenticación nativo de un usuario con un
-     * hash ya calculado (flujo diferido: la contraseña elegida en el registro se
-     * almacenó hasheada en el registro pendiente y se aplica al crear la cuenta).
-     */
-    private async overwriteNativePassword(
-        ctx: RequestContext,
-        emailAddress: string,
-        passwordHash: string,
-    ): Promise<void> {
-        const user = await this.connection.getRepository(ctx, User).findOne({
-            where: { identifier: emailAddress },
-            relations: { authenticationMethods: true },
-        });
-        const nativeMethod = user?.getNativeAuthenticationMethod(false);
-        if (!nativeMethod) {
-            Logger.warn(`No native auth method found for ${emailAddress} to overwrite`, loggerCtx);
-            return;
-        }
-        nativeMethod.passwordHash = passwordHash;
-        await this.connection.getRepository(ctx, NativeAuthenticationMethod).save(nativeMethod);
-        Logger.info(`Native auth password overwritten for ${emailAddress}`, loggerCtx);
     }
 
     private async assignFreePlanToSeller(
@@ -455,10 +344,6 @@ export class SellerOnboardingService {
             autoRenew: false,
         });
         await subRepository.save(subscription);
-
-        void this.bifrostService.provisionSellerVK(numericAdminId, DEFAULT_PLAN_NAMES.FREE).catch((e: any) => {
-            Logger.error(`Failed to provision bifrost key for seller ${input.emailAddress}: ${e?.message}`, loggerCtx);
-        });
 
         Logger.info(`Assigned Free plan to seller ${input.emailAddress} (administrator ${admin.id})`, loggerCtx);
     }
@@ -577,6 +462,7 @@ export class SellerOnboardingService {
         const superAdminUser = await this.connection.getRepository(ctx, User).findOne({
             where: { identifier: superadminCredentials.identifier },
         });
+
         return this.requestContextService.create({
             apiType: 'admin',
             user: superAdminUser!,

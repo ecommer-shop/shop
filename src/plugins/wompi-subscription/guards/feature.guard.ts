@@ -21,7 +21,7 @@ export class FeatureGuard implements CanActivate {
 
         const administratorId = await this.resolveAdministratorId(context);
         if (!administratorId) {
-            throw new ForbiddenException('Autenticación requerida');
+            throw new ForbiddenException('Authentication required');
         }
 
         let subscription = await this.subscriptionQueryService.getSubscriptionByAdministratorId(administratorId);
@@ -32,18 +32,19 @@ export class FeatureGuard implements CanActivate {
         }
 
         if (subscription.status === SubscriptionStatus.PENDING_PAYMENT) {
-            throw new ForbiddenException('La suscripción tiene un pago pendiente. Completa el pago primero.');
+            throw new ForbiddenException('Subscription is pending payment. Please complete the payment first.');
+        }
+
+        if (subscription.status === SubscriptionStatus.GRACE_PERIOD) {
+            throw new ForbiddenException('Subscription is in grace period. Please update your payment method.');
         }
 
         if (subscription.status === SubscriptionStatus.CANCELLED) {
-            throw new ForbiddenException('La suscripción ha sido cancelada.');
+            throw new ForbiddenException('Subscription has been cancelled.');
         }
 
-        if (
-            subscription.status !== SubscriptionStatus.ACTIVE
-            && subscription.status !== SubscriptionStatus.GRACE_PERIOD
-        ) {
-            throw new ForbiddenException('La suscripción no está activa.');
+        if (subscription.status !== SubscriptionStatus.ACTIVE) {
+            throw new ForbiddenException('Subscription is not active.');
         }
 
         return true;

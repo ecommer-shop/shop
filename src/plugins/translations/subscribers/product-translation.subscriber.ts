@@ -16,6 +16,7 @@ import { Subscription } from 'rxjs';
 import { getProductFallbackName, getVariantFallbackName, getNameFromExisting, getSlugFromName, PLACEHOLDER_NAMES } from './translation-utils';
 
 const LANGUAGES = [LanguageCode.es, LanguageCode.en];
+const FILTERED_PLACEHOLDERS = [...PLACEHOLDER_NAMES].filter(Boolean);
 
 @Injectable()
 export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -36,16 +37,15 @@ export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnA
 
                 setImmediate(async () => {
                     try {
-                        const ptRepo = this.connection.rawConnection.getRepository(ProductTranslation);
+                        const conn = this.connection.rawConnection;
 
                         for (const lang of LANGUAGES) {
-                            const existing = await ptRepo.findOne({
-                                where: { base: { id: productId } as any, languageCode: lang },
-                            });
+                            const [existing] = await conn.query(
+                                `SELECT id FROM "product_translation" WHERE "baseId" = $1 AND "languageCode" = $2 AND name IS NOT NULL AND TRIM(name) != '' AND LOWER(TRIM(name)) != ALL($3)`,
+                                [productId, lang, FILTERED_PLACEHOLDERS],
+                            );
 
-                            if (existing && existing.name?.trim() && !PLACEHOLDER_NAMES.has(existing.name.trim().toLowerCase())) {
-                                continue;
-                            }
+                            if (existing) continue;
 
                             const fallbackName = getNameFromExisting(null, lang, () => {
                                 const fb = getProductFallbackName(productId, 'default');
@@ -53,23 +53,24 @@ export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnA
                             });
                             const slug = getSlugFromName(fallbackName);
 
-                            if (existing) {
-                                await ptRepo.update(existing.id, { name: fallbackName, slug, description: '' });
-                                Logger.info(`Updated ${lang} translation for Product ${productId}: "${fallbackName}"`);
+                            const [existingRow] = await conn.query(
+                                `SELECT id FROM "product_translation" WHERE "baseId" = $1 AND "languageCode" = $2`,
+                                [productId, lang],
+                            );
+
+                            if (existingRow) {
+                                await conn.query(
+                                    `UPDATE "product_translation" SET name = $1, slug = $2, description = '' WHERE id = $3`,
+                                    [fallbackName, slug, existingRow.id],
+                                );
                             } else {
-                                try {
-                                    await ptRepo.insert({ base: { id: productId }, languageCode: lang, name: fallbackName, slug, description: '' } as any);
-                                    Logger.info(`Created ${lang} translation for Product ${productId}: "${fallbackName}"`);
-                                } catch {
-                                    const retry = await ptRepo.findOne({
-                                        where: { base: { id: productId } as any, languageCode: lang },
-                                    });
-                                    if (retry) {
-                                        await ptRepo.update(retry.id, { name: fallbackName, slug, description: '' });
-                                        Logger.info(`Retry - updated ${lang} translation for Product ${productId}: "${fallbackName}"`);
-                                    }
-                                }
+                                await conn.query(
+                                    `INSERT INTO "product_translation" ("baseId", "languageCode", "name", "slug", "description", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, '', NOW(), NOW())`,
+                                    [productId, lang, fallbackName, slug],
+                                );
                             }
+
+                            Logger.info(`Auto-created ${lang} translation for Product ${productId}: "${fallbackName}"`);
                         }
                     } catch (e: any) {
                         Logger.error(`[FixTranslation] Product ${productId}: ${e.message}`);
@@ -91,8 +92,8 @@ export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnA
 
                 setImmediate(async () => {
                     try {
-                        const pvtRepo = this.connection.rawConnection.getRepository(ProductVariantTranslation);
-                        const fullVariants = await this.connection.rawConnection.getRepository(ProductVariant).find({
+                        const conn = this.connection.rawConnection;
+                        const fullVariants = await conn.getRepository(ProductVariant).find({
                             where: { id: In(ids) as any },
                             relations: ['translations'],
                         });
@@ -111,27 +112,24 @@ export class ProductTranslationSubscriber implements OnApplicationBootstrap, OnA
                                     return getVariantFallbackName(full.id as number, full.productId as number, 'default');
                                 });
 
-                                const existing = await pvtRepo.findOne({
-                                    where: { base: { id: full.id } as any, languageCode: lang },
-                                });
+                                const [existingRow] = await conn.query(
+                                    `SELECT id FROM "product_variant_translation" WHERE "baseId" = $1 AND "languageCode" = $2`,
+                                    [full.id, lang],
+                                );
 
-                                if (existing) {
-                                    await pvtRepo.update(existing.id, { name });
-                                    Logger.info(`Updated ${lang} translation for Variant ${full.id}: "${name}"`);
+                                if (existingRow) {
+                                    await conn.query(
+                                        `UPDATE "product_variant_translation" SET name = $1 WHERE id = $2`,
+                                        [name, existingRow.id],
+                                    );
                                 } else {
-                                    try {
-                                        await pvtRepo.insert({ base: { id: full.id }, languageCode: lang, name } as any);
-                                        Logger.info(`Created ${lang} translation for Variant ${full.id}: "${name}"`);
-                                    } catch {
-                                        const retry = await pvtRepo.findOne({
-                                            where: { base: { id: full.id } as any, languageCode: lang },
-                                        });
-                                        if (retry) {
-                                            await pvtRepo.update(retry.id, { name });
-                                            Logger.info(`Retry - updated ${lang} translation for Variant ${full.id}: "${name}"`);
-                                        }
-                                    }
+                                    await conn.query(
+                                        `INSERT INTO "product_variant_translation" ("baseId", "languageCode", "name", "createdAt", "updatedAt") VALUES ($1, $2, $3, NOW(), NOW())`,
+                                        [full.id, lang, name],
+                                    );
                                 }
+
+                                Logger.info(`Auto-created ${lang} translation for Variant ${full.id}: "${name}"`);
                             }
                         }
                     } catch (e: any) {

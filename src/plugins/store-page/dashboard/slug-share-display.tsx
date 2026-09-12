@@ -3,13 +3,6 @@ import { Share2, CheckCheck, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CellContext } from '@tanstack/react-table';
 
-function getStoreFrontendUrl(): string {
-    const origin = window.location.origin;
-    return origin.replace(/^https?:\/\/admin[-.]/, 'https://');
-}
-
-const STOREFRONT_URL = typeof window !== 'undefined' ? getStoreFrontendUrl() : 'https://ecommer.shop';
-
 export function SlugShareDisplay(context: CellContext<any, any>) {
     const [copied, setCopied] = useState(false);
     const [downloading, setDownloading] = useState(false);
@@ -21,7 +14,7 @@ export function SlugShareDisplay(context: CellContext<any, any>) {
         e.preventDefault();
         e.stopPropagation();
         try {
-            const link = `${STOREFRONT_URL}/es/product/${slug}`;
+            const link = `https://ecommer.shop/es/product/${slug}`;
             await navigator.clipboard.writeText(link);
             toast.success('Link copiado');
             setCopied(true);
@@ -32,7 +25,7 @@ export function SlugShareDisplay(context: CellContext<any, any>) {
     };
 
     const handleDownloadQR = () => {
-        const base = `${STOREFRONT_URL}/api/product-qr`;
+        const base = 'https://stg.ecommer.shop/api/product-qr';
         const params = new URLSearchParams({ slug });
         window.open(`${base}?${params.toString()}`, '_blank');
     };

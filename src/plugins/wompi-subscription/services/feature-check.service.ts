@@ -49,7 +49,7 @@ export class FeatureCheckService {
 
     async getFeatureValue(administratorId: number, featureCode: string): Promise<string | null> {
         const subscription = await this.getSubscriptionByAdministratorId(administratorId);
-        if (!subscription || !this.isOperational(subscription.status)) {
+        if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
             return null;
         }
 
@@ -82,7 +82,7 @@ export class FeatureCheckService {
 
     async checkProductLimit(administratorId: number, channelToken?: string): Promise<{ allowed: boolean; current: number; limit: number }> {
         const subscription = await this.getSubscriptionByAdministratorId(administratorId);
-        if (!subscription || !this.isOperational(subscription.status)) {
+        if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
             return { allowed: false, current: 0, limit: 0 };
         }
 
@@ -101,6 +101,7 @@ export class FeatureCheckService {
             .innerJoin('product.channels', 'channel')
             .where('channel.id = :channelId', { channelId: channel.id })
             .andWhere('product.deletedAt IS NULL')
+            .andWhere('product."customFieldsHidden" IS DISTINCT FROM true')
             .getCount();
 
         return {
@@ -112,7 +113,7 @@ export class FeatureCheckService {
 
     async checkVariationLimit(administratorId: number, channelToken?: string): Promise<{ allowed: boolean; current: number; limit: number }> {
         const subscription = await this.getSubscriptionByAdministratorId(administratorId);
-        if (!subscription || !this.isOperational(subscription.status)) {
+        if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
             return { allowed: false, current: 0, limit: 0 };
         }
 
@@ -134,6 +135,7 @@ export class FeatureCheckService {
             .andWhere('product.deletedAt IS NULL')
             .andWhere('variant.deletedAt IS NULL')
             .andWhere('variant.enabled = :enabled', { enabled: true })
+            .andWhere('variant."customFieldsHidden" IS DISTINCT FROM true')
             .getCount();
 
         return {
@@ -141,9 +143,5 @@ export class FeatureCheckService {
             current: variantCount,
             limit,
         };
-    }
-
-    private isOperational(status: SubscriptionStatus): boolean {
-        return status === SubscriptionStatus.ACTIVE || status === SubscriptionStatus.GRACE_PERIOD;
     }
 }

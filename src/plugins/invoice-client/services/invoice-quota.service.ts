@@ -40,7 +40,7 @@ export class InvoiceQuotaService {
     private readonly connection: TransactionalConnection,
     private readonly channelService: ChannelService,
     private readonly billingPlans: BillingPlansService,
-  ) { }
+  ) {}
 
   async getCurrentChannelQuotaStatus(ctx: RequestContext): Promise<InvoiceQuotaStatus> {
     const channel = await this.connection.getRepository(ctx, Channel).findOne({
@@ -168,7 +168,7 @@ export class InvoiceQuotaService {
 
     if (!billingActive) {
       throw new Error(
-        `La tienda «${sellerChannel.code}» no tiene facturación activa. Compra un paquete en Facturación electrónica.`,
+        `La tienda «${sellerChannel.code}» no tiene facturación activa. Compra un paquete en Planes de facturación.`,
       );
     }
     if (remaining == null || remaining <= 0) {
