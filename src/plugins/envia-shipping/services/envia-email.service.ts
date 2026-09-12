@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { readFileSync } from 'node:fs';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const mjml: (input: string, options?: Record<string, any>) => { html: string; errors: any[] } = require('mjml');
+const mjml: (input: string, options?: Record<string, any>) => Promise<{ html: string; errors: any[] }> = require('mjml');
 
 @Injectable()
 export class EnviaEmailService {
@@ -49,13 +49,19 @@ export class EnviaEmailService {
         }
     }
 
-    private render(templateName: string, data: Record<string, any>): string {
+    private async render(templateName: string, data: Record<string, any>): Promise<string> {
         const compile = this.compiled[templateName];
         if (!compile) {
             throw new Error(`Template ${templateName} not found`);
         }
         const mjmlContent = compile(data);
-        const { html } = mjml(mjmlContent);
+        const { html, errors } = await mjml(mjmlContent);
+        if (errors?.length) {
+            this.logger.error(`MJML errors en ${templateName}: ${JSON.stringify(errors)}`);
+        }
+        if (!html) {
+            throw new Error(`No se pudo generar HTML del email ${templateName}`);
+        }
         return html;
     }
 
@@ -68,7 +74,7 @@ export class EnviaEmailService {
             pickupTimeTo: number;
         },
     ) {
-        const html = this.render('pickup-scheduled', data);
+        const html = await this.render('pickup-scheduled', data);
         await this.send(to, 'Recolección agendada - Ecommer.shop', html);
     }
 

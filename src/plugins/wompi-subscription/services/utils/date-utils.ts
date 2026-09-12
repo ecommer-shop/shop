@@ -1,7 +1,7 @@
 import { BillingInterval } from '../../entities/plan.entity';
 
 export function calculateEndDate(interval: BillingInterval, fromDate?: Date): Date {
-    const startDate = fromDate || new Date();
+    const startDate = fromDate && fromDate > new Date() ? fromDate : new Date();
     const endDate = new Date(startDate);
 
     if (interval === BillingInterval.MONTHLY) {

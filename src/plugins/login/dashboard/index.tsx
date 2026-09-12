@@ -2,7 +2,9 @@ import { defineDashboardExtension } from '@vendure/dashboard';
 import { LoginMarketingPage } from './marketing/LoginMarketingPage';
 import { LoginLogo } from './components/LoginLogo';
 import { DeleteAccountSection } from './components/DeleteAccountSection';
+import VerifySellerEmailPage from './components/VerifySellerEmailPage';
 import { SocialLinksSection } from '../../store-page/dashboard/social-links-section';
+import { SubscriptionAlertSection } from '../../wompi-subscription/dashboard/subscription-alert';
 
 defineDashboardExtension({
     routes: [{
@@ -10,6 +12,12 @@ defineDashboardExtension({
         authenticated: false,
         component: () => {
             return <LoginMarketingPage />;
+        }
+    }, {
+        path: '/verify-email',
+        authenticated: false,
+        component: () => {
+            return <VerifySellerEmailPage />;
         }
     }],
 
@@ -37,6 +45,15 @@ defineDashboardExtension({
     },
 
     pageBlocks: [
+        {
+            id: 'subscription-alert-section',
+            location: {
+                pageId: 'profile',
+                column: 'main',
+                position: { blockId: 'custom-fields', order: 'before' },
+            },
+            component: SubscriptionAlertSection,
+        },
         {
             id: 'social-links-section',
             location: {

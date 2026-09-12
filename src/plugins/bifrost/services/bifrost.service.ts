@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Logger } from '@vendure/core';
+import { Logger, TransactionalConnection, Administrator } from '@vendure/core';
 import { BifrostKey, BifrostKeyKind } from '../entities/bifrost-key.entity';
 import { BifrostClient } from './bifrost-client';
 import { BIFROST_PLANS } from '../plans';
 import { BIFROST_PLAN_NAMES, SHOP_TO_BIFROST_PLAN, loggerCtx } from '../constants';
 import { BifrostChatMessage, BifrostPlanConfig, BifrostUsage } from '../interfaces';
 
-const SELLER_KEY_PREFIX = 'store-';
+const SELLER_KEY_PREFIX = 'virtualkey-';
 const SUPERADMIN_KEY_NAME = 'ecommer-superadmin';
 
 @Injectable()
@@ -16,6 +16,7 @@ export class BifrostService {
     constructor(
         @InjectRepository(BifrostKey) private bifrostKeyRepository: Repository<BifrostKey>,
         private bifrostClient: BifrostClient,
+        private connection: TransactionalConnection,
     ) { }
 
     resolutionPlanName(planName: string): string {
@@ -44,12 +45,13 @@ export class BifrostService {
         // Una sola VK por vendedor: reconfiguramos la existente en bifrost al nuevo plan.
         if (existing) {
             try {
+                const channelCode = await this.resolveSellerChannelCode(administratorId);
                 await this.bifrostClient.updateVirtualKey(existing.id, config);
                 existing.planName = resolved;
                 existing.isActive = true;
                 existing.expiresAt = this.nextMonth();
                 const saved = await this.bifrostKeyRepository.save(existing);
-                Logger.info(`Reconfigured bifrost key ${existing.id} to plan ${resolved} for administrator ${administratorId}`, loggerCtx);
+                Logger.info(`Reconfigured bifrost key ${existing.id} to plan ${resolved} for channel ${channelCode ?? administratorId}`, loggerCtx);
                 return saved;
             } catch (e: any) {
                 Logger.error(`Failed to reconfigure bifrost key ${existing.id}: ${e?.message}`, loggerCtx);
@@ -181,6 +183,16 @@ export class BifrostService {
         return d;
     }
 
+    private async resolveSellerChannelCode(administratorId: number): Promise<string | null> {
+        const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
+            where: { id: administratorId },
+            relations: { user: { roles: { channels: true } } },
+        });
+        const sellerRole = admin?.user?.roles?.find(r => r.code.endsWith('-admin'));
+        const sellerChannel = sellerRole?.channels?.find(ch => ch.sellerId != null);
+        return sellerChannel?.code ?? null;
+    }
+
     private async provisionFor(
         administratorId: number | null,
         kind: BifrostKeyKind,
@@ -188,7 +200,8 @@ export class BifrostService {
         explicitName?: string,
     ): Promise<BifrostKey | null> {
         const config = this.getPlanConfig(planName);
-        const name = explicitName ?? `${SELLER_KEY_PREFIX}${administratorId}`;
+        const channelCode = administratorId != null ? await this.resolveSellerChannelCode(administratorId) : null;
+        const name = explicitName ?? `${SELLER_KEY_PREFIX}${channelCode ?? administratorId}`;
 
         try {
             // Idempotente: si bifrost ya tiene una VK con este nombre, la reutilizamos.
@@ -225,10 +238,10 @@ export class BifrostService {
             }
 
             const saved = await this.bifrostKeyRepository.save(key);
-            Logger.info(`Provisioned bifrost key (${planName}) for administrator ${administratorId ?? '(superadmin)'}`, loggerCtx);
+            Logger.info(`Provisioned bifrost key (${planName}) for channel ${channelCode ?? administratorId ?? '(superadmin)'}`, loggerCtx);
             return saved;
         } catch (error: any) {
-            Logger.error(`Failed to provision bifrost key for administrator ${administratorId ?? '(superadmin)'}: ${error?.message}`, loggerCtx);
+            Logger.error(`Failed to provision bifrost key for channel ${channelCode ?? administratorId ?? '(superadmin)'}: ${error?.message}`, loggerCtx);
             return null;
         }
     }
