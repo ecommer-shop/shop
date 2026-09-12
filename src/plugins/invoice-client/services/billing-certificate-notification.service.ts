@@ -20,7 +20,7 @@ export type CertificateSuperAdminNotifyReason =
 export class BillingCertificateNotificationService {
   private resend?: Resend;
 
-  constructor(private readonly connection: TransactionalConnection) {}
+  constructor(private readonly connection: TransactionalConnection) { }
 
   async notifyCertificateReviewResult(
     ctx: RequestContext,
@@ -42,12 +42,11 @@ export class BillingCertificateNotificationService {
       ? `Certificado de facturación aprobado — ${shopName}`
       : `Certificado de facturación rechazado — ${shopName}`;
     const body = approved
-      ? `<p>Tu certificado de facturación electrónica para <strong>${shopName}</strong> fue <strong>aprobado</strong>. Ya puedes comprar paquetes de facturas en el panel <em>Planes de facturación</em>.</p>`
-      : `<p>Tu certificado para <strong>${shopName}</strong> fue <strong>rechazado</strong>.</p>${
-          note?.trim()
-            ? `<p><strong>Motivo:</strong> ${this.escapeHtml(note.trim())}</p>`
-            : ''
-        }<p>Corrige los documentos y vuelve a enviarlos desde <em>Planes de facturación</em>. Si ya pagaste el certificado, <strong>no necesitas pagar de nuevo</strong>.</p>`;
+      ? `<p>Tu certificado de facturación electrónica para <strong>${shopName}</strong> fue <strong>aprobado</strong>. Ya puedes comprar paquetes de facturas en el panel <em>Facturación electrónica</em>.</p>`
+      : `<p>Tu certificado para <strong>${shopName}</strong> fue <strong>rechazado</strong>.</p>${note?.trim()
+        ? `<p><strong>Motivo:</strong> ${this.escapeHtml(note.trim())}</p>`
+        : ''
+      }<p>Corrige los documentos y vuelve a enviarlos desde <em>Facturación electrónica</em>. Si ya pagaste el certificado, <strong>no necesitas pagar de nuevo</strong>.</p>`;
 
     await this.sendHtml(recipients, subject, body);
   }
