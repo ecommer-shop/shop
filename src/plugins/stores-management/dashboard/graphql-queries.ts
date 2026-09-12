@@ -10,7 +10,6 @@ export const STORES_LIST_QUERY = `
         deletedAt
         isNew
         isDeleted
-        adminId
         adminName
         adminEmail
         adminLastLogin
@@ -73,7 +72,6 @@ export const STORE_QUERY = `
       deletedAt
       isNew
       isDeleted
-      adminId
       adminName
       adminEmail
       adminLastLogin
@@ -96,7 +94,6 @@ export interface StoreNode {
   deletedAt?: string | null;
   isNew: boolean;
   isDeleted: boolean;
-  adminId?: number | null;
   adminName?: string | null;
   adminEmail?: string | null;
   adminLastLogin?: string | null;
@@ -265,55 +262,3 @@ export const BACKFILL_MUTATION = `
     backfillStoreAnalytics
   }
 `;
-
-export const BIFROST_USAGES_QUERY = `
-  query BifrostKeyUsages {
-    bifrostKeyUsages {
-      key {
-        id
-        value
-        administratorId
-        planName
-        kind
-        isActive
-        expiresAt
-      }
-      usage {
-        usagePercent
-        budgetMax
-        budgetUsed
-        budgetResetAt
-        tokenUsed
-        tokenLimit
-        requestUsed
-        requestLimit
-        isActive
-      }
-    }
-  }
-`;
-
-export interface BifrostUsage {
-  usagePercent: number;
-  budgetMax: number;
-  budgetUsed: number;
-  budgetResetAt?: string | null;
-  tokenUsed: number;
-  tokenLimit: number;
-  requestUsed: number;
-  requestLimit: number;
-  isActive: boolean;
-}
-
-export interface BifrostKeyUsage {
-  key: {
-    id: string;
-    value: string;
-    administratorId?: number | null;
-    planName: string;
-    kind: string;
-    isActive: boolean;
-    expiresAt?: string | null;
-  };
-  usage: BifrostUsage;
-}

@@ -1,7 +1,6 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Ctx, RequestContext, TransactionalConnection, Logger, Administrator } from '@vendure/core';
 import { SavedPaymentMethod } from '../../payment/entities/saved-payment-method.entity';
-import { saveSavedPaymentMethod } from '../../payment/services/saved-payment.service';
 import { CustomerSubscription } from '../entities/customer-subscription.entity';
 import { WompiService } from '../services/wompi.service';
 
@@ -99,7 +98,7 @@ export class AdminSavedPaymentResolver {
             where: { customerId: adminId.toString() },
         });
 
-        const saved = await saveSavedPaymentMethod(repo, {
+        const method = repo.create({
             customerId: adminId.toString(),
             type,
             wompiPaymentSourceId: paymentSource.id,
@@ -108,8 +107,11 @@ export class AdminSavedPaymentResolver {
             expiryMonth,
             expiryYear,
             cardHolderName,
+            isDefault: existingCount === 0,
             channelToken: ctx.channel?.token || '',
-        }, existingCount === 0);
+        });
+
+        const saved = await repo.save(method);
 
         return {
             id: saved.id.toString(),

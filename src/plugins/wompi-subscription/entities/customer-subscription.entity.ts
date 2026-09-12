@@ -57,9 +57,6 @@ export class CustomerSubscription {
     @Column({ name: 'last_payment_at', type: 'timestamp', nullable: true })
     lastPaymentAt: Date;
 
-    @Column({ name: 'last_transaction_id', type: 'varchar', nullable: true })
-    lastTransactionId: string | null;
-
     @CreateDateColumn()
     createdAt: Date;
 

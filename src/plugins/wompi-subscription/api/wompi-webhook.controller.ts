@@ -4,6 +4,7 @@ import { SubscriptionQueryService } from '../services/subscription-query.service
 import { SubscriptionWriteService } from '../services/subscription-write.service';
 import { SubscriptionLifecycleService } from '../services/subscription-lifecycle.service';
 import { FeatureCheckService } from '../services/feature-check.service';
+import { ProductLimitEnforcementService } from '../services/product-limit-enforcement.service';
 import { SubscriptionStatus } from '../entities/customer-subscription.entity';
 
 @Controller('api/wompi-subscription')
@@ -16,6 +17,7 @@ export class WompiWebhookController {
         private subscriptionWriteService: SubscriptionWriteService,
         private lifecycleService: SubscriptionLifecycleService,
         private featureCheckService: FeatureCheckService,
+        private limitEnforcementService: ProductLimitEnforcementService,
     ) { }
 
     @Post('webhook')
@@ -92,8 +94,15 @@ export class WompiWebhookController {
         if (subscription.status === SubscriptionStatus.GRACE_PERIOD) {
             await this.lifecycleService.updateSubscriptionStatus(subscriptionId, SubscriptionStatus.ACTIVE);
             this.logger.log(`Restored subscription ${subscriptionId} to ACTIVE`);
+
+            const limitValue = await this.featureCheckService.getFeatureValue(
+                subscription.administratorId,
+                'max_products',
+            );
+            const limit = limitValue ? parseInt(limitValue, 10) : 15;
+            await this.limitEnforcementService.restoreHiddenProducts(subscription.administratorId, limit);
         } else if (subscription.status === SubscriptionStatus.ACTIVE) {
-            await this.lifecycleService.extendSubscription(subscriptionId, transaction.id);
+            await this.lifecycleService.extendSubscription(subscriptionId);
             this.logger.log(`Extended subscription ${subscriptionId}`);
         }
     }

@@ -51,7 +51,7 @@ export class WompiTokenController {
             );
 
             if (transaction.status === 'APPROVED') {
-                await this.lifecycleService.extendSubscription(subscription.id, transaction.id);
+                await this.lifecycleService.extendSubscription(subscription.id);
             }
 
             return {

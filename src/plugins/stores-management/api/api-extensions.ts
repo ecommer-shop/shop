@@ -11,7 +11,6 @@ const sharedStoreTypes = gql`
         isNew: Boolean!
         isDeleted: Boolean!
         deletedAt: DateTime
-        adminId: Int
         adminName: String
         adminEmail: String
         adminLastLogin: DateTime

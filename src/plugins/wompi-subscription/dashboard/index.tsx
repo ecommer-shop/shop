@@ -5,11 +5,11 @@ export default defineDashboardExtension({
     routes: [
         {
             path: '/billing',
-            loader: () => ({ breadcrumb: 'Plan' }),
+            loader: () => ({ breadcrumb: 'Facturación y Plan' }),
             navMenuItem: {
                 id: 'billing',
                 sectionId: 'settings',
-                title: 'Plan',
+                title: 'Facturación y Plan',
                 url: '/billing',
             },
             component: () => <BillingPage />,

@@ -4,14 +4,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WOMPI_SUBSCRIPTION_PLUGIN_OPTIONS } from './constants';
 import { WompiSubscriptionPluginInitOptions } from './interfaces';
 import { Plan, Feature, PlanFeature, CustomerSubscription } from './entities';
-import { WompiService, PlanManagementService, SubscriptionQueryService, SubscriptionWriteService, SubscriptionLifecycleService, FeatureCheckService, BillingJobService, BillingEmailService } from './services';
+import { WompiService, PlanManagementService, SubscriptionQueryService, SubscriptionWriteService, SubscriptionLifecycleService, FeatureCheckService, ProductLimitEnforcementService, BillingJobService, BillingEmailService } from './services';
 import { WompiWebhookController } from './api/wompi-webhook.controller';
 import { WompiTokenController } from './api/wompi-token.controller';
 import { PlanResolver } from './api/plan.resolver';
 import { SubscriptionResolver } from './api/subscription.resolver';
 import { WompiResolver } from './api/wompi.resolver';
 import { AdminSavedPaymentResolver } from './api/admin-saved-payment.resolver';
-import { ProductLimitResolver } from './api/product-limit.resolver';
 import { shopApiExtensions } from './api/api-extensions';
 import { FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAccessGuard, PlanGuard } from './guards';
 
@@ -26,12 +25,14 @@ import { FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAcc
         SubscriptionWriteService,
         SubscriptionLifecycleService,
         FeatureCheckService,
+        ProductLimitEnforcementService,
         BillingJobService,
         BillingEmailService,
         PlanResolver,
         SubscriptionResolver,
         WompiResolver,
         AdminSavedPaymentResolver,
+        // ProductLimitResolver,
         FeatureGuard,
         ProductLimitGuard,
         ProductVariationLimitGuard,
@@ -42,6 +43,7 @@ import { FeatureGuard, ProductLimitGuard, ProductVariationLimitGuard, FeatureAcc
         SubscriptionQueryService,
         SubscriptionWriteService,
         SubscriptionLifecycleService,
+        ProductLimitEnforcementService,
         FeatureCheckService,
         PlanManagementService,
         WompiService,
@@ -70,7 +72,7 @@ export class WompiSubscriptionModule { }
     },
     adminApiExtensions: {
         schema: shopApiExtensions,
-        resolvers: [PlanResolver, SubscriptionResolver, WompiResolver, AdminSavedPaymentResolver, ProductLimitResolver],
+        resolvers: [PlanResolver, SubscriptionResolver, WompiResolver, AdminSavedPaymentResolver],
     },
     dashboard: './dashboard/index.tsx',
     configuration: (config) => {

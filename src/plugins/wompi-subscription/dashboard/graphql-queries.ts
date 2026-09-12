@@ -48,32 +48,6 @@ export const ALL_PLANS_QUERY = `
   }
 `;
 
-export const MY_BIFROST_USAGE_QUERY = `
-  query MyBifrostKeyUsage {
-    myBifrostKeyUsage {
-      key {
-        id
-        value
-        planName
-        kind
-        isActive
-        expiresAt
-      }
-      usage {
-        usagePercent
-        budgetMax
-        budgetUsed
-        budgetResetAt
-        tokenUsed
-        tokenLimit
-        requestUsed
-        requestLimit
-        isActive
-      }
-    }
-  }
-`;
-
 export const ACTIVE_ADMIN_QUERY = `
   query ActiveAdmin {
     activeAdministrator {
@@ -81,6 +55,7 @@ export const ACTIVE_ADMIN_QUERY = `
     }
   }
 `;
+
 export const CHECK_PRODUCT_LIMIT_QUERY = `
   query CheckProductLimit($channelToken: String, $customerEmail: String) {
     checkProductLimit(channelToken: $channelToken, customerEmail: $customerEmail) {
