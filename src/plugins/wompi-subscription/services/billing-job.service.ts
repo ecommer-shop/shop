@@ -148,7 +148,7 @@ export class BillingJobService implements OnModuleInit {
                 );
 
                 if (transaction.status === 'APPROVED') {
-                    await this.lifecycleService.extendSubscription(subscription.id);
+                    await this.lifecycleService.extendSubscription(subscription.id, transaction.id);
                     this.logger.log(`Successfully renewed subscription ${subscription.id}`);
 
                     void this.bifrostService.updateSellerVK(subscription.administratorId, plan.name).catch((e: any) => {

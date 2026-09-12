@@ -35,15 +35,14 @@ export class FeatureGuard implements CanActivate {
             throw new ForbiddenException('La suscripción tiene un pago pendiente. Completa el pago primero.');
         }
 
-        if (subscription.status === SubscriptionStatus.GRACE_PERIOD) {
-            throw new ForbiddenException('La suscripción está en período de gracia. Actualiza tu método de pago.');
-        }
-
         if (subscription.status === SubscriptionStatus.CANCELLED) {
             throw new ForbiddenException('La suscripción ha sido cancelada.');
         }
 
-        if (subscription.status !== SubscriptionStatus.ACTIVE) {
+        if (
+            subscription.status !== SubscriptionStatus.ACTIVE
+            && subscription.status !== SubscriptionStatus.GRACE_PERIOD
+        ) {
             throw new ForbiddenException('La suscripción no está activa.');
         }
 

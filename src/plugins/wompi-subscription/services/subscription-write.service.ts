@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CustomerSubscription, SubscriptionStatus } from '../entities/customer-subscription.entity';
-import { Plan } from '../entities/plan.entity';
+import { Plan, BillingInterval } from '../entities/plan.entity';
 import { Logger } from '@vendure/core';
 import { PaymentFlowType } from '../payment-methods';
 import { DEFAULT_PLAN_NAMES } from '../constants';
@@ -44,9 +44,9 @@ export class SubscriptionWriteService {
             existing.status = SubscriptionStatus.ACTIVE;
             existing.autoRenew = true;
             existing.paymentFlowType = PaymentFlowType.RECURRENTE;
-            existing.endsAt = calculateEndDate(plan.billingInterval, existing.endsAt ?? undefined);
             existing.lastPaymentAt = new Date();
             existing.gracePeriodStart = null as any;
+            existing.endsAt = calculateEndDate(plan.billingInterval);
 
             const saved = await this.subscriptionRepository.save(existing);
             const reloaded = await this.subscriptionQueryService.reloadSubscriptionWithPlan(saved.id);
@@ -142,6 +142,9 @@ export class SubscriptionWriteService {
         subscription.lastPaymentAt = new Date();
         if (paymentSourceId) {
             subscription.billingPaymentSourceId = paymentSourceId;
+        }
+        if (!subscription.endsAt || subscription.endsAt <= new Date()) {
+            subscription.endsAt = calculateEndDate(subscription.plan?.billingInterval ?? BillingInterval.MONTHLY);
         }
 
         const saved = await this.subscriptionRepository.save(subscription);

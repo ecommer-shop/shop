@@ -253,7 +253,8 @@ export class SubscriptionResolver {
             );
 
             if (transaction.status === 'APPROVED') {
-                await this.lifecycleService.extendSubscription(subscription.id);
+                const extended = await this.lifecycleService.extendSubscription(subscription.id, transaction.id);
+                subscription.endsAt = extended.endsAt;
             } else {
                 Logger.debug(`Transaction ${transaction.id} initial status: ${transaction.status} — awaiting webhook`, 'SubscriptionResolver');
             }

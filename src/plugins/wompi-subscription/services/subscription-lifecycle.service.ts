@@ -53,7 +53,7 @@ export class SubscriptionLifecycleService {
         return saved;
     }
 
-    async extendSubscription(subscriptionId: number): Promise<CustomerSubscription> {
+    async extendSubscription(subscriptionId: number, transactionId?: string): Promise<CustomerSubscription> {
         const subscription = await this.subscriptionRepository.findOne({
             where: { id: subscriptionId },
             relations: ['plan'],
@@ -62,8 +62,16 @@ export class SubscriptionLifecycleService {
             throw new Error('Subscription not found');
         }
 
+        if (transactionId && subscription.lastTransactionId === transactionId) {
+            Logger.debug(`Subscription ${subscriptionId} already extended by transaction ${transactionId}`, 'SubscriptionLifecycleService');
+            return subscription;
+        }
+
         subscription.endsAt = calculateEndDate(subscription.plan.billingInterval, subscription.endsAt ?? undefined);
         subscription.lastPaymentAt = new Date();
+        if (transactionId) {
+            subscription.lastTransactionId = transactionId;
+        }
         return this.subscriptionRepository.save(subscription);
     }
 
@@ -107,25 +115,21 @@ export class SubscriptionLifecycleService {
             await this.wompiService.deletePaymentSource(subscription.billingPaymentSourceId);
         }
 
-        const freePlan = await this.planManagementService.getFreePlan();
-        subscription.plan = freePlan;
-        subscription.planId = freePlan.id;
-        subscription.status = SubscriptionStatus.ACTIVE;
+        // Cancelación rápida: conservar el plan pagado y los días que faltaban para la
+        // próxima renovación (endsAt). Pasa a GRACE_PERIOD; el job degradará a Free
+        // (plan + bifrost) cuando se cumpla max(endsAt, graceStart + 7d).
+        subscription.status = SubscriptionStatus.GRACE_PERIOD;
         subscription.autoRenew = false;
+        subscription.gracePeriodStart = new Date();
         subscription.billingPaymentSourceId = null;
         subscription.billingCustomerEmail = null as any;
         subscription.paymentMethodType = null as any;
         subscription.paymentFlowType = null as any;
-        subscription.gracePeriodStart = null as any;
         subscription.lastPaymentAt = null as any;
 
         const saved = await this.subscriptionRepository.save(subscription);
 
-        void this.bifrostService.updateSellerVK(administratorId, freePlan.name).catch((e: any) => {
-            Logger.error(`Failed to downgrade bifrost key for administrator ${administratorId}: ${e?.message}`, 'SubscriptionLifecycleService');
-        });
-
-        Logger.info(`Subscription ${subscriptionId} reverted to Free plan for administrator ${administratorId}`, 'SubscriptionLifecycleService');
+        Logger.info(`Subscription ${subscriptionId} cancelled, grace until ${saved.endsAt?.toISOString()} for administrator ${administratorId}`, 'SubscriptionLifecycleService');
         return saved;
     }
 
@@ -157,6 +161,10 @@ export class SubscriptionLifecycleService {
         subscription.plan = freePlan;
         subscription.planId = freePlan.id;
         subscription.status = SubscriptionStatus.ACTIVE;
+        subscription.autoRenew = false;
+        subscription.endsAt = null;
+        subscription.gracePeriodStart = null as any;
+        subscription.lastTransactionId = null;
 
         const saved = await this.subscriptionRepository.save(subscription);
 

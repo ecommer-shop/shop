@@ -93,7 +93,7 @@ export class WompiWebhookController {
             await this.lifecycleService.updateSubscriptionStatus(subscriptionId, SubscriptionStatus.ACTIVE);
             this.logger.log(`Restored subscription ${subscriptionId} to ACTIVE`);
         } else if (subscription.status === SubscriptionStatus.ACTIVE) {
-            await this.lifecycleService.extendSubscription(subscriptionId);
+            await this.lifecycleService.extendSubscription(subscriptionId, transaction.id);
             this.logger.log(`Extended subscription ${subscriptionId}`);
         }
     }
