@@ -314,14 +314,15 @@ SuperAdmin store management with listing, detail, analytics dashboard, rankings,
 ## 7. WompiSubscriptionPlugin (`src/plugins/wompi-subscription/`)
 
 **Class:** `WompiSubscriptionPlugin.init({ wompiApiUrl, wompiApiKey, ... })`
-**Dashboard:** Route `/billing` (nav: settings, "Facturación y Plan")
+**Dashboard:** Route `/billing` (nav: settings, "Plan")
 
 Full subscription/billing system:
 - **Plans:** Free / Tienda / Omnichannel (seeded on startup)
 - **Features:** Product limits, variation limits, AI access, electronic billing
 - **Guards:** `FeatureGuard`, `ProductLimitGuard`, `ProductVariationLimitGuard`, `PlanGuard`, `DefaultChannelGuard`
 - **Webhooks:** Wompi webhook controller for payment status updates
-- **Enforcement:** Auto-hides/restores excess products/variants via custom fields
+- **Grace period:** `GRACE_PERIOD_DAYS = 7`. On cancel the subscription keeps the paid plan and enters `GRACE_PERIOD` (operational); `BillingJobService` (`grace-period-downgrade` queue) degrades to Free once `max(endsAt, gracePeriodStart + 7d)` has passed. Renewal dedup via `lastTransactionId` avoids double `endsAt` accumulation (`calculateEndDate` only extends forward).
+- **Saved cards:** deduplicated by physical-method fingerprint (`saveSavedPaymentMethod` / `dedupeOrRefreshSavedPaymentMethod` in `payment/services/saved-payment.service.ts`) + unique index `uq_saved_payment_method_fingerprint`.
 
 ---
 
@@ -405,9 +406,10 @@ LLM gateway integration (Maxim BiFrost) that provisions a **virtual key** (`sk-b
 
 ### What it does
 
-- **Seller VKs** are tied to the `WompiSubscriptionPlugin` subscription lifecycle (by `administratorId`): provisioned on registration (Free), upgraded on plan purchase, refreshed on monthly renewal, downgraded on cancel.
+- **Seller VKs** are tied to the `WompiSubscriptionPlugin` subscription lifecycle (by `administratorId`): provisioned on registration (Free), upgraded on plan purchase, refreshed on monthly renewal, downgraded on cancel/grace expiry.
 - **SuperAdmin VK** (`kind=superadmin`, plan `ecommer`) is a single global key reused across all superadmins.
 - Each VK carries `budgets[].reset_duration: "1M"` (monthly spend), rate limits, and provider model routing (azure/Phi-4).
+- **VK naming:** seller keys are named `virtualkey-<channelCode>` (channel code resolved via `resolveSellerChannelCode`, looking up the seller `-admin` role's channel); superadmin key is named `ecommer-superadmin`.
 
 ### Bifrost plans (`plans.ts`, provider azure)
 
@@ -444,7 +446,8 @@ extend type Mutation {
 | `SellerOnboardingService.assignFreePlanToSeller` | `provisionSellerVK(free)` |
 | `SubscriptionWriteService.createRecurrentSubscription` | `updateSellerVK(plan)` |
 | `SubscriptionWriteService.activateSubscriptionAfterPayment` | `updateSellerVK(plan)` |
-| `SubscriptionLifecycleService.cancelSubscription` / `downgradeToFree` | `updateSellerVK(free)` |
+| `SubscriptionLifecycleService.cancelSubscription` | (no-op on VK; goes to GRACE_PERIOD keeping paid plan) |
+| `SubscriptionLifecycleService.downgradeToFree` | `updateSellerVK(free)` |
 | `BillingJobService.processMonthlyCollection` | `updateSellerVK(plan)` on renewal |
 
 ### AI chat consumption
@@ -602,3 +605,4 @@ Expone solo: `platform`, `username`, `dmLink`, `profileUrl`, `displayName`, `inP
 | 2026-07-01 | Full stores-management plugin: store listing with ListPage, analytics dashboard with Recharts, daily analytics job, investor metrics, backfill mutation, custom chart colors, restricted to SuperAdmin | `7ca8392`, `458a4c5`, `038e17d`, `cb6541e`, `f0e1c97`, `e0d876a`, `0d74e1f`, `1aab58a`, `56b2e5f`, `7b27aff`, `333a4f3`, `75be861`, `951f5ff` |
 | 2026-07-01 | Add useIsSuperAdmin hook + superadminvisibility dashboard extension; hide DeleteAccountSection from superadmin | `f7b3e51`, `9c0617a` |
 | 2026-09-12 | Add BifrostPlugin: LLM gateway virtual keys per seller (Free/Tienda/Omnichannel) + superadmin `ecommer` VK, tied to subscription lifecycle; migrate AiChat to bifrost inference | — |
+| 2026-09-12 | Port wompi-subscription refactor + fixes from StevenDev: grace period 7d (operational, cancel→grace), `endsAt` accumulation fix via `lastTransactionId`, bifrost VK naming `virtualkey-<channelCode>`, `mjml()` async, saved-card fingerprint dedup, remove ProductLimitEnforcementService, subscription alert in profile | — |
