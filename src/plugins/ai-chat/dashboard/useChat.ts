@@ -9,6 +9,7 @@ export interface ChatMessage {
 
 const SHOP_API_URL = import.meta.env.VITE_SHOP_API_URL ?? '/shop-api';
 const PERSIST_KEY = 'ecommer-chat-messages';
+const CHANNEL_TOKEN = localStorage.getItem('vendure-selected-channel-token')?.replace(/"/g, '') ?? '';
 
 const WELCOME_MSG: ChatMessage = {
     id: '1',
@@ -137,7 +138,7 @@ export function useChat() {
 
             const res = await fetch(SHOP_API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'vendure-token': CHANNEL_TOKEN },
                 body: JSON.stringify({
                     query: `
                         mutation SendChatMessage($message: String!, $history: [ChatHistoryInput!]) {
