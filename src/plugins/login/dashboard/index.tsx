@@ -2,6 +2,7 @@ import { defineDashboardExtension } from '@vendure/dashboard';
 import { LoginMarketingPage } from './marketing/LoginMarketingPage';
 import { LoginLogo } from './components/LoginLogo';
 import { DeleteAccountSection } from './components/DeleteAccountSection';
+import VerifySellerEmailPage from './components/VerifySellerEmailPage';
 import { SocialLinksSection } from '../../store-page/dashboard/social-links-section';
 import { SubscriptionAlertSection } from '../../wompi-subscription/dashboard/subscription-alert';
 
@@ -11,6 +12,12 @@ defineDashboardExtension({
         authenticated: false,
         component: () => {
             return <LoginMarketingPage />;
+        }
+    }, {
+        path: '/verify-email',
+        authenticated: false,
+        component: () => {
+            return <VerifySellerEmailPage />;
         }
     }],
 
