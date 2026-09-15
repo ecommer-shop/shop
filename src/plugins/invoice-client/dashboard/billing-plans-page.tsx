@@ -614,7 +614,7 @@ export function BillingPlansPage() {
     if (isLoading) {
         return (
             <Page pageId="billing-plans">
-                <PageTitle>Planes de facturación</PageTitle>
+                <PageTitle>Facturación electrónica</PageTitle>
                 <p className="text-sm text-muted-foreground">Cargando...</p>
             </Page>
         );
@@ -623,7 +623,7 @@ export function BillingPlansPage() {
     if (error) {
         return (
             <Page pageId="billing-plans">
-                <PageTitle>Planes de facturación</PageTitle>
+                <PageTitle>Facturación electrónica</PageTitle>
                 <Card className="border-destructive/50">
                     <CardContent className="py-6 text-sm text-destructive">{String(error)}</CardContent>
                 </Card>
@@ -633,7 +633,7 @@ export function BillingPlansPage() {
 
     return (
         <Page pageId="billing-plans">
-            <PageTitle>Planes de facturación</PageTitle>
+            <PageTitle>Facturación electrónica</PageTitle>
             <PageLayout>
                 {step !== 'plans' && (
                     <PageBlock column="main" blockId="header">
@@ -700,8 +700,8 @@ export function BillingPlansPage() {
                                             {isRejected
                                                 ? 'Certificado rechazado — corrige tus documentos'
                                                 : needsRenewal
-                                                  ? 'Renueva tu certificado'
-                                                  : 'Primero adquiere tu certificado'}
+                                                    ? 'Renueva tu certificado'
+                                                    : 'Primero adquiere tu certificado'}
                                         </CardTitle>
                                         <CardDescription>
                                             {isRejected
@@ -777,29 +777,29 @@ export function BillingPlansPage() {
                                     <CardContent className="min-w-0">
                                         <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
                                             <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Fecha</TableHead>
-                                                    <TableHead>Plan</TableHead>
-                                                    <TableHead>Facturas</TableHead>
-                                                    <TableHead>Valor</TableHead>
-                                                    <TableHead>Origen</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {state!.purchaseHistory.map((row, i) => (
-                                                    <TableRow key={`${row.purchasedAt}-${i}`}>
-                                                        <TableCell>
-                                                            {new Date(row.purchasedAt).toLocaleString('es-CO')}
-                                                        </TableCell>
-                                                        <TableCell>{row.planName}</TableCell>
-                                                        <TableCell>+{row.invoicesAdded}</TableCell>
-                                                        <TableCell>${row.priceCop.toLocaleString('es-CO')}</TableCell>
-                                                        <TableCell className="text-xs">{row.source}</TableCell>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Fecha</TableHead>
+                                                        <TableHead>Plan</TableHead>
+                                                        <TableHead>Facturas</TableHead>
+                                                        <TableHead>Valor</TableHead>
+                                                        <TableHead>Origen</TableHead>
                                                     </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {state!.purchaseHistory.map((row, i) => (
+                                                        <TableRow key={`${row.purchasedAt}-${i}`}>
+                                                            <TableCell>
+                                                                {new Date(row.purchasedAt).toLocaleString('es-CO')}
+                                                            </TableCell>
+                                                            <TableCell>{row.planName}</TableCell>
+                                                            <TableCell>+{row.invoicesAdded}</TableCell>
+                                                            <TableCell>${row.priceCop.toLocaleString('es-CO')}</TableCell>
+                                                            <TableCell className="text-xs">{row.source}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -818,11 +818,11 @@ export function BillingPlansPage() {
                                 <div className="min-w-0 flex-1">
                                     <CardTitle className="text-lg sm:text-xl">Certificado de facturación electrónica</CardTitle>
                                     <CardDescription className="break-words mt-1">
-                                            {isRejected
-                                                ? certPaymentAlreadyMade
-                                                    ? 'Corrige los documentos indicados y guárdalos. Tu pago ya está confirmado.'
-                                                    : 'Corrige los documentos indicados, guárdalos y completa el pago del certificado.'
-                                                : 'Documentos obligatorios y pago anual. Tras el pago, se valida y activa el certificado.'}
+                                        {isRejected
+                                            ? certPaymentAlreadyMade
+                                                ? 'Corrige los documentos indicados y guárdalos. Tu pago ya está confirmado.'
+                                                : 'Corrige los documentos indicados, guárdalos y completa el pago del certificado.'
+                                            : 'Documentos obligatorios y pago anual. Tras el pago, se valida y activa el certificado.'}
                                     </CardDescription>
                                 </div>
                             </CardHeader>

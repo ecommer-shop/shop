@@ -15,15 +15,15 @@ Estado: `[x]` hecho · `[~]` en progreso · `[ ]` pendiente
 
 ## Quick wins
 
-1. [ ] **Pase de consistencia en páginas propias** — aplicar la receta visual de Cocreativo (hero, cards rounded-xl, badges tintados) a Facturación y Plan, Métricas, Tiendas, Analíticas e Importar Excel.
+1. [ ] **Pase de consistencia en páginas propias** — aplicar la receta visual de Cocreativo (hero, cards rounded-xl, badges tintados) a Plan, Métricas, Tiendas, Analíticas e Importar Excel.
 2. [ ] **Skeletons en vez de spinners** — en las páginas propias que aún muestran spinner centrado, usar skeletons que imiten el layout final.
-3. [ ] **Iconos en el menú lateral** para entradas de plugins (Cocreativo, Facturación y Plan, Ubicaciones de stock…).
+3. [ ] **Iconos en el menú lateral** para entradas de plugins (Cocreativo, Plan, Ubicaciones de stock…).
 
 ## Efecto medio, alta visibilidad
 
 4. [ ] **Página de inicio real** — saludo con nombre del vendedor, métricas clave, acciones rápidas y teaser del roadmap. *Primer intento (plugin `home` con widgets del Insights) se revirtió el 19/7/2026: los widgets no aparecían para el usuario; queda pendiente diagnosticar (los queries y el bundle estaban OK) o rehacerlo como ruta propia en vez de widgets.*
 5. [ ] **Checklist de onboarding para vendedores nuevos** — primer producto, método de envío, primer pedido, verificados con datos reales, descartable. *Se revirtió junto con el punto 4 (el código nunca se llegó a commitear); si se retoma hay que reconstruirlo.*
-6. [x] **Estados vacíos en páginas propias** — componente compartido `src/plugins/shared/dashboard/empty-state.tsx` aplicado en widget de métricas, página de Métricas Avanzadas y planes de Facturación. Las analíticas de Tiendas ya tenían buen tratamiento. De paso: fix del `asChild` inválido en el date-picker de métricas y del variant `danger` inexistente en el badge de suscripción.
+6. [x] **Estados vacíos en páginas propias** — componente compartido `src/plugins/shared/dashboard/empty-state.tsx` aplicado en widget de métricas, página de Métricas Avanzadas y Facturación electrónica. Las analíticas de Tiendas ya tenían buen tratamiento. De paso: fix del `asChild` inválido en el date-picker de métricas y del variant `danger` inexistente en el badge de suscripción.
 
 ## Apuestas grandes
 

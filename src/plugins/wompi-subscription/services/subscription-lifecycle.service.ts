@@ -6,9 +6,10 @@ import { CustomerSubscription, SubscriptionStatus } from '../entities/customer-s
 import { Plan, BillingInterval } from '../entities/plan.entity';
 import { WompiService } from './wompi.service';
 import { PlanManagementService } from './plan-management.service';
-import { ProductLimitEnforcementService } from './product-limit-enforcement.service';
-import { FEATURE_CODES } from '../constants';
+import { SubscriptionQueryService } from './subscription-query.service';
+import { BillingEmailService } from './billing-email.service';
 import { calculateEndDate } from './utils/date-utils';
+import { BifrostService } from '../../bifrost/services/bifrost.service';
 
 @Injectable()
 export class SubscriptionLifecycleService {
@@ -17,7 +18,9 @@ export class SubscriptionLifecycleService {
         @InjectRepository(Plan) private planRepository: Repository<Plan>,
         private wompiService: WompiService,
         private planManagementService: PlanManagementService,
-        private productLimitEnforcementService: ProductLimitEnforcementService,
+        private subscriptionQueryService: SubscriptionQueryService,
+        private billingEmailService: BillingEmailService,
+        private bifrostService: BifrostService,
     ) { }
 
     async updateSubscriptionStatus(subscriptionId: number, status: SubscriptionStatus): Promise<CustomerSubscription> {
@@ -35,10 +38,22 @@ export class SubscriptionLifecycleService {
             subscription.endsAt = calculateEndDate(subscription.plan?.billingInterval || BillingInterval.MONTHLY);
         }
 
-        return this.subscriptionRepository.save(subscription);
+        const saved = await this.subscriptionRepository.save(subscription);
+
+        if (status === SubscriptionStatus.GRACE_PERIOD) {
+            const adminEmail = await this.subscriptionQueryService.getAdministratorEmail(subscription.administratorId);
+            if (adminEmail) {
+                await this.billingEmailService.sendGracePeriodNotice(
+                    adminEmail,
+                    subscription.plan?.name ?? 'Unknown',
+                );
+            }
+        }
+
+        return saved;
     }
 
-    async extendSubscription(subscriptionId: number): Promise<CustomerSubscription> {
+    async extendSubscription(subscriptionId: number, transactionId?: string): Promise<CustomerSubscription> {
         const subscription = await this.subscriptionRepository.findOne({
             where: { id: subscriptionId },
             relations: ['plan'],
@@ -47,8 +62,16 @@ export class SubscriptionLifecycleService {
             throw new Error('Subscription not found');
         }
 
+        if (transactionId && subscription.lastTransactionId === transactionId) {
+            Logger.debug(`Subscription ${subscriptionId} already extended by transaction ${transactionId}`, 'SubscriptionLifecycleService');
+            return subscription;
+        }
+
         subscription.endsAt = calculateEndDate(subscription.plan.billingInterval, subscription.endsAt ?? undefined);
         subscription.lastPaymentAt = new Date();
+        if (transactionId) {
+            subscription.lastTransactionId = transactionId;
+        }
         return this.subscriptionRepository.save(subscription);
     }
 
@@ -92,29 +115,21 @@ export class SubscriptionLifecycleService {
             await this.wompiService.deletePaymentSource(subscription.billingPaymentSourceId);
         }
 
-        const freePlan = await this.planManagementService.getFreePlan();
-        subscription.plan = freePlan;
-        subscription.planId = freePlan.id;
-        subscription.status = SubscriptionStatus.ACTIVE;
+        // Cancelación rápida: conservar el plan pagado y los días que faltaban para la
+        // próxima renovación (endsAt). Pasa a GRACE_PERIOD; el job degradará a Free
+        // (plan + bifrost) cuando se cumpla max(endsAt, graceStart + 7d).
+        subscription.status = SubscriptionStatus.GRACE_PERIOD;
         subscription.autoRenew = false;
+        subscription.gracePeriodStart = new Date();
         subscription.billingPaymentSourceId = null;
         subscription.billingCustomerEmail = null as any;
         subscription.paymentMethodType = null as any;
         subscription.paymentFlowType = null as any;
-        subscription.gracePeriodStart = null as any;
         subscription.lastPaymentAt = null as any;
 
         const saved = await this.subscriptionRepository.save(subscription);
 
-        const productLimitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_PRODUCTS);
-        const productLimit = productLimitValue ? parseInt(productLimitValue, 10) : 15;
-        await this.productLimitEnforcementService.hideExcessProducts(administratorId, productLimit);
-
-        const variantLimitValue = await this.getFeatureValue(administratorId, FEATURE_CODES.MAX_VARIATIONS);
-        const variantLimit = variantLimitValue ? parseInt(variantLimitValue, 10) : 0;
-        await this.productLimitEnforcementService.hideExcessVariants(administratorId, variantLimit);
-
-        Logger.info(`Subscription ${subscriptionId} reverted to Free plan for administrator ${administratorId}`, 'SubscriptionLifecycleService');
+        Logger.info(`Subscription ${subscriptionId} cancelled, grace until ${saved.endsAt?.toISOString()} for administrator ${administratorId}`, 'SubscriptionLifecycleService');
         return saved;
     }
 
@@ -146,27 +161,17 @@ export class SubscriptionLifecycleService {
         subscription.plan = freePlan;
         subscription.planId = freePlan.id;
         subscription.status = SubscriptionStatus.ACTIVE;
+        subscription.autoRenew = false;
+        subscription.endsAt = null;
+        subscription.gracePeriodStart = null as any;
+        subscription.lastTransactionId = null;
 
-        return this.subscriptionRepository.save(subscription);
-    }
+        const saved = await this.subscriptionRepository.save(subscription);
 
-    private async getFeatureValue(administratorId: number, featureCode: string): Promise<string | null> {
-        const subscription = await this.subscriptionRepository
-            .createQueryBuilder('sub')
-            .leftJoinAndSelect('sub.plan', 'plan')
-            .leftJoinAndSelect('plan.planFeatures', 'planFeatures')
-            .leftJoinAndSelect('planFeatures.feature', 'feature')
-            .where('sub.administratorId = :adminId', { adminId: administratorId })
-            .getOne();
+        void this.bifrostService.updateSellerVK(subscription.administratorId, freePlan.name).catch((e: any) => {
+            Logger.error(`Failed to downgrade bifrost key for administrator ${subscription.administratorId}: ${e?.message}`, 'SubscriptionLifecycleService');
+        });
 
-        if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
-            return null;
-        }
-
-        const planFeature = subscription.plan?.planFeatures?.find(
-            pf => pf.feature?.code === featureCode
-        );
-
-        return planFeature?.value || null;
+        return saved;
     }
 }
