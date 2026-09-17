@@ -50,6 +50,7 @@ import { FeedbackPlugin } from '../plugins/feedback/feedback.plugin';
 import { StorePagePlugin } from '../plugins/store-page/store-page.plugin';
 import { AutoSkuPlugin } from '../plugins/auto-sku/auto-sku.plugin';
 import { ProductVariantEnforcementPlugin } from '../plugins/product-variant-enforcement/product-variant-enforcement.plugin';
+import { ProductContentValidationPlugin } from '../plugins/product-content-validation/product-content-validation.plugin';
 import {
   DeliveryCostPlugin,
   MessengerDomisDeliveryCostStrategy,
@@ -59,7 +60,9 @@ import {
   MessengerDomisDeliveryOrderStrategy,
 } from '../plugins/delivery-order';
 import { SuperadminvisibilityPlugin } from '../plugins/superadminvisibility/superadminvisibility.plugin';
+import { BlogPlugin } from '../plugins/blog/blog.plugin';
 import { WompiSubscriptionPlugin } from '../plugins/wompi-subscription/wompi-subscription.plugin';
+import { BifrostPlugin } from '../plugins/bifrost/bifrost.plugin';
 import { DynamicShippingPricePlugin } from '../plugins/dynamic-shipping-price';
 import { MetricsApiPlugin } from '../plugins/metrics-api/metrics-api.plugin';
 import { SafeShippingPlugin } from '../plugins/safe-shipping/safe-shipping.plugin';
@@ -70,6 +73,7 @@ import { EnviaShippingPlugin } from '../plugins/envia-shipping';
 import { ChannelStockLocationPlugin } from '../plugins/channel-stock-location/channel-stock-location.plugin';
 import { SellerUxPlugin } from '../plugins/seller-ux/seller-ux.plugin';
 import { TranslationsPlugin } from '../plugins/translations/translations.plugin';
+import { PayoutPlugin } from '../plugins/payout/payout.plugin';
 
 const assetServerPlugin = AssetServerPlugin.init({
   route: ROUTE.Assets,
@@ -123,7 +127,7 @@ export const plugins: VendureConfig['plugins'] = [
   AutoSkuPlugin,
   TranslationsPlugin,
   MultivendorPlugin.init({
-    platformFeePercent: 10,
+    platformFeePercent: 7.9,
     platformFeeSKU: "FEE"
   }),
 
@@ -216,6 +220,7 @@ export const plugins: VendureConfig['plugins'] = [
   }),
 
   ProductVariantEnforcementPlugin,
+  ProductContentValidationPlugin,
   SuperadminvisibilityPlugin,
 
   StoresManagementPlugin.init({}),
@@ -228,6 +233,8 @@ export const plugins: VendureConfig['plugins'] = [
 
   SellerUxPlugin,
 
+  BlogPlugin.init({}),
+
   WompiSubscriptionPlugin.init({
     wompiApiUrl: process.env.WOMPI_API_URL || 'https://sandbox.wompi.co/v1',
     wompiApiKey: process.env.WOMPI_API_KEY || process.env.PAYMENT_PRIVATE_KEY || '',
@@ -237,6 +244,21 @@ export const plugins: VendureConfig['plugins'] = [
     currency: process.env.WOMPI_CURRENCY || 'COP',
     wompiPublicKey:
       process.env.WOMPI_PUBLIC_KEY || process.env.PAYMENT_PUBLIC_KEY || '',
+  }),
+
+PayoutPlugin.init({
+    platformFeePercent: 7.9,
+    wompiFeePercent: 6.9,
+    ecommerFeePercent: 1.0,
+    companyNit: process.env.PAYOUT_COMPANY_NIT || '',
+    companyAccount: process.env.PAYOUT_COMPANY_ACCOUNT || '',
+    companyAccountType: (process.env.PAYOUT_COMPANY_ACCOUNT_TYPE || 'AHORROS') as 'AHORROS' | 'CORRIENTE',
+  }),
+
+  BifrostPlugin.init({
+    bifrostBaseUrl: process.env.BIFROST_BASE_URL || '',
+    bifrostAdminUser: process.env.BIFROST_ADMIN_USER || '',
+    bifrostAdminPassword: process.env.BIFROST_ADMIN_PASSWORD || '',
   }),
 
   MetricsApiPlugin,

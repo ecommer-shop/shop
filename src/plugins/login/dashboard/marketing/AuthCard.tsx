@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, type KeyboardEvent } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { GoogleLoginButton } from '../components/GoogleLoginButton';
-import { SellerRegistrationForm } from '../components/SellerRegistrationForm';
+import { SellerRegistrationWizard } from '../components/SellerRegistrationWizard';
 
 const FALLBACK_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '';
 const FALLBACK_GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -13,6 +13,8 @@ function getAdminApiUrl(): string {
 }
 
 type AuthView = 'home' | 'login' | 'register';
+
+const VERIFICATION_NEEDED_RE = /no ha sido verificado|no has verificado|verificaci[oó]n de correo/i;
 
 /**
  * Tarjeta de autenticación (Google OAuth + registro de vendedor). Vive flotando
@@ -30,6 +32,7 @@ export function AuthCard() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [verificationNeeded, setVerificationNeeded] = useState(false);
 
     const redirectToRegisterFlow = useCallback(() => {
         setView('register');
@@ -221,6 +224,7 @@ export function AuthCard() {
 
             setError(null);
             setStatus('Iniciando sesión...');
+            setVerificationNeeded(false);
 
             try {
                 const response = await fetch(adminApiUrl, {
@@ -268,6 +272,7 @@ export function AuthCard() {
 
                 if (authResult?.__typename === 'InvalidCredentialsError' || authResult?.errorCode) {
                     setError(authResult.message || 'Credenciales inválidas.');
+                    setVerificationNeeded(VERIFICATION_NEEDED_RE.test(authResult.message || ''));
                     setStatus(null);
                     return;
                 }
@@ -346,6 +351,7 @@ export function AuthCard() {
                             setView('login');
                             setError(null);
                             setStatus(null);
+                            setVerificationNeeded(false);
                         }}
                     >
                         Iniciar sesión
@@ -359,7 +365,7 @@ export function AuthCard() {
                             setStatus(null);
                         }}
                     >
-                        Registrarse como Vendedor
+                        Crear mi tienda
                     </button>
                 </div>
             )}
@@ -374,6 +380,14 @@ export function AuthCard() {
                         <p className="w-full text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
                             {error}
                         </p>
+                    )}
+                    {verificationNeeded && (
+                        <a
+                            href="/dashboard/verify-email"
+                            className="w-full text-sm text-center text-primary bg-primary/10 border border-primary/30 rounded-md px-3 py-2 hover:bg-primary/20 transition-colors"
+                        >
+                            Reenviar correo de verificación
+                        </a>
                     )}
                     {status && (
                         <p className="w-full text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 text-center">
@@ -456,22 +470,36 @@ export function AuthCard() {
                     >
                         ← Volver
                     </button>
+
+                    <button
+                        className="w-full border border-border rounded-md px-5 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+                        onClick={() => {
+                            setView('register');
+                            setError(null);
+                            setStatus(null);
+                            setVerificationNeeded(false);
+                        }}
+                    >
+                        ¿No tienes una tienda? Crea tu tienda
+                    </button>
                 </div>
             )}
 
             {view === 'register' && (
-                <div className="flex flex-col items-center gap-4">
-                    {registerNotice && (
-                        <p className="w-full text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
-                            {registerNotice}
-                        </p>
-                    )}
-
-                    <SellerRegistrationForm
+                <div className="flex flex-col items-center gap-4 w-full">
+                    <SellerRegistrationWizard
                         clientId={googleClientId}
                         googleMapsApiKey={googleMapsApiKey}
-                        onRegistered={(_email, token) => handleGoogleLogin(token, true)}
                         adminApiUrl={adminApiUrl}
+                        onGoogleRegistered={(_email, token) => handleGoogleLogin(token, true)}
+                        notice={registerNotice}
+                        onSwitchToLogin={() => {
+                            setView('login');
+                            setError(null);
+                            setStatus(null);
+                            setRegisterNotice(null);
+                            setVerificationNeeded(false);
+                        }}
                     />
 
                     <button
@@ -480,30 +508,10 @@ export function AuthCard() {
                             setView('home');
                             setError(null);
                             setStatus(null);
+                            setVerificationNeeded(false);
                         }}
                     >
                         ← Volver
-                    </button>
-
-                    <div className="relative w-full">
-                        <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-border" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-background px-2 text-muted-foreground">¿Ya tienes cuenta?</span>
-                        </div>
-                    </div>
-
-                    <button
-                        className="w-full border border-border rounded-md px-5 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
-                        onClick={() => {
-                            setView('login');
-                            setError(null);
-                            setStatus(null);
-                            setRegisterNotice(null);
-                        }}
-                    >
-                        Iniciar sesión
                     </button>
                 </div>
             )}

@@ -8,7 +8,7 @@ import {
     Button,
 } from '@vendure/dashboard';
 import { CreditCard } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     gql,
     Plan,
@@ -28,6 +28,7 @@ import { ViewStep } from './ViewStep';
 import { PlansStep } from './PlansStep';
 import { PaymentStep } from './PaymentStep';
 import { SavedPaymentMethodsSection } from './components/saved-payment-methods-section';
+import { AiUsageCard } from './components/ai-usage-card';
 
 export function BillingPage() {
     const [step, setStep] = useState<'view' | 'plans' | 'payment'>('view');
@@ -44,6 +45,7 @@ export function BillingPage() {
     const [pendingResult, setPendingResult] = useState<any>(null);
     const [adminEmail, setAdminEmail] = useState<string | undefined>();
     const [usage, setUsage] = useState<{ product: { allowed: boolean; current: number; limit: number }; variation: { allowed: boolean; current: number; limit: number } } | null>(null);
+    const paymentInFlight = useRef(false);
 
     useEffect(() => {
         gql<{ activeAdministrator: { emailAddress: string } }>(ACTIVE_ADMIN_QUERY)
@@ -163,6 +165,8 @@ export function BillingPage() {
 
     const handleWidgetTokenReceived = async (token: string, sessionId?: string, deviceId?: string, cardDetails?: { lastFour?: string; brand?: string; expiryMonth?: string; expiryYear?: string; cardHolderName?: string }) => {
         if (!selectedPlan || !selectedMethod) return;
+        if (paymentInFlight.current) return;
+        paymentInFlight.current = true;
         setPaymentProcessing(true);
         try {
             const data = await gql<{ createSubscriptionWithPayment: any }>(CREATE_SUBSCRIPTION_MUTATION, {
@@ -184,6 +188,7 @@ export function BillingPage() {
         } catch (e: any) {
             setError(e.message);
         } finally {
+            paymentInFlight.current = false;
             setPaymentProcessing(false);
             setShowTokenForm(false);
         }
@@ -202,7 +207,7 @@ export function BillingPage() {
             <PageTitle>
                 <span className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5" />
-                    Facturación y Plan
+                    Plan
                 </span>
             </PageTitle>
 
@@ -254,6 +259,7 @@ export function BillingPage() {
                                 onCancel={handleCancel}
                                 actionLoading={actionLoading}
                             />
+                            <AiUsageCard />
                             <SavedPaymentMethodsSection
                                 onSubscriptionUpdated={loadData}
                             />
