@@ -185,6 +185,11 @@ export class WompiService {
             await this.apiClient.delete(`/payment_sources/${paymentSourceId}`);
             Logger.debug('Deleted payment source: ' + paymentSourceId, 'WompiService');
         } catch (error: any) {
+            const status = error?.response?.status;
+            if (status === 404) {
+                Logger.debug(`Payment source ${paymentSourceId} already deleted (404)`, 'WompiService');
+                return;
+            }
             Logger.error(`Failed to delete payment source ${paymentSourceId}: ${error.message}`, 'WompiService');
         }
     }

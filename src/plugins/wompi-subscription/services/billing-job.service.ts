@@ -2,12 +2,11 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { SubscriptionQueryService } from './subscription-query.service';
 import { SubscriptionLifecycleService } from './subscription-lifecycle.service';
 import { FeatureCheckService } from './feature-check.service';
-import { ProductLimitEnforcementService } from './product-limit-enforcement.service';
 import { WompiService } from './wompi.service';
 import { BillingEmailService } from './billing-email.service';
 import { SubscriptionStatus } from '../entities/customer-subscription.entity';
-import { FEATURE_CODES } from '../constants';
 import { JobQueue, JobQueueService, ProcessContext } from '@vendure/core';
+import { BifrostService } from '../../bifrost/services/bifrost.service';
 
 @Injectable()
 export class BillingJobService implements OnModuleInit {
@@ -18,11 +17,11 @@ export class BillingJobService implements OnModuleInit {
         private subscriptionQueryService: SubscriptionQueryService,
         private lifecycleService: SubscriptionLifecycleService,
         private featureCheckService: FeatureCheckService,
-        private limitEnforcementService: ProductLimitEnforcementService,
         private wompiService: WompiService,
         private billingEmailService: BillingEmailService,
         private jobQueueService: JobQueueService,
         private processContext: ProcessContext,
+        private bifrostService: BifrostService,
     ) { }
 
     async onModuleInit() {
@@ -149,8 +148,12 @@ export class BillingJobService implements OnModuleInit {
                 );
 
                 if (transaction.status === 'APPROVED') {
-                    await this.lifecycleService.extendSubscription(subscription.id);
+                    await this.lifecycleService.extendSubscription(subscription.id, transaction.id);
                     this.logger.log(`Successfully renewed subscription ${subscription.id}`);
+
+                    void this.bifrostService.updateSellerVK(subscription.administratorId, plan.name).catch((e: any) => {
+                        this.logger.error(`Failed to refresh bifrost key for administrator ${subscription.administratorId}: ${e?.message}`);
+                    });
 
                     if (subscription.billingCustomerEmail) {
                         await this.billingEmailService.sendRenewalSuccess(
@@ -186,13 +189,6 @@ export class BillingJobService implements OnModuleInit {
 
         for (const subscription of subscriptions) {
             try {
-                const productLimitValue = await this.featureCheckService.getFeatureValue(
-                    subscription.administratorId,
-                    FEATURE_CODES.MAX_PRODUCTS,
-                );
-                const productLimit = productLimitValue ? parseInt(productLimitValue, 10) : 15;
-
-                await this.limitEnforcementService.hideExcessProducts(subscription.administratorId, productLimit);
                 await this.lifecycleService.downgradeToFree(subscription.id);
 
                 this.logger.log(`Downgraded subscription ${subscription.id} to Free plan`);

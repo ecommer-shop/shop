@@ -124,7 +124,7 @@ export function MatiasStoresPage() {
                         cada tienda vendedora configura el <strong>Company ID (UUID)</strong>, el{' '}
                         <strong>prefijo</strong> y el <strong>número de resolución DIAN</strong>. El Company ID
                         identifica la cuenta; la resolución indica a Matias qué rango de numeración aplicar. El
-                        cupo se acredita al pagar un paquete en Planes de facturación.
+                        cupo se acredita al pagar un paquete en Facturación electrónica.
                     </p>
                 </PageBlock>
 
